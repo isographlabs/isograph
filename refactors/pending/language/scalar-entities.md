@@ -64,3 +64,50 @@ Consequences:
 - A scalar entity has no record. Following the link to a `String` takes the value, and the entity's identity is its value. Under that reading, value-keyed identity (option (b) above) is the natural identity of a client field on `String`. Path-keyed identity (option (a)) still works: the derived node attaches to the record and path that produced the value.
 - The TypeScript type of a selection with no selection set is the target entity's self type.
 - The query text is unchanged.
+
+## Per-type imports in both ASTs
+
+This is a user direction, parked like the rest of this doc.
+
+The default reader lives in the reader AST. The compiler emits it per selection, and the runtime does not look it up in a registry. A selection with no selection set carries one of three default readers:
+
+- `Value`: the selection returns the field's value.
+- `EmptyObject`: the selection returns `{}`, or `null` when the field is null.
+- `Reader`: the selection calls a reader the artifact imports, referenced through an import thunk.
+
+The compiler emits the default reader instead of a runtime registry for three reasons. A read does no lookup. The environment has no registry, so there is no registration and no registration order. The static target of a selection always decides its default reader: an abstract target is an object entity, and a GraphQL union cannot mix scalars and objects.
+
+The direction generalizes this. For every concrete type a reader AST or a normalization AST encounters, the generated artifact imports what that type needs: its default reader, a constructor or destructor, its TypeScript types, or anything else the type defines. The imports are hoisted to the top of the artifact, and the AST references each import by its local name.
+
+### What upstream hoists today
+
+Upstream collects imports per field, never per type. `ReaderImports` is a set of (field, `ImportedFileCategory`) pairs, and the three categories are `ResolverReader`, `RefetchReader`, and `Entrypoint` (`../isograph/crates/artifact_content/src/import_statements.rs:7` to `:24`). `reader_imports_to_import_statement` prints them as default imports at the top of the artifact (`import_statements.rs:27`; called at `../isograph/crates/artifact_content/src/eager_reader_artifact.rs:89` and `../isograph/crates/artifact_content/src/refetch_reader_artifact.rs:77`).
+
+The reader AST adds to that set at these sites in `../isograph/crates/artifact_content/src/reader_ast.rs`:
+
+- A client field selection imports its resolver reader and references it as `readerArtifact` (`:473` to `:490`).
+- An inline fragment and a client pointer import their resolver reader as the linked node's `condition` (`:282` to `:285`, `:301` to `:311`). A plain server linked field gets `condition: null` (`:290`).
+- An imperatively loaded field imports its refetch reader (`:508` to `:535`).
+- A `@loadable` selection imports its entrypoint (`:559` to `:564`), or with `lazyLoadArtifact` emits `loader: () => import("../../P/f/entrypoint")` with no hoisted import (`:595`).
+
+The generated file `../isograph/demos/pet-demo/src/components/__isograph/Mutation/MutualBestFriendSetterOtherSide/resolver_reader.ts:4` hoists `import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';`, and `:49` references it as `readerArtifact: Pet__fullName__resolver_reader`.
+
+Param types follow the same pattern: `ParamTypeImports` is a set of fields, printed as type imports of each field's `output_type` or `param_type` (`import_statements.rs:25`, `:46`, `:63`). The entrypoint artifact hoists its normalization AST, resolver reader, query text, and refetch query imports, or emits lazy `loader` thunks for the normalization AST and reader (`../isograph/crates/artifact_content/src/entrypoint_artifact.rs:433` to `:509`).
+
+The normalization AST imports nothing. A linked field's concrete type is a string literal (`concreteType` at `../isograph/crates/artifact_content/src/normalization_ast_text.rs:68`; generated as `concreteType: "Pet"` at `../isograph/demos/pet-demo/src/components/__isograph/Mutation/SetTagline/normalization_ast.ts:22`). A scalar's TypeScript type is a fixed JavaScript type name (`string`, `boolean`, `number` at `../isograph/crates/graphql_network_protocol/src/graphql_network_protocol.rs:35` to `:37`), printed inline with no import.
+
+### What i2 hoists today
+
+i2 hoists imports from the artifact value. `ArtifactValue` has `Import`, `ImportCallThunk`, and `NamedImport` variants (`crates/typescript_artifacts/src/module.rs:44` to `:57`). `imports_of` and `named_imports_of` collect every import in a value at any depth (`crates/typescript_artifacts/src/imports.rs:9`, `:28`). `module_of_artifact` (`crates/typescript_artifacts/src/module.rs:252`) and the reader artifact (`crates/typescript_artifacts/src/reader_artifact.rs:54` to `:63`) print them at the top of the module.
+
+The reader AST imports per field. A `ReaderSelection::Resolver` node references its field's resolver reader through `ArtifactValue::Import` (`crates/typescript_artifacts/src/reader_artifact.rs:131` to `:140`), and the reader artifact imports the user's resolver through `ArtifactValue::NamedImport` (`reader_artifact.rs:37`). The generated file `demos/pet-demo/src/__isograph/Owner/OwnerBadge/resolver_reader.ts:5` hoists `import Owner__displayName__resolver_reader from './../displayName/resolver_reader';`, and `:17` references it. The entrypoint imports its normalization AST and query text and references its resolver reader through `ImportCallThunk` (`crates/typescript_artifacts/src/entrypoint.rs:69` to `:79`; generated at `demos/pet-demo/src/__isograph/Query/HomeRoute/entrypoint.ts:4` to `:6`, `:17`).
+
+The normalization AST imports nothing. A record's entity is `{ kind: 'Known', entityName: '<name>' }`, a string (`crates/typescript_artifacts/src/normalization_ast.rs:115` to `:120`; generated at `demos/pet-demo/src/__isograph/Mutation/SetTagline/normalization_ast.ts:40` to `:41`).
+
+The one per-type import i2 has is for a custom scalar's TypeScript type: `custom_scalar_imports` emits `import type { <name> as <scalar>__custom_scalar } from "<module>"` for each custom scalar a type file uses (`crates/typescript_artifacts/src/generate_types.rs:473` to `:490`). It is a type import in the type files, not a value import referenced from an AST.
+
+### What this direction adds
+
+- Imports keyed by concrete type, not only by field: each concrete type a reader AST or normalization AST encounters contributes the imports that type defines.
+- The reader AST's default reader per selection (`Value`, `EmptyObject`, or `Reader` with an import thunk), where both upstream and i2 today have no default reader.
+- Value imports referenced from the normalization AST (for example a type's constructor or destructor), where both upstream and i2 today emit only the type's name as a string.
