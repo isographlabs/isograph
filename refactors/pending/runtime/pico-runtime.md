@@ -6,7 +6,7 @@ Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit 
 
 ## Goal
 
-Everything is graph. A server value is a source node in the store, and a resolver result is a derived node beside it in the same record container. Every edge is an object reference in both directions. A write sets a source node's value and marks the derived nodes above it, and runs no resolver. A read pulls: it brings a marked derived node up to date, and recomputes it only when an input it read changed value (short circuit). A resolver is called again on a pull only when its node is `Dirty`: a source node its last computation read was written with a value `normalize` found changed, a derived node it read recomputed to a value its `equal` rejected, the record container of a source node it read was deleted, a derived node it read was disposed, the record that owns its node was deleted (the next read creates a new node), or its last computation threw outside the resolver (open decision 3).
+Everything is graph. A server value is a source node in the store, and a resolver result is a derived node beside it in the same record container. Every edge is an object reference in both directions. A write sets a source node's value and marks the derived nodes above it, and runs no resolver. A read pulls: it brings a marked derived node up to date, and recomputes it only when an input it read changed value (short circuit). A resolver is called again on a pull only when its node is `Dirty`: a source node its last computation read was written with a value `normalize` found changed, a derived node it read recomputed to a value its `equal` rejected, the record container of a source node it read was deleted, a derived node it read was disposed, or the record that owns its node was deleted (the next read creates a new node).
 
 The engine is independent of Isograph and usable on its own by other projects (the user's goal). The engine is the graph: source nodes, derived nodes, marks, marking, pull with short circuit, dependency recording, per-node equality, and disposal. It ships as its own package with no runtime dependencies (The engine package), imports nothing from the Isograph runtime, and names no Isograph type in its API, so a project that has no store, no reader AST, and no resolver uses it with values of its own types. Everything Isograph-specific (record containers, absent records and `MISSING`, the reader walk and its hooks, resolver nodes and their keys, `normalize`'s marking, resolver result equality, record deletion, and garbage collection) lives in the Isograph runtime and calls the engine's public API (The engine and the Isograph runtime).
 
@@ -355,7 +355,7 @@ function setDependencies(
 - `compute` decrements `computingDepth` in a `finally`, so the count is restored when a computation throws and the graph accepts writes afterwards.
 - The context is a parameter built per computation; there is no ambient current computation (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`).
 
-A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so the node keeps its mark, its previous value, and its previous dependencies and dependents, and the next pull recomputes it again. A verifying ancestor keeps its mark too. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record. `resolverResultsEqual` does not throw; a field-supplied `outputEqual` (open decision 7) can. A resolver's own throw does not propagate: it is a stored value (Equality, `ResolverThrew`). What propagates is a throw of the walk outside the resolver, such as `linkAt` on a non-link (`libs/isograph-runtime/src/store.ts:74-86`). Open decision 3 covers that throw.
+A computation must not throw, and neither must an equality. A throw out of either is a broken programmer invariant, not behavior the engine supports. The engine guarantees only that such a throw does not corrupt its state: it leaves `compute` or `recompute` before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was, and `compute`'s `finally` restores `computingDepth`. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record.
 
 ## The engine and the Isograph runtime
 
@@ -509,7 +509,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - The write-during-computation guard. It is engine state, because a standalone consumer has no store: an engine `Graph` that every engine write takes (open decision 2 (f), the body), and the Isograph `Store` holds the graph beside its records.
 - Equality defaults. The engine has none: every node's `equal` is a constructor argument. `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. The previous revision typed every node of a graph with one `TValue`, `ResolverResult<unknown>` in the core. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (The graph, open decision 19).
-- A throw outside the resolver. Open decision 3 (a) stored the throw in `compute` as an Isograph `ReadErr`; under the split the catch is in `resolverComputation`, or the engine stores throws generically (open decision 3 (d)).
+- Throws. A computation must not throw (Pull). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching the resolver's own throw into `ResolverThrew` (Stored resolver results).
 - Field visibility. A consumer outside this repo can write a node's fields; open decision 21.
 - Construction. `sourceNodeAt` built a source node as an object literal; it calls `createSourceNode`, so the Isograph runtime builds no engine object by hand.
 
@@ -1360,6 +1360,8 @@ function callResolver(
 
 The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
+A resolver computation keeps the engine's contract that a computation must not throw (Pull): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
+
 Every read inside a computation goes through the walk, so none goes unrecorded. User code never receives a `ComputeContext` or the store. A resolver that reaches the store through a closure is open decision 2.
 
 The resolver store key:
@@ -1473,17 +1475,6 @@ read FP: Dirty -> recompute FP
   FP Clean
     other.1.dependents -= FP, other.2.dependents -= FP, next.1.dependents += FP, next.2.dependents += FP
 write other.2 -> other.2.dependents = {} -> nothing marked
-```
-
-A throw outside a resolver: `root.2` holds the string `"x"` under a composite key.
-
-```text
-write root.2 = "x" -> root.2.dependents = {FP, FC} -> FP Dirty, FC Dirty
-read FP: Dirty -> recompute FP: root.1, root.2 -> linkAt throws
-  FP stays Dirty with p1 and its edges (root.1, root.2, other.1, other.2, FC); FC stays Dirty; the throw propagates
-read FP: Dirty -> recompute FP -> linkAt throws again
-write root.2 = other -> FP, FC already Dirty
-read FP: Dirty -> recompute FP: root.1, root.2, other.1, other.2, FC Dirty -> recompute FC -> v1 === v1 -> FC keeps v1 -> FP Clean
 ```
 
 Record deletion of `other`:
@@ -1815,20 +1806,9 @@ Every graph mutation passes through the engine's `writeSource`, `markSourceChang
 
 Not decided between (f) and (g). The body is written under (f), as `refactors/pending/runtime/reactive-engine.md` is.
 
-### 3. A throw inside a computation outside its resolver
+### 3. A throw inside a computation outside its resolver (decided)
 
-`callResolver` catches only the resolver's throw. The walk throws on a broken store invariant: `linkAt` on a non-link under a composite key (`libs/isograph-runtime/src/store.ts:74-86`, reached from `readLinkedValue`, `read.ts:226`), and `variableValue` on a missing variable (`storeKey.ts:56-63`, reached from `read.ts:131`, `:133`). Step A's subscription read catches both as `ReadErr` (`subscribe.ts:120-131`).
-
-- (a) `resolverComputation` catches any throw of the walk and returns it as the node's value, `{ kind: 'Err', error }`; `ResolverResult` gains `ReadErr`, and the node ends `Clean` with the dependencies it recorded before the throw, so a write that repairs one of them recomputes it. The catch is in the Isograph runtime, because `ReadErr` is an Isograph type and the engine's `compute` cannot build a `TValue` from an error; the engine is unchanged. Held, not decided. Cost: an engine bug is stored as a value instead of surfacing; the node is retried only when an input it recorded changes.
-- (b) `recompute` catches the throw, restores the node `Clean` with its previous value and dependencies, and rethrows. Cost: the node holds a value no current input explains.
-- (c) Propagate, and leave the node marked with its previous value and dependencies; the next pull retries it. The body and the trace in Traces are written for (c), as the user specified the trace. Cost: every pull of the node and of every node above it throws until a write repairs the store.
-- (d) The engine stores a throw generically: `DerivedNodeState` gains a value-or-error payload (`{ kind: 'Value'; value } | { kind: 'Threw'; error }` in `CleanState` and `CheckState`), the node ends `Clean` with the dependencies recorded before the throw, `pull` rethrows a stored error, and `equal` compares two `Threw` by `===` of their errors. Cost: every state and `PreviousValue` gains a variant, and an Isograph pull still throws, so the walk's throw reaches the caller as in (c) while the node is not retried until an input changes. Every pull of the node and of every node above it rethrows the stored error until such a write.
-
-A second question arises once something pulls inside a write (`reconcileEffects`, Values with lifecycles; loaders.md's `reconcileEffectRoots`) and does not arise under (a): when `normalize` threw part-way and that pull then throws, which error the caller of the write receives.
-
-- (i) The pull's error. Cost: the response's error is lost.
-- (ii) The response's error; the pull's error is reported through `reportCallbackError`. Cost: the broken store invariant surfaces in a microtask with no stack frame of the write.
-- (iii) An `AggregateError` of both. Cost: a caller testing for the response's error no longer matches.
+Decided by the user: a computation must not throw (Pull; Stored resolver results).
 
 ### 4. A response that throws part-way
 
