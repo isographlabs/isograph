@@ -1596,7 +1596,7 @@ describe('degenerate cases', () => {
     expect(calls.node).toBe(1);
   });
 
-  test("the source's equal decides whether a write marks", () => {
+  test("the source's equals decides whether a write marks", () => {
     const calls = { strictReader: 0, structuralReader: 0 };
     const sameElements = (previous: ReadonlyArray<number>, next: ReadonlyArray<number>) =>
       previous.length === next.length && previous.every((element, index) => element === next[index]);
@@ -1664,7 +1664,7 @@ describe('degenerate cases', () => {
     expect(calls).toEqual({ nothing: 2, parent: 1 });
   });
 
-  test('the supplied equal decides cutoff for NaN', () => {
+  test('the supplied equals decides cutoff for NaN', () => {
     const calls = { strictParent: 0, objectIsParent: 0 };
     const count = createSourceNode(1, strictEqual);
     const strictNaN = createDerivedNode(
@@ -1692,7 +1692,7 @@ describe('degenerate cases', () => {
     expect(calls).toEqual({ strictParent: 2, objectIsParent: 1 });
   });
 
-  test('the supplied equal decides cutoff for 0 and -0', () => {
+  test('the supplied equals decides cutoff for 0 and -0', () => {
     const sign = createSourceNode(1, strictEqual);
     const strictZero = createDerivedNode((context) => context.readSource(sign) * 0, strictEqual);
     const objectIsZero = createDerivedNode((context) => context.readSource(sign) * 0, Object.is);
