@@ -154,6 +154,8 @@ export {
   type DerivedNode,
   disposeDerivedNode,
   markSourceChanged,
+  MISSING,
+  type Missing,
   pull,
   type SourceNode,
   sourceValue,
@@ -161,7 +163,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, and `Dependency` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
+`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `Dependency` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
 
 ### Types
 
@@ -226,14 +228,15 @@ export type CheckState<TValue> = {
  * rejected, or it was never computed, or it was disposed. */
 export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
-  readonly previous: PreviousValue<TValue>;
+  /** The value of the last computation; `MISSING` when the node was never computed or was disposed. */
+  readonly previous: TValue | Missing;
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** `NoValue`: the node was never computed, or it was disposed. */
-export type PreviousValue<TValue> =
-  | { readonly kind: 'NoValue' }
-  | { readonly kind: 'Value'; readonly value: TValue };
+/** A value that is not there: `DirtyState.previous` of a node that was never computed or was
+ * disposed, and a consumer's value for "not set" (The design, Sources). */
+export const MISSING: unique symbol = Symbol('Missing');
+export type Missing = typeof MISSING;
 
 /** One read of the node's last computation, in read order. A node read twice appears twice. */
 export type Dependency =
@@ -332,7 +335,7 @@ export function createDerivedNode<TValue>(
 
 /** The state of a node that was never computed or was disposed. */
 function neverComputed<TValue>(): DirtyState<TValue> {
-  return { mark: 'Dirty', previous: { kind: 'NoValue' }, dependencies: [] };
+  return { mark: 'Dirty', previous: MISSING, dependencies: [] };
 }
 
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
@@ -379,14 +382,14 @@ function markOneDirty(node: AnyDerivedNode): ReadonlyArray<AnyDerivedNode> {
     case 'Clean':
       slot.state = {
         mark: 'Dirty',
-        previous: { kind: 'Value', value: state.value },
+        previous: state.value,
         dependencies: state.dependencies,
       };
       return [...node.dependents];
     case 'Check':
       slot.state = {
         mark: 'Dirty',
-        previous: { kind: 'Value', value: state.value },
+        previous: state.value,
         dependencies: state.dependencies,
       };
       return [];
@@ -477,14 +480,14 @@ function recompute<TValue>(
 ): TValue {
   const computed = compute(node.computation);
   const previous = state.previous;
-  if (previous.kind === 'Value' && node.equals(previous.value, computed.value)) {
+  if (previous !== MISSING && node.equals(previous, computed.value)) {
     setDependencies(node, state.dependencies, computed.dependencies);
     stateOf(node).state = {
       mark: 'Clean',
-      value: previous.value,
+      value: previous,
       dependencies: computed.dependencies,
     };
-    return previous.value;
+    return previous;
   }
   setDependencies(node, state.dependencies, computed.dependencies);
   stateOf(node).state = {
@@ -523,6 +526,7 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
+- `recompute` calls no `equals` when the previous value is `MISSING`. A node whose last computed value is `MISSING` is then handled as a node never computed: its next recomputation marks its dependents `Dirty` whatever it returns. That costs recomputation above it, never a wrong value.
 - A computation is synchronous, and a read through its context after it returned breaks the contract. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array, so a read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) adds an entry to the stored list with no matching `dependents` edge, and a later write to what it read does not mark the node. The engine does not check it (decision 2).
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
@@ -573,7 +577,7 @@ export function disposeDerivedNode(node: AnyDerivedNode): void {
 ```
 
 - The node leaves the `dependents` set of everything it read, so no later write reaches it, and its state is reset to never computed, so its state lists no dependency that does not list it back.
-- Its value is dropped (`NoValue`), so the engine holds no reference to it.
+- Its value is dropped (`MISSING`), so the engine holds no reference to it.
 - Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their dependency lists still name the disposed node, and `node.dependents` still names them, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes them from `node.dependents`.
 - Disposing a node that was never computed or was already disposed changes nothing but marking its dependents, of which a never-computed node has none.
 
@@ -657,7 +661,7 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 ### Sources
 
-A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
+A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value that says so, the package's `MISSING` or one of its own (`undefined`, a tagged union), and readers depend on that value like any other. The Isograph runtime's store uses `MISSING`.
 
 A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
