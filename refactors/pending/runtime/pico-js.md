@@ -193,6 +193,12 @@ export type DerivedNode<TValue> = {
   equals(previous: TValue, next: TValue): boolean;
   /** Value, mark, and dependencies. Read and written only through `stateOf`. */
   readonly slot: StateSlot<TValue>;
+  /** The reads of the running computation, in read order; between computations, the previous
+   * dependency list, kept as a spare buffer. Pushed to only by `context`, cleared only by `compute`,
+   * and swapped with the state's dependency list only by `recompute`. */
+  reads: AnyNode[];
+  /** Passed to every run of `computation`. Built once by `createDerivedNode`. */
+  readonly context: ComputeContext;
   /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
@@ -214,7 +220,7 @@ export type DerivedNodeState<TValue> =
 export type CleanState<TValue> = {
   readonly mark: 'Clean';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<AnyNode>;
+  readonly dependencies: AnyNode[];
 };
 
 /** A derived node this one reads, directly or transitively, is `Dirty`. Only a `Clean` node becomes
@@ -222,7 +228,7 @@ export type CleanState<TValue> = {
 export type CheckState<TValue> = {
   readonly mark: 'Check';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<AnyNode>;
+  readonly dependencies: AnyNode[];
 };
 
 /** A source node it read was written, or a derived node it read recomputed to a value `equals`
@@ -231,7 +237,7 @@ export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
   /** The value of the last computation; `MISSING` when the node was never computed or was disposed. */
   readonly previous: Option<TValue>;
-  readonly dependencies: ReadonlyArray<AnyNode>;
+  readonly dependencies: AnyNode[];
 };
 
 /** The previous value of a node that was never computed or was disposed. Not exported from
@@ -250,8 +256,8 @@ export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
  * what it reads, and is synchronous: every read happens before it returns. */
 export type Computation<TValue> = (context: ComputeContext) => TValue;
 
-/** The reads a computation makes. Built per computation by `compute`; there is no ambient current
- * computation. Read only while its computation runs (Pull). */
+/** The reads a computation makes. Built once per derived node by `createDerivedNode`; there is no
+ * ambient current computation. Read only while its computation runs (Pull). */
 export type ComputeContext = {
   /** Records that the computation read `source`, and returns its value. */
   readSource<TValue>(source: SourceNode<TValue>): TValue;
@@ -328,13 +334,26 @@ export function createDerivedNode<TValue>(
   computation: Computation<TValue>,
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue> {
-  return {
+  const node: DerivedNode<TValue> = {
     kind: 'Derived',
     computation,
     equals,
     slot: { state: neverComputed() },
+    reads: [],
+    context: {
+      readSource: (source) => {
+        node.reads.push(source);
+        return source.value;
+      },
+      readDerived: (read) => {
+        const value = pull(read);
+        node.reads.push(read);
+        return value;
+      },
+    },
     dependents: new Set(),
   };
+  return node;
 }
 
 /** The state of a node that was never computed or was disposed. */
@@ -490,57 +509,37 @@ function recompute<TValue>(
   node: DerivedNode<TValue>,
   state: DirtyState<TValue>,
 ): TValue {
-  const computed = compute(node.computation);
+  const value = compute(node);
+  const dependencies = node.reads;
   const previous = state.previous;
-  if (previous !== MISSING && node.equals(previous, computed.value)) {
-    setDependencies(node, state.dependencies, computed.dependencies);
-    stateOf(node).state = {
-      mark: 'Clean',
-      value: previous,
-      dependencies: computed.dependencies,
-    };
+  if (previous !== MISSING && node.equals(previous, value)) {
+    setDependencies(node, state.dependencies, dependencies);
+    node.reads = state.dependencies;
+    stateOf(node).state = { mark: 'Clean', value: previous, dependencies };
     return previous;
   }
-  setDependencies(node, state.dependencies, computed.dependencies);
-  stateOf(node).state = {
-    mark: 'Clean',
-    value: computed.value,
-    dependencies: computed.dependencies,
-  };
+  setDependencies(node, state.dependencies, dependencies);
+  node.reads = state.dependencies;
+  stateOf(node).state = { mark: 'Clean', value, dependencies };
   markDirty(node.dependents);
-  return computed.value;
+  return value;
 }
 
-/** A computation's value and the reads it made, in read order. */
-type Computed<TValue> = {
-  readonly value: TValue;
-  readonly dependencies: ReadonlyArray<AnyNode>;
-};
-
-/** Runs `computation` with a context that records what it reads, in read order. */
-function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
-  const dependencies: AnyNode[] = [];
-  const value = computation({
-    readSource: (source) => {
-      dependencies.push(source);
-      return source.value;
-    },
-    readDerived: (node) => {
-      const read = pull(node);
-      dependencies.push(node);
-      return read;
-    },
-  });
-  return { value, dependencies };
+/** Runs `node`'s computation with `node.context`, which records each read in `node.reads`, in read
+ * order. */
+function compute<TValue>(node: DerivedNode<TValue>): TValue {
+  node.reads.length = 0;
+  return node.computation(node.context);
 }
 ```
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`. It is a `for` loop with `break` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
-- `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
+- `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time.
 - `recompute` calls no `equals` when the previous value is `MISSING`. A computation cannot return `MISSING`, because no module exports it, so `previous === MISSING` means only that the node was never computed or was disposed.
-- A computation is synchronous, and a read through its context after it returned breaks the contract. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array, so a read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) adds an entry to the stored list with no matching `dependents` edge, and a later write to what it read does not mark the node. The engine does not check it (decision 2).
-- The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
+- A node's dependency list and `node.reads` are two arrays the node owns, swapped by every `recompute`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone, and `context` and its two closures are built once per node. A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `neverComputed` allocates a fresh empty list for each node it resets, so no array is shared between two nodes' buffers. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A computation is synchronous, and a read through its context after it returned breaks the contract. Such a read (from an `async` computation after an `await`, or through a context the computation stored) pushes into `node.reads`, which after the swap is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. The engine does not check it (decision 2).
+- The context is a parameter built once per node. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
 `pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
@@ -702,7 +701,7 @@ Two pulls with no write between them run nothing the second time. A pull of a `C
 
 ### How dependencies are recorded
 
-`compute` builds a fresh context for each run. `readSource` appends the source node and returns its value. `readDerived` pulls the node, appends it, and returns its value. The list is in read order and keeps repeats.
+`compute` clears the node's `reads` buffer and passes the node's `context`. `readSource` appends the source node and returns its value. `readDerived` pulls the node, appends it, and returns its value. The list is in read order and keeps repeats.
 
 When the computation returns, `recompute` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
@@ -1907,7 +1906,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value` and `StateSlot.state`, which the engine writes; arrays are `ReadonlyArray`. The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `StateSlot.state`, and `DerivedNode.reads`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 
