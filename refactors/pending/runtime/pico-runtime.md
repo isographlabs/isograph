@@ -56,7 +56,7 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `Dependency`, `MISSING`, `Missing`, `Computation`, `ComputeContext`, `Computed`.
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `Dependency`, `Computation`, `ComputeContext`, `Computed`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction and plain reads: `createSourceNode`, `createDerivedNode`, `neverComputed`, `sourceValue`, `stateOf`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.

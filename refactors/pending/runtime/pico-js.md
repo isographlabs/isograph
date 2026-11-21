@@ -154,8 +154,6 @@ export {
   type DerivedNode,
   disposeDerivedNode,
   markSourceChanged,
-  MISSING,
-  type Missing,
   pull,
   type SourceNode,
   sourceValue,
@@ -163,7 +161,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `Dependency` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
+`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `Dependency` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DirtyState` that names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
 
 ### Types
 
@@ -229,14 +227,17 @@ export type CheckState<TValue> = {
 export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
   /** The value of the last computation; `MISSING` when the node was never computed or was disposed. */
-  readonly previous: TValue | Missing;
+  readonly previous: Option<TValue>;
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** A value that is not there: `DirtyState.previous` of a node that was never computed or was
- * disposed, and a consumer's value for "not set" (The design, Sources). */
-export const MISSING: unique symbol = Symbol('Missing');
-export type Missing = typeof MISSING;
+/** The previous value of a node that was never computed or was disposed. Not exported from
+ * `graph.ts`, so no consumer value is `MISSING`. */
+const MISSING: unique symbol = Symbol('Missing');
+type Missing = typeof MISSING;
+
+/** `TValue`, or `MISSING` for no value. Not exported. */
+type Option<TValue> = TValue | Missing;
 
 /** One read of the node's last computation, in read order. A node read twice appears twice. */
 export type Dependency =
@@ -526,7 +527,7 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
-- `recompute` calls no `equals` when the previous value is `MISSING`. A node whose last computed value is `MISSING` is then handled as a node never computed: its next recomputation marks its dependents `Dirty` whatever it returns. That costs recomputation above it, never a wrong value.
+- `recompute` calls no `equals` when the previous value is `MISSING`. A computation cannot return `MISSING`, because no module exports it, so `previous === MISSING` means only that the node was never computed or was disposed.
 - A computation is synchronous, and a read through its context after it returned breaks the contract. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array, so a read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) adds an entry to the stored list with no matching `dependents` edge, and a later write to what it read does not mark the node. The engine does not check it (decision 2).
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
@@ -661,7 +662,7 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 ### Sources
 
-A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value that says so, the package's `MISSING` or one of its own (`undefined`, a tagged union), and readers depend on that value like any other. The Isograph runtime's store uses `MISSING`.
+A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
 A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceChanged(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
