@@ -122,18 +122,21 @@ pub enum RecordStorage {
     Fixed(FixedRecordId),
 }
 
-/// The table of `entity` as `client` reads the schema and sources.
-#[memo]
+/// The table of `entity` as `client` reads the schema and sources. `reachable` is the set of
+/// fields whose reader artifact `project_artifacts` generates.
 pub fn entity_table<TProfile: CompilationProfile>(
     db: &IsographDb<TProfile>,
     client: ClientId,
     entity: EntityName,
+    reachable: &BTreeSet<EntityNameAndSelectableName>,
 ) -> Result<EntityTable, GenerationError>;
 ```
 
+`project_artifacts` calls it once per generated table, after it computes `reachable` (`crates/isograph_compiler/src/artifact_types.rs:782-788`). It is a plain function and not a memo: `reachable` is built inside `project_artifacts`, which is not a memo, from every entrypoint of the project.
+
 `entity_table` builds:
 
-- `fields`: every protocol selectable of `entity` as `Source(target)` (`target` from `server.target.inner_values()`, as `inlined_in_selection` reads it, `crates/isograph_compiler/src/merged_selection.rs:1325-1338`), every `field entity.f` declaration without `to` as `Derived { target: None }`, and every generated refinement field on `entity` that some reader in the project selects as `Derived { target: Some(T) }`. A client pointer is not read in v0 (open decision 1) and is not listed. Which fields are listed is open decision 4.
+- `fields`: every protocol selectable of `entity` as `Source(target)` (`target` from `server.target.inner_values()`, as `inlined_in_selection` reads it, `crates/isograph_compiler/src/merged_selection.rs:1325-1338`), every `field entity.f` declaration without `to` that is in `reachable` as `Derived { target: None }`, and every generated refinement field on `entity` that some reader in the project selects as `Derived { target: Some(T) }`. A client pointer is not read in v0 (open decision 1) and is not listed. A declared client field outside `reachable` is not listed: its reader artifact is not generated (open decision 4).
 - `shape`: `EntityShape::Leaf` is `Leaf`, `EntityShape::Composite(_)` is `Composite` (`crates/isograph_compiler/src/protocol_shape.rs:5-13`).
 - `storage`: from the entity's `CompositeShape.identity` (`protocol_shape.rs:17-20`), `Fixed` for a root entity as `complete` assigns it (`merged_selection.rs:1450-1458`), and `FromParent` for a leaf.
 
@@ -704,5 +707,5 @@ Each is one commit, in order; each is independently shippable. They are pico-run
 
 A table is per entity and shared by every reader, so whichever set it lists is the same for every reader of the project.
 
-- (a) Every protocol selectable of the entity, every client field declared on it, and every generated refinement field on it that some reader in the project selects. Held. Reason: the table is a function of the schema and the declarations, as the user specified; one rule. Cost: a table imports the reader artifact of every client field of the entity, selected or not, so a bundle that reads one field of `Pet` holds every `Pet` client field (pico-runtime.md, Follow-ups 12).
-- (b) Only the fields some reader in the project selects. Cost: a field declared and not yet selected has no entry, and adding its first selection regenerates the table; the import cost of (a) remains for every selected field.
+- (a) Every protocol selectable of the entity, every client field declared on it, and every generated refinement field on it. Cost: the reader artifact of every declared client field must be generated, reachable or not, since the table imports it; today `project_artifacts` generates a reader artifact only for a field reachable from an entrypoint (`resolver_reader: reachable.contains(..).then_some(..)`, `crates/isograph_compiler/src/artifact_types.rs:782-788`, `:847`), so (a) changes that rule and generates a reader for every declaration. A bundle that reads one field of `Pet` holds every `Pet` client field (pico-runtime.md, Follow-ups 12).
+- (b) Every protocol selectable of the entity, every generated refinement field on it, and only the client fields on it whose reader artifact is generated: the fields reachable from an entrypoint, as `project_artifacts` computes them (`crates/isograph_compiler/src/artifact_types.rs:728-731`, `:782-805`). Held. Reason: a client field no entrypoint reaches is never read at run time, and a table entry for it would import a `resolver_reader.ts` the compiler does not write, which breaks the build; the bundle holds only reachable fields. Cost: a field declared and not yet reachable has no entry, and the change that makes it reachable regenerates its entity's table.
