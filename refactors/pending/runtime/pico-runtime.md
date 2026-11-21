@@ -274,7 +274,7 @@ export function deleteRecord(store: Store, link: StoreLink): void {
 }
 ```
 
-`storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store. `deleteRecord`'s `container.derived` line arrives with `derived` in core change 8; in core change 5 the container has no `derived` map.
+`deleteRecord` calls `markSourceDirty` on every source node of the container, `MISSING` ones included, disposes every derived node the container owns, and then removes the container (open decision 31). `storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store. `deleteRecord`'s `container.derived` line arrives with `derived` in core change 8; in core change 5 the container has no `derived` map.
 
 The sweep, after (`libs/isograph-runtime/src/garbageCollection.ts:32-41`):
 
@@ -1975,12 +1975,6 @@ A bare selection of a scalar reads its record's `__value`; a bare selection of a
 
 Moot under open decision 2: the engine throws no error of its own, so `callResolver` has no class to rethrow. `callResolver` catches every throw of the resolver into `ResolverThrew` (Stored resolver results).
 
-### 31. How `deleteRecord` marks the readers of a deleted record's source nodes
+### 31. How `deleteRecord` marks the readers of a deleted record's source nodes (decided)
 
-`deleteRecord` removes a container, so a reader of one of its source nodes must recompute, or it keeps depending on a source node the store no longer holds and never sees a later write of that key into a new container. Today `deleteRecord` calls `markSourceDirty(source)` for each source node (The store). Replacing it with `writeSource(source, MISSING)` marks nothing for a source that already holds `MISSING`, because `isUnchanged` answers `previous === next` when either side is `MISSING`: a reader of a missing key on a deleted record (an `Absent` container, open decision 9) stays `Clean` on the removed node and returns `MissingData` after `normalize` writes the key.
-
-- (a) Keep `markSourceDirty`, which marks without comparing. Cost: a second engine write function.
-- (b) `isUnchanged` answers changed whenever the written value is `MISSING`, and `deleteRecord` calls `writeSource(source, MISSING)` for each source node; then the engine drops `markSourceDirty`. Only `deleteRecord` writes `MISSING`, because `writeValue` takes a `StoreValue`. This option is held and not decided. Reason: one engine write function, and an equality that answers changed for indistinguishable values costs recomputation, never a wrong value (pico-js.md, Cutoff). Cost: each deletion recomputes the readers of the record's missing keys once; each recomputes to an equal `MissingData` and cuts off.
-- (c) A `DELETED` sentinel that `deleteRecord` writes and `isUnchanged` rejects against every value. Cost: a third value in the source node type that no reader observes after the container is removed.
-
-`markSourceDirty` stays in pico-js.md and in `deleteRecord` until this is decided.
+Decided by the user: (a). `deleteRecord` calls `markSourceDirty(source)` on each source node of the container, `MISSING` ones included, which marks without comparing (The store). A reader of a deleted record's source node must recompute, or it keeps depending on a source node the store no longer holds and never sees a later write of that key into a new container. `writeSource(source, MISSING)` would mark nothing for a source that already holds `MISSING`, because `isUnchanged` answers `previous === next` when either side is `MISSING`, so a reader of a missing key on a deleted record would stay `Clean` on the removed node. `isUnchanged` keeps that rule.
