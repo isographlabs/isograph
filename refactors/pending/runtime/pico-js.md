@@ -161,7 +161,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `Dependency` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DirtyState` that names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
+`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DirtyState` that names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
 
 ### Types
 
@@ -169,6 +169,8 @@ export {
 // from libs/isograph-pico-js/src/graph.ts
 /** A value set from outside the graph, and the derived nodes whose last computation read it. */
 export type SourceNode<TValue> = {
+  /** Tells a source from a derived node in a dependency list. */
+  readonly kind: 'Source';
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
   /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
@@ -181,6 +183,8 @@ export type SourceNode<TValue> = {
 
 /** A computation's value, kept until an input it read changes. */
 export type DerivedNode<TValue> = {
+  /** Tells a derived node from a source in a dependency list. */
+  readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
   /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
    * node's previous value and the value its computation just returned. Must not write a source or
@@ -193,8 +197,7 @@ export type DerivedNode<TValue> = {
   readonly dependents: Set<AnyDerivedNode>;
 };
 
-/** A derived node of any value type: the element of every `dependents` set and of a `Derived`
- * dependency. */
+/** A derived node of any value type: the element of every `dependents` set and a member of `AnyNode`. */
 export type AnyDerivedNode = DerivedNode<unknown>;
 
 /** The holder of one derived node's state. A separate object so that a later layered graph gives a
@@ -211,7 +214,7 @@ export type DerivedNodeState<TValue> =
 export type CleanState<TValue> = {
   readonly mark: 'Clean';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
+  readonly dependencies: ReadonlyArray<AnyNode>;
 };
 
 /** A derived node this one reads, directly or transitively, is `Dirty`. Only a `Clean` node becomes
@@ -219,7 +222,7 @@ export type CleanState<TValue> = {
 export type CheckState<TValue> = {
   readonly mark: 'Check';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
+  readonly dependencies: ReadonlyArray<AnyNode>;
 };
 
 /** A source node it read was written, or a derived node it read recomputed to a value `equals`
@@ -228,7 +231,7 @@ export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
   /** The value of the last computation; `MISSING` when the node was never computed or was disposed. */
   readonly previous: Option<TValue>;
-  readonly dependencies: ReadonlyArray<Dependency>;
+  readonly dependencies: ReadonlyArray<AnyNode>;
 };
 
 /** The previous value of a node that was never computed or was disposed. Not exported from
@@ -239,10 +242,9 @@ type Missing = typeof MISSING;
 /** `TValue`, or `MISSING` for no value. Not exported. */
 type Option<TValue> = TValue | Missing;
 
-/** One read of the node's last computation, in read order. A node read twice appears twice. */
-export type Dependency =
-  | { readonly kind: 'Source'; readonly source: SourceNode<unknown> }
-  | { readonly kind: 'Derived'; readonly node: AnyDerivedNode };
+/** A node of any kind and value type: the element of a dependency list, which holds each node the
+ * last computation read, in read order. A node read twice appears twice. */
+export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
 
 /** A derived node's computation. It reads every node through `context`, is a pure function of
  * what it reads, and is synchronous: every read happens before it returns. */
@@ -319,7 +321,7 @@ export function createSourceNode<TValue>(
   value: TValue,
   equals: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue> {
-  return { value, equals, dependents: new Set() };
+  return { kind: 'Source', value, equals, dependents: new Set() };
 }
 
 export function createDerivedNode<TValue>(
@@ -327,6 +329,7 @@ export function createDerivedNode<TValue>(
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue> {
   return {
+    kind: 'Derived',
     computation,
     equals,
     slot: { state: neverComputed() },
@@ -442,7 +445,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   }
 }
 
-/** Pulls each `Derived` dependency in recorded order until one recomputes to a value its `equals`
+/** Pulls each dependency whose `kind` is `Derived`, in recorded order, until one recomputes to a value its `equals`
  * rejects, which marks `node` `Dirty`; then recomputes `node`. Otherwise `node` ends `Clean`
  * without running. */
 function verify<TValue>(
@@ -451,7 +454,7 @@ function verify<TValue>(
 ): TValue {
   state.dependencies.some((dependency) => {
     if (dependency.kind === 'Derived') {
-      pull(dependency.node);
+      pull(dependency);
     }
     return stateOf(node).state.mark === 'Dirty';
   });
@@ -503,20 +506,20 @@ function recompute<TValue>(
 /** A computation's value and the reads it made, in read order. */
 type Computed<TValue> = {
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
+  readonly dependencies: ReadonlyArray<AnyNode>;
 };
 
 /** Runs `computation` with a context that records what it reads, in read order. */
 function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
-  const dependencies: Dependency[] = [];
+  const dependencies: AnyNode[] = [];
   const value = computation({
     readSource: (source) => {
-      dependencies.push({ kind: 'Source', source });
+      dependencies.push(source);
       return source.value;
     },
     readDerived: (node) => {
       const read = pull(node);
-      dependencies.push({ kind: 'Derived', node });
+      dependencies.push(node);
       return read;
     },
   });
@@ -541,25 +544,15 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
  * The only writer of any `dependents` set. Called by `recompute` and `disposeDerivedNode`. */
 function setDependencies(
   node: AnyDerivedNode,
-  previous: ReadonlyArray<Dependency>,
-  next: ReadonlyArray<Dependency>,
+  previous: ReadonlyArray<AnyNode>,
+  next: ReadonlyArray<AnyNode>,
 ): void {
-  previous.forEach((dependency) => dependentsOf(dependency).delete(node));
-  next.forEach((dependency) => dependentsOf(dependency).add(node));
-}
-
-/** The `dependents` set of the node `dependency` names. */
-function dependentsOf(dependency: Dependency): Set<AnyDerivedNode> {
-  switch (dependency.kind) {
-    case 'Source':
-      return dependency.source.dependents;
-    case 'Derived':
-      return dependency.node.dependents;
-  }
+  previous.forEach((dependency) => dependency.dependents.delete(node));
+  next.forEach((dependency) => dependency.dependents.add(node));
 }
 ```
 
-Removing every old edge and then adding every new one is `O(old + new)`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
+A dependency list holds the nodes themselves, and each node carries its own `kind`, one field per node and nothing per edge, so `readSource` and `readDerived` allocate nothing per read: each pushes the node it read. Removing every old edge and then adding every new one is `O(old + new)`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
 
 The dependency list keeps a node read twice as two entries. pico drops a read equal to the last one recorded (`TrackedDependencies::push`, `crates/pico/src/dependency.rs:33-41`). The engine does not: `Set.add` makes the edge idempotent, and the second verify step on that node finds it `Clean` and returns at once, so dropping repeats would cost a comparison per read to save a step that costs one.
 
@@ -680,7 +673,7 @@ Two pulls with no write between them run nothing the second time. A pull of a `C
 
 ### How dependencies are recorded
 
-`compute` builds a fresh context for each run. `readSource` appends a `Source` dependency and returns the value. `readDerived` pulls the node, appends a `Derived` dependency, and returns its value. The list is in read order and keeps repeats.
+`compute` builds a fresh context for each run. `readSource` appends the source node and returns its value. `readDerived` pulls the node, appends it, and returns its value. The list is in read order and keeps repeats.
 
 When the computation returns, `recompute` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
