@@ -441,6 +441,125 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - `check`, `garbageCollect` (mark and sweep), `test/fixtures.ts`'s `storeFrom`, the subscription re-read (`readSubscription`, `storedResultHooks`, `callSubscriptions`, `subscriptionResultsAreEqual`).
 - Later: `retention.ts` (`Retention`, `retainEntrypoint`, `dispose`, `Entrypoint`), the fetch decision, subscriptions as derived nodes, React's `useSyncExternalStore` hook, and `normalize` writing into a layer.
 
+## The engine package
+
+The engine is a workspace library beside the Isograph runtime, at `libs/<engine directory>` (open decision 18), covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s, without the Babel plugin, which only the runtime's fixtures need.
+
+```text
+libs/<engine directory>/
+  package.json
+  tsconfig.json            references tsconfig.package.json and tsconfig.test.json
+  tsconfig.package.json    extends ../../tsconfig.build.json, includes src/**/*.ts
+  tsconfig.test.json       extends ../../tsconfig.build.json, includes test/**/*.ts
+  tsdown.config.ts         merges ../../tsdown.config.ts, dts.build true
+  vitest.config.ts         typecheck enabled with tsconfig.test.json
+  src/graph.ts
+  src/index.ts
+  test/graph.test.ts
+```
+
+```json
+// from libs/<engine directory>/package.json
+{
+  "name": "<engine package>",
+  "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
+  "private": true,
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "license": "MIT",
+  "scripts": {
+    "compile-libs": "tsdown",
+    "watch-libs": "tsdown --watch",
+    "test": "vitest run",
+    "test-watch": "vitest watch",
+    "coverage": "vitest run --coverage",
+    "prepack": "pnpm run test && pnpm run compile-libs",
+    "tsc": "tsc -b",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "vitest": "^2.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isographlabs/isograph.git",
+    "directory": "libs/<engine directory>"
+  },
+  "sideEffects": false,
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  }
+}
+```
+
+Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned.
+
+```ts
+// from libs/<engine directory>/tsconfig.test.json
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "noUnusedLocals": false
+  },
+  "include": ["test/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
+}
+```
+
+```ts
+// from libs/<engine directory>/vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: { typecheck: { enabled: true, tsconfig: './tsconfig.test.json' } },
+});
+```
+
+`tsconfig.json`, `tsconfig.package.json`, and `tsdown.config.ts` are the runtime's, byte for byte. Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin.
+
+The Isograph runtime depends on the engine:
+
+```json
+// from libs/isograph-runtime/package.json
+  "dependencies": {
+    "@isograph/disposable-types": "workspace:*",
+    "<engine package>": "workspace:*"
+  },
+```
+
+The runtime resolves the engine through `node_modules` to its `dist`, as it resolves `@isograph/disposable-types`: `tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps to a directory without the `isograph-` prefix, which does not exist. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked.
+
+`.pre-commit-config.yaml` gains two hooks, and the runtime's three hooks match the engine's directory:
+
+```yaml
+# from .pre-commit-config.yaml
+      - id: engine-test
+        name: engine test
+        entry: pnpm --filter <engine package> test
+        language: system
+        files: '^libs/<engine directory>/'
+        pass_filenames: false
+      - id: engine-typecheck
+        name: engine typecheck
+        entry: pnpm --filter <engine package> tsc
+        language: system
+        files: '^(libs/<engine directory>/|tsconfig\.build\.json$)'
+        pass_filenames: false
+      # runtime-dependencies-build and runtime-typecheck, files:
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/<engine directory>/|tsconfig\.build\.json$)'
+      # runtime-test, files:
+        files: '^libs/(isograph-runtime|isograph-disposable-types|<engine directory>)/'
+```
+
+The engine's tests are `test/graph.test.ts`: the use without Isograph (The engine and the Isograph runtime), and the traces of Traces rebuilt over plain source nodes: a `Check` node that ends `Clean` without running, a `Check` node whose derived dependency changed, a dependency set that changes between computations (the link retarget), a throw out of a computation that leaves the node's mark and edges, and disposal marking the disposed node's dependents. Each counts computation calls and asserts values with `toBe`.
+
 ## The store
 
 The store is the set of source nodes. A record is a container that holds its source nodes by store key and the derived nodes it owns by resolver store key.
