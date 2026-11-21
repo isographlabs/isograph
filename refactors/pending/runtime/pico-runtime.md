@@ -33,16 +33,15 @@ The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single spe
 
 pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (pico-js.md, Reverse edges, no epochs).
 
-The engine has no graph object and no write-during-computation check (pico-js.md decision 2; this doc's open decision 2, decided). Every engine call takes only the node it acts on: `createSourceNode(value, equals)`, `createDerivedNode(computation, equals)`, `writeSource(source, value)`, `markSourceDirty(source)`, `pull(node)`, `disposeDerivedNode(node)`.
+The engine has no graph object and no write-during-computation check (pico-js.md decision 2; this doc's open decision 2, decided). Every engine call takes only the node it acts on: `createSourceNode(value, equals)`, `createDerivedNode(computation, equals)`, `writeSource(source, value)`, `markSourceDirty(source)`, `readSource(reader, source)`, `readDerived(reader, node)`, `pull(node)`, `disposeDerivedNode(node)`. An untracked read of a source is `source.value`.
 
 ### The engine and the Isograph runtime
 
-The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function reads or writes a node's `value`, `dependents`, `precalculated`, or `reads`, and no Isograph function calls an engine function the index does not export (`stateOf`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `precalculated`, or `reads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`stateOf`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
 
 The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, The public API):
 
 - `createSourceNode`: `sourceNodeAt`, with `MISSING` and `isUnchanged(key)` (The store).
-- `sourceValue`: `storeValue` and `storeSnapshot` (The store).
 - `writeSource`: `normalize`'s `writeValue` (`normalize` writes source nodes), and `storeFrom` in `test/fixtures.ts`.
 - `markSourceDirty`: `deleteRecord`, for each source node of the deleted container (The store).
 - `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, identical)` (Stored resolver results).
@@ -59,12 +58,12 @@ Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The imp
 
 - Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
-- Construction and plain reads: `createSourceNode`, `createDerivedNode`, `sourceValue`, `stateOf`.
+- Construction and plain reads: `createSourceNode`, `createDerivedNode`, `stateOf`.
 - Mark: `writeSource`, `markSourceDirty`, `markDirty`, `markOneDirty`, `markCheck`.
 - Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The reader).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
-- Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
+- Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
 
@@ -79,7 +78,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 ### What resists the split
 
-- `stateOf` and layering. Later: a DAG of graphs gives a node one slot per world by changing `stateOf`, and a source one value per world. That holds across the package boundary only if the Isograph runtime never reads a node's fields, so the runtime reads a source through `readSource` and `sourceValue` and never calls `stateOf`, which the package does not export. Layers are then the engine's (Later: a DAG of graphs).
+- `stateOf` and layering. Later: a DAG of graphs gives a node one slot per world by changing `stateOf`, and a source one value per world. The runtime never calls `stateOf`, which the package does not export, so a derived node's per-world slot is the engine's alone. A source's per-world value is not: `storeValue` and `presentValues` read `source.value`, which is the base value, so layering changes those two reads as well as `readSource` (Later: a DAG of graphs).
 - Equality defaults. The engine has none: every node's `equals` is a constructor argument (pico-js.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (pico-js.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
 - Throws. A computation must not throw (pico-js.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching every throw of the resolver into `ResolverThrew` (Stored resolver results, open decision 30).
@@ -117,7 +116,7 @@ The store is the set of source nodes. A record is a container that holds its sou
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-import { createSourceNode, type DerivedNode, type SourceNode, sourceValue } from '@isograph/pico-js';
+import { createSourceNode, type DerivedNode, type SourceNode } from '@isograph/pico-js';
 
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
 
@@ -154,7 +153,7 @@ export type StoreRecord = Map<StoreKey, StoreValue>;
 
 `Store` is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `isMissing` narrows with no cast. `MISSING` is internal to `store.ts`: `store.ts` holds every write of it (`sourceNodeAt`'s new source node, `storeValue`, and `deleteRecord` under open decision 31 (b)) and every comparison with it (`isUnchanged`, `storeSnapshot`, `isMissing`); every other module tests a value with `isMissing` and names only the type `Missing`; `normalize` writes only present values and never names it. The package index exports none of `MISSING`, `Missing`, and `isMissing`, and no public type names `Missing`: a public result reports an absent key as `MissingData` with its record and key, and `storeSnapshot` omits a key whose source holds `MISSING` (`PlainStore` has no representation of an absent key).
 
-There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` holds every node of the graph. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store, and its callers still pass `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests). The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `readSource(reader, ..)`; no store function reads or writes a node's fields.
+There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` holds every node of the graph. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store, and its callers still pass `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests). The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value as `source.value` or with `readSource(reader, ..)`; no store function writes a node's fields or reads a field other than a source's `value`.
 
 ### Accessors
 
@@ -226,7 +225,7 @@ function compositeUnchanged(stored: StoreValue, written: StoreValue): boolean {
 /** `storeValue` inserts nothing and records no dependency. */
 export function storeValue(store: Store, link: StoreLink, key: StoreKey): StoreValue | Missing {
   const source = recordContainer(store, link)?.sources.get(key);
-  return source === undefined ? MISSING : sourceValue(source);
+  return source === undefined ? MISSING : source.value;
 }
 
 export function recordPresence(store: Store, link: StoreLink): RecordPresence {
@@ -251,7 +250,7 @@ export function storeSnapshot(store: Store): PlainStore {
 function presentValues(container: RecordContainer): Map<StoreKey, StoreValue> {
   return new Map(
     [...container.sources].flatMap(([key, source]): ReadonlyArray<[StoreKey, StoreValue]> => {
-      const value = sourceValue(source);
+      const value = source.value;
       return value === MISSING ? [] : [[key, value]];
     }),
   );
@@ -1451,7 +1450,7 @@ Each is one commit, in order; each is independently shippable.
    Tests and fixtures. Every `storeOf(..)` that holds a leaf lists it as a link under the parent's key plus the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), and `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated with `Leaf` targets. New tests: in `test/normalize.test.ts`, "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", and "a custom scalar's JSON array below its list depth is one __value"; in `test/check.test.ts`, "a missing __value is missing its scalar record"; in `test/garbageCollection.test.ts`, "a scalar record no retained query reaches is deleted".
 
 4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/isograph-pico-js` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
-5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equals`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceDirty` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceDirty` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
+5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equals`, `storeValue` and `storeSnapshot` read `source.value`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceDirty` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceDirty` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 
    Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
 
@@ -1708,9 +1707,9 @@ A computation is pure and runs on every pull, including a pull a discarded rende
 
 Not part of the core: optimistic layers and forks. The base graph is the core's store. Layer graphs sit above it, each with one parent, and form a tree. A world is a path from the base to a layer.
 
-- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `value` or `precalculated` directly (The engine and the Isograph runtime), so giving `readSource`, `sourceValue`, and `stateOf` a world changes the engine alone. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
+- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `precalculated` (The engine and the Isograph runtime), so giving `readSource` and `stateOf` a world is the engine's change. The runtime's untracked reads of `source.value` in `storeValue` and `presentValues` read the base value, so they change too. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
 - Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `NodeState` for a derived node).
-- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup; no other code changes (pico-js.md, Construction and plain reads).
+- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup for a derived node (pico-js.md, Construction and plain reads), and `readSource` and the runtime's `source.value` reads are that lookup for a source.
 - Placement. A node computed in `W` is stored in the deepest layer on `W`'s path that supplied any of its inputs, a source value or a derived input's slot. That is usually lower than `W`'s top: a node that read nothing the top layer overrides is stored in the base, shared with every world. Valid because the value is a function of its inputs: every world whose path holds that layer reads the same value for each input, unless a deeper layer on its path overrides one, and that override's write marked the node in the deeper layer (next bullet), whose shadow state that world reads first.
 - Writes mark in the layer where they happen. A write in layer `L` gives each node above the written source a marked shadow state in `L` (`Dirty` for direct dependents, `Check` above), copied from the state its worlds through `L` read. A base write marks the base states and also the shadow states that descendant layers hold for those nodes.
 - Reverse edges are the union across layers: a node is in a source's or node's `dependents` while any layer's slot lists that dependency. Each layer records its contributions, so discarding it removes them.
@@ -1942,7 +1941,7 @@ This deviates from AGENTS.md's "Never rely on discipline what we can enforce wit
 
 ### 25. An untracked read inside a computation (decided)
 
-`refactors/pending/runtime/pico-js.md` open decision 10. Decided by the user: allowed. `sourceValue` and a `pull` called inside a computation read without recording a dependency. The Isograph layer makes no untracked read inside a computation: `resolverComputation` reads only through `contextHooks`.
+`refactors/pending/runtime/pico-js.md` open decision 10. Decided by the user: allowed. A read of `source.value` and a `pull` called inside a computation read without recording a dependency. The Isograph layer makes no untracked read inside a computation: `resolverComputation` reads only through `contextHooks`.
 
 ### 26. Whether the engine package ships before its first caller (decided)
 

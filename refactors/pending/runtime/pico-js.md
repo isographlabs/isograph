@@ -158,7 +158,6 @@ export {
   readDerived,
   readSource,
   type SourceNode,
-  sourceValue,
   writeSource,
 } from './graph';
 ```
@@ -233,9 +232,6 @@ export function createDerivedNode<TValue>(
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
 
-/** Inside a computation, `sourceValue` records no dependency (decision 10). */
-export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
-
 export function readSource<TValue>(reader: AnyDerivedNode, source: SourceNode<TValue>): TValue;
 
 export function readDerived<TValue>(reader: AnyDerivedNode, node: DerivedNode<TValue>): TValue;
@@ -253,11 +249,11 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(node: AnyDerivedNode): void;
 ```
 
-In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` and `sourceValue` in `store.ts`; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
-`graph.ts` is the whole engine. Every function below is in it. No code outside `graph.ts` reads or writes a node's `value`, `dependents`, `precalculated`, or `reads`, or calls an unexported function.
+`graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`, reads or writes its `dependents`, `precalculated`, or `reads`, or calls an unexported function.
 
 ### Construction and plain reads
 
@@ -282,10 +278,6 @@ export function createDerivedNode<TValue>(
     reads: [],
     dependents: new Set(),
   };
-}
-
-export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
-  return source.value;
 }
 
 /** Every read and write of `precalculated` goes through `stateOf`, so that a layered graph changes this function alone. */
@@ -587,9 +579,9 @@ pull(banner); // 'Free shipping' (runs all three)
 
 ## Rules
 
-- A computation reads nodes only through the `reader` it receives: `readSource(reader, source)` and `readDerived(reader, node)`. A read through a closure, `sourceValue`, or `pull` is not recorded, and the node will not recompute when that value changes.
+- A computation reads nodes only through the `reader` it receives: `readSource(reader, source)` and `readDerived(reader, node)`. A read through a closure, `source.value`, or `pull` is not recorded, and the node will not recompute when that value changes.
 - The `reader` is the node being computed. A computation reads no field of it and passes it only to `readSource` and `readDerived`, and only while it runs. The engine does not check this: a read through a reader after its computation returned, such as a read after an `await`, is lost, and the node does not recompute when that value changes.
-- A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
+- A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A read of `source.value` or a `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceDirty` marks a source whose value object you changed in place.
@@ -611,7 +603,7 @@ A source node is an input fact: a value the graph does not compute. The consumer
 
 A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
-Code outside a computation reads a source with `sourceValue(source)`, which records nothing. A computation reads it with `readSource(reader, source)`, passing the node it received.
+Code outside a computation reads a source as `source.value`, which records nothing. A computation reads it with `readSource(reader, source)`, passing the node it received.
 
 A source is not collected by the engine. It lives as long as the consumer and the dependency lists of its readers hold it.
 
@@ -629,7 +621,7 @@ Two pulls with no write between them run nothing the second time. A pull of a `C
 
 When the computation returns, `recompute` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
-Only `readSource` and `readDerived` record. A computation that reads a source through `sourceValue`, or a derived node through `pull`, records nothing: both are untracked reads, allowed inside a computation (decision 10). pico has the same hole and the same rule: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`; pico.md, Memo).
+Only `readSource` and `readDerived` record. A computation that reads a source as `source.value`, or a derived node through `pull`, records nothing: both are untracked reads, allowed inside a computation (decision 10). pico has the same hole and the same rule: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`; pico.md, Memo).
 
 ### Verification
 
@@ -662,7 +654,7 @@ p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
 write s again -> c already Dirty -> stop -> p is never marked
 ```
 
-An equality runs while the engine is between two writes of its own state: `writeSource` calls `source.equals` before it sets the value, and `recompute` calls `node.equals` after the computation returned and before `setDependencies`. A write from inside either leaves a node `Clean` over a changed input in the same way. Reads are not restricted: a `sourceValue` or `pull` inside a computation is an untracked read, which records no dependency of the running computation and writes no source (decision 10).
+An equality runs while the engine is between two writes of its own state: `writeSource` calls `source.equals` before it sets the value, and `recompute` calls `node.equals` after the computation returned and before `setDependencies`. A write from inside either leaves a node `Clean` over a changed input in the same way. Reads are not restricted: a read of `source.value` or a `pull` inside a computation is an untracked read, which records no dependency of the running computation and writes no source (decision 10).
 
 ## Comparison with the Rust pico crate
 
@@ -748,8 +740,8 @@ Top-level files:
 - `missing_key.rs:133` `set_reruns_only_readers_of_that_key`: does not port, for the same reason; the remainder is the ports of `basic` and `unrelated_source_changes`.
 - `missing_key.rs:164` `same_missing_key_twice_in_one_memo`: ports as "a computation that reads one source twice". Delta: the source holds a value; the port adds a second write to assert that the edge survives the duplicate read.
 - `missing_key.rs:192` `parent_of_missing_reader_reruns`: does not port. It pins that an absent key's dependency propagates to a parent memo; with absence as a value, the remainder is the port of `multi_function_chain`.
-- `missing_key.rs:212` `read_outside_a_memo_then_set`: ports as "sourceValue outside a computation, then a reader created after the write".
-- `missing_key.rs:233` `read_outside_a_memo_after_absent_node_exists`: ports as "sourceValue outside a computation leaves the readers' dependency".
+- `missing_key.rs:212` `read_outside_a_memo_then_set`: ports as "source.value outside a computation, then a reader created after the write".
+- `missing_key.rs:233` `read_outside_a_memo_after_absent_node_exists`: ports as "source.value outside a computation leaves the readers' dependency".
 - `remove.rs:52` `present_then_removed_reruns_and_returns_none`, `:77` `removed_then_set_reruns`, `:102` `removed_and_still_removed_does_not_rerun`, `:128` `remove_of_missing_key_does_not_rerun`, `:145` `remove_of_never_read_key_then_read`: do not port. They pin `remove_singleton`'s epoch rules (a remove of a present key advances the epoch, a remove of an absent key does not). The engine has no removal; a consumer writes its absence value, which is a write like any other (the ports of `basic` and `overriding_same_source`).
 - `try_get.rs:43` `set_of_never_set_key_reruns_reader`, `:64` `unrelated_set_does_not_rerun_reader_of_never_set_key`, `:83` `id_for_key_matches_the_id_set_returns`: do not port. They pin `try_get` of a never-set key and `id_for_key`; the engine has no keys.
 - `garbage_collection.rs:46` `collected_reader_of_missing_key_sees_set`: ports as `disposal.test.ts` "a disposed node recomputes on its next pull and sees writes made after disposal". Delta: pico's LRU collects the reader; the test disposes it.
@@ -765,7 +757,7 @@ Top-level files:
 
 `tracking_field`:
 
-- `correctness.rs:17` `tracking_field_correctness`: ports as `dependencies.test.ts` "sourceValue inside a computation records nothing". Delta: pico's untracked iteration of a `#[tracked]` map becomes `sourceValue` inside a computation, which is the engine's untracked read (decision 10), and pico's tracked iteration becomes `readSource`.
+- `correctness.rs:17` `tracking_field_correctness`: ports as `dependencies.test.ts` "source.value inside a computation records nothing". Delta: pico's untracked iteration of a `#[tracked]` map becomes a read of `source.value` inside a computation, which is the engine's untracked read (decision 10), and pico's tracked iteration becomes `readSource`.
 - `efficiency.rs:23` `untracked_efficiency`, `:57` `tracked_inefficiency`: do not port. They pin the `#[tracked]` counter's granularity (a tracked read depends on the whole map); the engine has no tracked map, and a consumer that wants per-key granularity holds one source per key, which the port of `unrelated_source_changes` covers.
 - `never_written.rs:54` `iteration_before_first_write_then_insert_reruns`, `:79` `untracked_miss_then_tracked_then_insert_reruns`, `:91` `first_tracked_write_writes_counter_zero`: do not port. They pin the tracked counter's never-written singleton; the engine has neither.
 
@@ -1173,7 +1165,6 @@ import {
   pull,
   readDerived,
   readSource,
-  sourceValue,
   writeSource,
 } from '../src';
 
@@ -1285,10 +1276,10 @@ describe('recorded dependencies', () => {
   });
 
   // crates/pico/tests/absent_source/missing_key.rs:212
-  test('sourceValue outside a computation, then a reader created after the write', () => {
+  test('source.value outside a computation, then a reader created after the write', () => {
     const calls = { name: 0 };
     const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
-    expect(sourceValue(config)).toBe(MISSING);
+    expect(config.value).toBe(MISSING);
 
     writeSource(config, 'a');
     const name = createDerivedNode((reader) => {
@@ -1298,14 +1289,14 @@ describe('recorded dependencies', () => {
     }, strictEqual);
     expect(pull(name)).toBe('a');
     expect(calls.name).toBe(1);
-    expect(sourceValue(config)).toBe('a');
+    expect(config.value).toBe('a');
   });
 
   // crates/pico/tests/absent_source/missing_key.rs:233
-  test('sourceValue outside a computation leaves the readers’ dependency', () => {
+  test('source.value outside a computation leaves the readers’ dependency', () => {
     // config and name are the nodes of the previous test.
     expect(pull(name)).toBe(null);
-    expect(sourceValue(config)).toBe(MISSING);
+    expect(config.value).toBe(MISSING);
 
     writeSource(config, 'a');
     expect(pull(name)).toBe('a');
@@ -1313,9 +1304,9 @@ describe('recorded dependencies', () => {
   });
 
   // crates/pico/tests/tracking_field/correctness.rs:17
-  test('sourceValue inside a computation records nothing', () => {
+  test('source.value inside a computation records nothing', () => {
     const items = createSourceNode<ReadonlyArray<string>>(['asdf'], strictEqual);
-    const untrackedCount = createDerivedNode(() => sourceValue(items).length, strictEqual);
+    const untrackedCount = createDerivedNode(() => items.value.length, strictEqual);
     const trackedCount = createDerivedNode(
       (reader) => readSource(reader, items).length,
       strictEqual,
@@ -1549,7 +1540,6 @@ import {
   pull,
   readDerived,
   readSource,
-  sourceValue,
   writeSource,
 } from '../src';
 
@@ -1590,7 +1580,7 @@ describe('degenerate cases', () => {
     const count = createSourceNode(1, strictEqual);
     writeSource(count, 2);
     markSourceDirty(count);
-    expect(sourceValue(count)).toBe(2);
+    expect(count.value).toBe(2);
   });
 
   test('a pull of a never-computed node computes it once', () => {
@@ -1623,8 +1613,8 @@ describe('degenerate cases', () => {
     expect(pull(strictReader)).toBe(2);
     expect(pull(structuralReader)).toBe(2);
 
-    writeSource(strictItems, sourceValue(strictItems));
-    writeSource(structuralItems, sourceValue(structuralItems));
+    writeSource(strictItems, strictItems.value);
+    writeSource(structuralItems, structuralItems.value);
     expect(pull(strictReader)).toBe(2);
     expect(pull(structuralReader)).toBe(2);
     expect(calls).toEqual({ strictReader: 1, structuralReader: 1 });
@@ -1648,7 +1638,7 @@ describe('degenerate cases', () => {
     );
     expect(pull(score)).toBe(1);
 
-    sourceValue(scores).set('a', 2);
+    scores.value.set('a', 2);
     expect(pull(score)).toBe(1);
     markSourceDirty(scores);
     expect(pull(score)).toBe(2);
@@ -1933,7 +1923,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
 - Pull depth is a contract on the consumer; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
 - The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
-- A `sourceValue` or `pull` inside a computation is an untracked read (decision 10).
+- A read of `source.value` or a `pull` inside a computation is an untracked read (decision 10).
 
 pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
 
@@ -1984,7 +1974,7 @@ A disposal that leaves the node's state as it was is not an option: a `Clean` no
 
 ### 10. An untracked read inside a computation (decided)
 
-An untracked read is allowed. `sourceValue(source)`, and a `pull` called inside a computation, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. `dependencies.test.ts` "sourceValue inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
+An untracked read is allowed. A read of `source.value`, and a `pull` called inside a computation, read without recording a dependency of the running computation, like pico's untracked lookup (`MemoRef::lookup`, `crates/pico/src/memo_ref.rs:57`, against `lookup_tracked`, `:80`), Preact's `peek()`, and Solid's `untrack`. An untracked read writes no source and marks nothing. `dependencies.test.ts` "source.value inside a computation records nothing" and "pull inside a computation records nothing" assert that a later write to what was read untracked does not mark the node.
 
 ### 11. Whether the package ships before its first caller (decided)
 
