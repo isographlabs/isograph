@@ -1951,3 +1951,22 @@ Decided by the user: the engine has no default equality and exports no compariso
 
 - (a) `storeSnapshot` returns the store as stored: each scalar value is a record of its scalar entity with `__value`, and the parent's key holds the link. Held. Reason: the snapshot is the store's server data, and the runtime cannot tell a scalar record from another record without a field that records it. Cost: every store test fixture (`storeOf`, `test/fixtures.ts`) lists scalar records.
 - (b) `RecordContainer` gains `origin: 'Response' | 'ScalarValue'`, written by `leafRecords`, and `storeSnapshot` inlines each `ScalarValue` record's `__value` into the key that links to it. Cost: a field on every container read only by the snapshot; `storeFrom(plain)` still cannot tell which plain values are scalars, so a store built from a `PlainStore` needs the normalization AST.
+
+### 23. Whether `writeSource` compares the new value with the old (decided)
+
+`refactors/pending/runtime/reactive-engine.md` open decision 8. Decided by the user: writing an equal value does not propagate. `createSourceNode(value, equal)` takes a required equality and `writeSource` marks nothing when it accepts (The graph). The store passes `isUnchanged(key)` for every source node (The store), so `normalize` compares nothing itself.
+
+### 24. A pull of a disposed node
+
+`refactors/pending/runtime/reactive-engine.md` open decision 9.
+
+- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges (The graph). Held. Reason: pico's behavior; the next call of a collected memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`). Cost: a consumer that pulls a node it disposed gets a working node again instead of an error. In the Isograph runtime no code pulls a node after `deleteRecord` disposed it: the node is removed from its container's `derived`, and the next read creates a new node.
+- (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
+
+### 25. An untracked read inside a computation (decided)
+
+`refactors/pending/runtime/reactive-engine.md` open decision 10. Decided by the user: allowed. `sourceValue` and a `pull` called inside a computation outside its context read without recording a dependency, and the guard does not reject them (open decision 2 (f)). The Isograph layer makes no untracked read inside a computation: `resolverComputation` reads only through `contextHooks`.
+
+### 26. Whether the engine package ships before its first caller (decided)
+
+`refactors/pending/runtime/reactive-engine.md` open decision 11. Decided by the user: `@isograph/reactive-graph` ships alone, as its own core change (Core changes), with its tests and before the Isograph runtime uses it. Its reader is the stated goal that the engine is usable by projects outside Isograph (Goal).
