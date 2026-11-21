@@ -22,13 +22,13 @@ The engine gives up no performance to prevent misuse. Misuse is a documented con
 
 A source node holds a value and the set of derived nodes whose last computation read it (`dependents`).
 
-A derived node holds a computation, an equality, a state, and the set of derived nodes whose last computation read it. Its state is one of three marks, the marks of Reactively (`CacheClean`, `CacheCheck`, `CacheDirty`):
+A derived node holds a computation, an equality, its precalculated value, and the set of derived nodes whose last computation read it. A node that was never computed, or was disposed, has no precalculated value. Otherwise the precalculated value holds a value, the nodes its computation read, and one of three marks, the marks of Reactively (`CacheClean`, `CacheCheck`, `CacheDirty`):
 
 - `Clean`: the stored value is what the computation would return now.
 - `Check`: a derived node this one read, directly or transitively, is `Dirty`. The stored value may be current.
-- `Dirty`: a source node the last computation read was written, or a derived node it read recomputed to a value its equality rejected, or the node was never computed.
+- `Dirty`: a source node the last computation read was written, or a derived node it read recomputed to a value its equality rejected.
 
-`Clean` and `Check` hold a value. `Dirty` holds the previous value if there was one. Every state holds the dependencies the last computation recorded, in read order.
+Every mark holds the last computed value and the dependencies the last computation recorded, in read order. The first pull of a node with no precalculated value computes it and calls no equality.
 
 ### Eager invalidation on write
 
@@ -161,7 +161,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DirtyState` that names them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
+`AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` and `NodeState` that name them. Open decision 7 (pico-runtime.md open decision 21) covers that a consumer can still read and write a node's fields.
 
 ### Types
 
@@ -191,65 +191,52 @@ export type DerivedNode<TValue> = {
    * dispose a node (Writes during a computation). A method signature, so that a `DerivedNode<T>` is
    * an `AnyDerivedNode` (open decision 5). */
   equals(previous: TValue, next: TValue): boolean;
-  /** Value, mark, and dependencies. Read and written only through `stateOf`. */
-  readonly slot: StateSlot<TValue>;
-  /** The reads of the running computation, in read order; between computations, the previous
-   * dependency list, kept as a spare buffer. Pushed to only by `context`, cleared only by `compute`,
-   * and swapped with the state's dependency list only by `recompute`. */
+  /** The last computed value and its status; `MISSING` when the node was never computed or was
+   * disposed. Read and written only through `stateOf`. */
+  precalculated: Option<PrecalculatedValue<TValue>>;
+  /** The reads of the running computation, in read order; between computations, a spare buffer that
+   * is the dependency list before the last recomputation. Pushed to only by `context`, cleared only
+   * by `compute`, and swapped with `PrecalculatedValue.dependencies` only by `commitReads`. */
   reads: AnyNode[];
   /** Passed to every run of `computation`. Built once by `createDerivedNode`. */
   readonly context: ComputeContext;
-  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
+  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. On the
+   * node, not in `PrecalculatedValue`, because it outlives this node's value: after disposal its
+   * former readers are `Dirty` and still name this node until their recomputation removes them. */
   readonly dependents: Set<AnyDerivedNode>;
 };
 
 /** A derived node of any value type: the element of every `dependents` set and a member of `AnyNode`. */
 export type AnyDerivedNode = DerivedNode<unknown>;
 
-/** The holder of one derived node's state. A separate object so that a later layered graph gives a
- * node one slot per layer by changing `stateOf` alone. */
-export type StateSlot<TValue> = { state: DerivedNodeState<TValue> };
+/** The part of a derived node that a later layered graph keeps once per layer. `stateOf` returns it. */
+export type NodeState<TValue> = Pick<DerivedNode<TValue>, 'precalculated'>;
 
-/** What the node's last computation established, and whether it is still current. */
-export type DerivedNodeState<TValue> =
-  | CleanState<TValue>
-  | CheckState<TValue>
-  | DirtyState<TValue>;
-
-/** `value` is what the computation would return now. */
-export type CleanState<TValue> = {
-  readonly mark: 'Clean';
-  readonly value: TValue;
-  readonly dependencies: AnyNode[];
+/** What one computation established: its value, whether that value is still current, and the nodes
+ * it read. Allocated once, by the node's first computation after creation or disposal; its fields
+ * are written in place after that. */
+export type PrecalculatedValue<TValue> = {
+  value: TValue;
+  status: Status;
+  /** The nodes the computation read, in read order. A node read twice appears twice. */
+  dependencies: AnyNode[];
 };
 
-/** A derived node this one reads, directly or transitively, is `Dirty`. Only a `Clean` node becomes
- * `Check`, so a `Check` node always has a value. */
-export type CheckState<TValue> = {
-  readonly mark: 'Check';
-  readonly value: TValue;
-  readonly dependencies: AnyNode[];
-};
+/** `Clean`: `value` is what the computation would return now. `Check`: a derived node this one
+ * reads, directly or transitively, is `Dirty`, and `value` may be current. `Dirty`: a source node
+ * the last computation read was written, or a derived node it read recomputed to a value its
+ * `equals` rejected. */
+export type Status = 'Clean' | 'Check' | 'Dirty';
 
-/** A source node it read was written, or a derived node it read recomputed to a value `equals`
- * rejected, or it was never computed, or it was disposed. */
-export type DirtyState<TValue> = {
-  readonly mark: 'Dirty';
-  /** The value of the last computation; `MISSING` when the node was never computed or was disposed. */
-  readonly previous: Option<TValue>;
-  readonly dependencies: AnyNode[];
-};
-
-/** The previous value of a node that was never computed or was disposed. Not exported from
- * `graph.ts`, so no consumer value is `MISSING`. */
+/** The precalculated value of a node that was never computed or was disposed. Not exported from
+ * `graph.ts`. */
 const MISSING: unique symbol = Symbol('Missing');
 type Missing = typeof MISSING;
 
 /** `TValue`, or `MISSING` for no value. Not exported. */
 type Option<TValue> = TValue | Missing;
 
-/** A node of any kind and value type: the element of a dependency list, which holds each node the
- * last computation read, in read order. A node read twice appears twice. */
+/** A node of any kind and value type: the element of a dependency list. */
 export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
 
 /** A derived node's computation. It reads every node through `context`, is a pure function of
@@ -317,7 +304,7 @@ Callers. In the Isograph runtime (pico-runtime.md, The engine and the Isograph r
 
 ## The implementation
 
-`graph.ts` is the whole engine. Every function below is in it. No code outside `graph.ts` reads or writes a node's `value`, `dependents`, or `slot`, or calls an unexported function.
+`graph.ts` is the whole engine. Every function below is in it. No code outside `graph.ts` reads or writes a node's `value`, `dependents`, `precalculated`, or `reads`, or calls an unexported function.
 
 ### Construction and plain reads
 
@@ -338,7 +325,7 @@ export function createDerivedNode<TValue>(
     kind: 'Derived',
     computation,
     equals,
-    slot: { state: neverComputed() },
+    precalculated: MISSING,
     reads: [],
     context: {
       readSource: (source) => {
@@ -356,19 +343,15 @@ export function createDerivedNode<TValue>(
   return node;
 }
 
-/** The state of a node that was never computed or was disposed. */
-function neverComputed<TValue>(): DirtyState<TValue> {
-  return { mark: 'Dirty', previous: MISSING, dependencies: [] };
-}
-
 export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
   return source.value;
 }
 
-/** The slot of `node`'s state. Every read and write of a node's value, mark, and dependencies goes
- * through it, so that a later layered graph changes this function alone. Not exported. */
-function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
-  return node.slot;
+/** The holder of `node`'s precalculated value. Every read and write of it goes through `stateOf`, so
+ * that a later layered graph, which keeps a `NodeState` per layer, changes this function alone. Not
+ * exported. */
+function stateOf<TValue>(node: DerivedNode<TValue>): NodeState<TValue> {
+  return node;
 }
 ```
 
@@ -404,24 +387,19 @@ function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
   markCheck(work);
 }
 
-/** Marks `node` `Dirty` and returns the mark it had. A `Clean` node's dependents are then marked
- * `Check` by `markDirty`; a `Check` node's dependents are already marked; a `Dirty` node is
- * unchanged. Called only by `markDirty`. */
-function markOneDirty(node: AnyDerivedNode): DerivedNodeState<unknown>['mark'] {
-  const slot = stateOf(node);
-  const state = slot.state;
-  switch (state.mark) {
-    case 'Clean':
-    case 'Check':
-      slot.state = {
-        mark: 'Dirty',
-        previous: state.value,
-        dependencies: state.dependencies,
-      };
-      return state.mark;
-    case 'Dirty':
-      return state.mark;
+/** Sets `node`'s status to `Dirty` and returns the status it had. A `Clean` node's dependents are
+ * then marked `Check` by `markDirty`; a `Check` node's dependents are already marked. A node in a
+ * `dependents` set was computed, so its precalculated value is not `MISSING`; for a `MISSING` node
+ * it changes nothing and returns `MISSING`, which marks nothing above it. Called only by
+ * `markDirty`. */
+function markOneDirty(node: AnyDerivedNode): Option<Status> {
+  const precalculated = stateOf(node).precalculated;
+  if (precalculated === MISSING) {
+    return MISSING;
   }
+  const status = precalculated.status;
+  precalculated.status = 'Dirty';
+  return status;
 }
 
 /** Marks every `Clean` node of `work`, and every `Clean` node above those, `Check`. A marked node is
@@ -434,14 +412,9 @@ function markCheck(work: AnyDerivedNode[]): void {
   };
   let node = work.pop();
   while (node !== undefined) {
-    const slot = stateOf(node);
-    const state = slot.state;
-    if (state.mark === 'Clean') {
-      slot.state = {
-        mark: 'Check',
-        value: state.value,
-        dependencies: state.dependencies,
-      };
+    const precalculated = stateOf(node).precalculated;
+    if (precalculated !== MISSING && precalculated.status === 'Clean') {
+      precalculated.status = 'Check';
       node.dependents.forEach(push);
     }
     node = work.pop();
@@ -459,71 +432,90 @@ Marking does not recurse. `markCheck` is a loop over a work list, the worklist c
 // from libs/isograph-pico-js/src/graph.ts
 /** Called by the consumer, by `readDerived`, and by `verify`. */
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
-  const state = stateOf(node).state;
-  switch (state.mark) {
+  const precalculated = stateOf(node).precalculated;
+  if (precalculated === MISSING) {
+    return computeFirst(node);
+  }
+  switch (precalculated.status) {
     case 'Clean':
-      return state.value;
+      return precalculated.value;
     case 'Check':
-      return verify(node, state);
+      return verify(node, precalculated);
     case 'Dirty':
-      return recompute(node, state);
+      return recompute(node, precalculated);
   }
 }
 
-/** Pulls each dependency whose `kind` is `Derived`, in recorded order, until one recomputes to a value its `equals`
- * rejects, which marks `node` `Dirty`; then recomputes `node`. Otherwise `node` ends `Clean`
- * without running. */
-function verify<TValue>(
-  node: DerivedNode<TValue>,
-  state: CheckState<TValue>,
-): TValue {
-  for (const dependency of state.dependencies) {
-    if (dependency.kind === 'Derived') {
-      pull(dependency);
-    }
-    if (stateOf(node).state.mark === 'Dirty') {
-      break;
-    }
-  }
-  const after = stateOf(node).state;
-  switch (after.mark) {
-    case 'Dirty':
-      return recompute(node, after);
-    case 'Check':
-      stateOf(node).state = {
-        mark: 'Clean',
-        value: after.value,
-        dependencies: after.dependencies,
-      };
-      return after.value;
-    case 'Clean':
-      return after.value;
-  }
-}
-
-/** Runs the computation, compares its value with the previous one, replaces the dependencies, and
- * stores the new value unless `equals` accepted it, in which case the previous value object stays.
- * A new value marks the dependents `Dirty`. A throw out of the computation or out of `equals` is a
- * programmer error; it leaves the state and every `dependents` set untouched. */
-function recompute<TValue>(
-  node: DerivedNode<TValue>,
-  state: DirtyState<TValue>,
-): TValue {
+/** Computes a node that was never computed or was disposed, stores its value `Clean`, and marks its
+ * dependents `Dirty`. Calls no `equals`: there is no previous value. */
+function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = compute(node);
   const dependencies = node.reads;
-  const previous = state.previous;
-  if (previous !== MISSING && node.equals(previous, value)) {
-    setDependencies(node, state.dependencies, dependencies);
-    node.reads = state.dependencies;
-    stateOf(node).state = { mark: 'Clean', value: previous, dependencies };
-    return previous;
-  }
-  setDependencies(node, state.dependencies, dependencies);
-  node.reads = state.dependencies;
-  stateOf(node).state = { mark: 'Clean', value, dependencies };
+  setDependencies(node, NO_DEPENDENCIES, dependencies);
+  node.reads = [];
+  stateOf(node).precalculated = { value, status: 'Clean', dependencies };
   markDirty(node.dependents);
   return value;
 }
+
+/** Pulls each dependency whose `kind` is `Derived`, in recorded order, until one recomputes to a value
+ * its `equals` rejects, which marks `node` `Dirty`; then recomputes `node`. Otherwise `node` ends
+ * `Clean` without running. */
+function verify<TValue>(
+  node: DerivedNode<TValue>,
+  precalculated: PrecalculatedValue<TValue>,
+): TValue {
+  for (const dependency of precalculated.dependencies) {
+    if (dependency.kind === 'Derived') {
+      pull(dependency);
+    }
+    if (precalculated.status === 'Dirty') {
+      break;
+    }
+  }
+  switch (precalculated.status) {
+    case 'Dirty':
+      return recompute(node, precalculated);
+    case 'Check':
+      precalculated.status = 'Clean';
+      return precalculated.value;
+    case 'Clean':
+      return precalculated.value;
+  }
+}
+
+/** Runs the computation, compares its value with the precalculated one, replaces the dependencies,
+ * and stores the new value unless `equals` accepted it, in which case the previous value object
+ * stays. A new value marks the dependents `Dirty`. A throw out of the computation or out of
+ * `equals` is a programmer error; it leaves the state and every `dependents` set untouched. */
+function recompute<TValue>(
+  node: DerivedNode<TValue>,
+  precalculated: PrecalculatedValue<TValue>,
+): TValue {
+  const value = compute(node);
+  if (node.equals(precalculated.value, value)) {
+    commitReads(node, precalculated);
+    precalculated.status = 'Clean';
+    return precalculated.value;
+  }
+  commitReads(node, precalculated);
+  precalculated.value = value;
+  precalculated.status = 'Clean';
+  markDirty(node.dependents);
+  return value;
+}
+
+/** Makes `node.reads` the dependency list of `precalculated` and moves the edges, then keeps the
+ * previous list as `node.reads`, the buffer the next `compute` clears. Called only by `recompute`. */
+function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: PrecalculatedValue<TValue>): void {
+  const previous = precalculated.dependencies;
+  setDependencies(node, previous, node.reads);
+  precalculated.dependencies = node.reads;
+  node.reads = previous;
+}
+
+/** The previous dependency list of a first computation and the next one of a disposal. Never written. */
+const NO_DEPENDENCIES: ReadonlyArray<AnyNode> = [];
 
 /** Runs `node`'s computation with `node.context`, which records each read in `node.reads`, in read
  * order. */
@@ -535,9 +527,9 @@ function compute<TValue>(node: DerivedNode<TValue>): TValue {
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`. It is a `for` loop with `break` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
-- `recompute` calls `equals` before `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time.
-- `recompute` calls no `equals` when the previous value is `MISSING`. A computation cannot return `MISSING`, because no module exports it, so `previous === MISSING` means only that the node was never computed or was disposed.
-- A node's dependency list and `node.reads` are two arrays the node owns, swapped by every `recompute`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone, and `context` and its two closures are built once per node. A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `neverComputed` allocates a fresh empty list for each node it resets, so no array is shared between two nodes' buffers. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- `recompute` calls `equals` before `commitReads`, which calls `setDependencies`. A throw out of `equals` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time.
+- A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
+- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context: `compute` returns the value alone, and `context` and its two closures are built once per node. A throw out of the computation or out of `equals` leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and `computeFirst` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `AnyNode[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous, and a read through its context after it returned breaks the contract. Such a read (from an `async` computation after an `await`, or through a context the computation stored) pushes into `node.reads`, which after the swap is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. The engine does not check it (decision 2).
 - The context is a parameter built once per node. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
@@ -591,19 +583,22 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
 export function disposeDerivedNode(node: AnyDerivedNode): void {
-  const slot = stateOf(node);
-  setDependencies(node, slot.state.dependencies, []);
-  slot.state = neverComputed();
+  const state = stateOf(node);
+  const precalculated = state.precalculated;
+  if (precalculated !== MISSING) {
+    setDependencies(node, precalculated.dependencies, NO_DEPENDENCIES);
+    state.precalculated = MISSING;
+  }
   markDirty(node.dependents);
 }
 ```
 
-- The node leaves the `dependents` set of everything it read, so no later write reaches it, and its state is reset to never computed, so its state lists no dependency that does not list it back.
-- Its value is dropped (`MISSING`), so the engine holds no reference to it.
+- The node leaves the `dependents` set of everything it read, so no later write reaches it, and its `PrecalculatedValue`, which held its dependency list, is dropped, so it lists no dependency that does not list it back.
+- Its precalculated value becomes `MISSING`, so the engine holds no reference to the value, and its next pull is `computeFirst`.
 - Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their dependency lists still name the disposed node, and `node.dependents` still names them, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes them from `node.dependents`.
 - Disposing a node that was never computed or was already disposed changes nothing but marking its dependents, of which a never-computed node has none.
 
-Without the reset, a `Clean` node disposed by `setDependencies` and marking alone would keep its value and its dependency list while no source lists it, so a later pull would return its old value forever. The reset closes that.
+Without `MISSING`, a `Clean` node disposed by `setDependencies` and marking alone would keep its value while no source lists it, so a later pull would return its old value forever.
 
 ### Throws
 
@@ -767,7 +762,7 @@ Observable behavior is the same: for any sequence of writes and reads that keeps
 
 ## Comparison with Reactively and Preact signals
 
-Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. `update` assigns the new value to `_value` (`:222`) before it compares it with the old one (`:259`), so an equal recomputation marks no observer and keeps the new value object. The engine keeps the previous value object on an equal recomputation (Cutoff), so a reader that holds the old object holds the node's current value. A throw out of the function propagates from `:222`, before the links are updated (`:224-251`) and before the state is set `CacheClean` (`:269`), so the state, the links, and `_value` are unchanged, as the engine's are; but `update` has already called and cleared the node's `onCleanup` callbacks (`:218-221`), so a later successful run does not call them. The engine has no cleanup callbacks. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares by `equals` and skips an equal value, as `writeSource` does by the source's `equals`; it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
+Reactively is the same scheme. Its states are `CacheClean`, `CacheCheck`, and `CacheDirty`, and it creates a node `CacheDirty` with no value; the engine keeps a node that was never computed apart from the three marks, as `MISSING` in place of a precalculated value, so its first pull calls no equality. `set` marks direct observers `CacheDirty` through `stale`, which marks their observers `CacheCheck` and stops at a node already at or above the requested state. `updateIfNecessary` walks `sources` in order when `CacheCheck`, breaks when the node becomes `CacheDirty`, and then calls `update`. Its default equality is `===` (`defaultEquality`), per node through `equals`. `update` assigns the new value to `_value` (`:222`) before it compares it with the old one (`:259`), so an equal recomputation marks no observer and keeps the new value object. The engine keeps the previous value object on an equal recomputation (Cutoff), so a reader that holds the old object holds the node's current value. A throw out of the function propagates from `:222`, before the links are updated (`:224-251`) and before the state is set `CacheClean` (`:269`), so the state, the links, and `_value` are unchanged, as the engine's are; but `update` has already called and cleared the node's `onCleanup` callbacks (`:218-221`), so a later successful run does not call them. The engine has no cleanup callbacks. It has no cycle check. Its differences from the engine: an ambient `CurrentReaction` global records reads where the engine passes a context; `set` compares by `equals` and skips an equal value, as `writeSource` does by the source's `equals`; it reuses the unchanged prefix of the source list; and it schedules effects (`stabilize`), which the engine's core has none of.
 
 Preact signals uses versions instead of marks. Every signal has a `_version`, a global `globalVersion` counts writes, and each dependency link (a doubly linked list `Node` with `_source`, `_target`, and `_version`) records the version the target last saw. A computed decides with `needsToRecompute`, which walks its sources in order and returns at the first whose version changed, refreshing derived sources as it goes: pico's epochs per link, with pico's in-order walk. Writes notify effects eagerly through flags (`OUTDATED`, `NOTIFIED`). Its comparison is `!==`, a setter with an equal value notifies nothing, and a computed that throws stores the error (`HAS_ERROR`) and rethrows it on read; the engine forbids the throw (Throws). It throws "Cycle detected" when a computed is read while `RUNNING`; the engine has no cycle check (Cycles). It records reads through an ambient `evalContext`, and a signal written inside a computed is allowed.
 
@@ -778,14 +773,14 @@ The engine takes Reactively's marking and pull, pico's equality and per-computat
 No published library has the engine's contract. Reactively, alien-signals, signal-polyfill, Preact signals, Vue's reactivity, MobX, Solid, Jotai, `@tldraw/state`, and `@liby-tools/salsa` each record reads through ambient tracking state, make equality optional or fix it, and have no explicit disposal of a derived node. alien-signals' `createReactiveSystem` (`src/system.ts:34`) is the only workable base: it holds no module state, and the caller supplies `update`, `notify`, and `unwatched`. The engine does not use it, for five reasons:
 
 - The engine imports nothing (Goal), and a dependency on alien-signals breaks that.
-- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `StateSlot`, which `stateOf` reads so that a later layered graph gives a node one slot per layer by changing `stateOf` alone (Types), has no place.
+- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `PrecalculatedValue`, which `stateOf` reaches so that a later layered graph gives a node one slot per layer by changing `stateOf` alone (Types), has no place.
 - `link` returns early when the dependency read is the one read just before (`:52-55`), so consecutive repeated reads are merged into one link, where the engine records each read in its dependency list, and a node read twice is listed twice (pico-runtime.md, Example, Duplicate dependency entries).
 - A node whose computation threw is left marked clean, where the engine leaves every mark as it was before the throwing run (Throws).
 - It has had three major versions since its first release in 2024-10 (1.0.0 2025-01, 2.0.0 2025-04, 3.0.0 2025-09).
 
 ## Tests
 
-The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `slot`, `dependents`, or mark, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
+The tests assert values with `toBe` and `toEqual`, and assert which computations ran by counting calls in a `calls` object each test owns. Counting re-invocations is allowed: which writes make which computations run again is the engine's own dependency tracking (AGENTS.md, Tests). No test reads a node's `precalculated`, `reads`, or `dependents`, and no test calls an unexported function: marks and edges are implementation, and each test observes them only through values and call counts. There are no snapshot tests and no fixture files; every input is built in the test.
 
 The tests are written under the option the body is written for: open decision 9 (a). Each test whose assertions change under another option says how.
 
@@ -1512,6 +1507,28 @@ import {
 const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('disposeDerivedNode (open decision 9 (a))', () => {
+  test('the first pull, and the first pull after disposal, call no equals', () => {
+    const calls = { equals: 0 };
+    const count = createSourceNode(1, strictEqual);
+    const node = createDerivedNode(
+      (context) => context.readSource(count),
+      (previous, next) => {
+        calls.equals += 1;
+        return previous === next;
+      },
+    );
+    expect(pull(node)).toBe(1);
+    expect(calls.equals).toBe(0);
+
+    writeSource(count, 2);
+    expect(pull(node)).toBe(2);
+    expect(calls.equals).toBe(1);
+
+    disposeDerivedNode(node);
+    expect(pull(node)).toBe(2);
+    expect(calls.equals).toBe(1);
+  });
+
   test('marks the dependents Dirty, and their next pull recomputes the disposed node', () => {
     const calls = { scaled: 0, parent: 0 };
     const count = createSourceNode(1, strictEqual);
@@ -1906,7 +1923,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `StateSlot.state`, and `DerivedNode.reads`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.precalculated`, `DerivedNode.reads`, and the fields of `PrecalculatedValue`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class, so the ES private field rule applies only under open decision 7 (b). oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 
@@ -2000,7 +2017,7 @@ The engine defines no equality. `createDerivedNode` requires `equals`, with no o
 
 ### 7. Whether a consumer can write a node's fields
 
-pico-runtime.md open decision 21, restated. The types are plain object types whose fields every consumer sees, and a consumer that writes `dependents` or `slot` breaks an invariant silently.
+pico-runtime.md open decision 21, restated. The types are plain object types whose fields every consumer sees, and a consumer that writes `dependents`, `precalculated`, or `reads` breaks an invariant silently.
 
 - (a) Plain object types; each field's comment names its only reader and writer. Held, not decided. Reason: (b) and (c) each cost a cast or a slower link type. Cost: the comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes".
 - (b) Classes with ES private fields, with module-local accessors assigned in each class's `static {}` block. Cost: a private `#equals` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>`, so it needs open decision 5 (c) or a cast per link; a node cannot be wrapped in a `Proxy`.

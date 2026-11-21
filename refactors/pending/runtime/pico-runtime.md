@@ -37,7 +37,7 @@ The engine has no graph object and no write-during-computation check (pico-js.md
 
 ### The engine and the Isograph runtime
 
-The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function reads or writes a node's `value`, `dependents`, or `slot`, and no Isograph function calls an engine function the index does not export (`stateOf`, `neverComputed`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function reads or writes a node's `value`, `dependents`, `precalculated`, or `reads`, and no Isograph function calls an engine function the index does not export (`stateOf`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
 
 The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, The public API):
 
@@ -56,11 +56,11 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `AnyNode`, `Computation`, `ComputeContext`, and the unexported `MISSING`, `Missing`, and `Option`.
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, `ComputeContext`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
-- Construction and plain reads: `createSourceNode`, `createDerivedNode`, `neverComputed`, `sourceValue`, `stateOf`.
+- Construction and plain reads: `createSourceNode`, `createDerivedNode`, `sourceValue`, `stateOf`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
-- Pull: `pull`, `verify`, `recompute`, `compute` (the context and dependency recording).
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute` (the context and dependency recording).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
@@ -1787,8 +1787,8 @@ A computation is pure and runs on every pull, including a pull a discarded rende
 
 Not part of the core: optimistic layers and forks. The base graph is the core's store. Layer graphs sit above it, each with one parent, and form a tree. A world is a path from the base to a layer.
 
-- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `value` or `slot` directly (The engine and the Isograph runtime), so giving `readSource`, `sourceValue`, and `stateOf` a world changes the engine alone. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
-- Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `StateSlot` for a derived node).
+- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `value` or `precalculated` directly (The engine and the Isograph runtime), so giving `readSource`, `sourceValue`, and `stateOf` a world changes the engine alone. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
+- Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `NodeState` for a derived node).
 - Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup; no other code changes (pico-js.md, Construction and plain reads).
 - Placement. A node computed in `W` is stored in the deepest layer on `W`'s path that supplied any of its inputs, a source value or a derived input's slot. That is usually lower than `W`'s top: a node that read nothing the top layer overrides is stored in the base, shared with every world. Valid because the value is a function of its inputs: every world whose path holds that layer reads the same value for each input, unless a deeper layer on its path overrides one, and that override's write marked the node in the deeper layer (next bullet), whose shadow state that world reads first.
 - Writes mark in the layer where they happen. A write in layer `L` gives each node above the written source a marked shadow state in `L` (`Dirty` for direct dependents, `Check` above), copied from the state its worlds through `L` read. A base write marks the base states and also the shadow states that descendant layers hold for those nodes.
@@ -2002,7 +2002,7 @@ Decided by the user: the engine has no default equality and exports no compariso
 `SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every consumer of the package. A consumer that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (pico-js.md, Dependencies), and the result is a silently stale value.
 
 - (a) Plain object types; each field's comment names its only reader and writer (pico-js.md, Types). Held, not decided. Reason: (b) and (c) each cost a cast or a sound-but-slower link type. Cost: the field comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes", once the engine has consumers outside this repo.
-- (b) Classes with ES private fields (AGENTS.md, TypeScript): `class SourceNode<TValue> { #value; #dependents }` and `class DerivedNode<TValue> { #computation; #equals; #slot; #dependents }`. `setDependencies` and `markSourceChanged` read another class's private fields through module-local functions assigned in each class's `static {}` block (ES2022, `tsconfig.build.json`'s `target`). Cost: a private field `#equals: (previous: TValue, next: TValue) => boolean` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>` (checked with this repo's `tsc` 5.6.3), so the erased link of open decision 19 (a) no longer type-checks; (b) needs open decision 19 (c) or a cast at each link. A node cannot be wrapped in a `Proxy` (AGENTS.md, TypeScript).
+- (b) Classes with ES private fields (AGENTS.md, TypeScript): `class SourceNode<TValue> { #value; #dependents }` and `class DerivedNode<TValue> { #computation; #equals; #precalculated; #reads; #context; #dependents }`. `setDependencies` and `markSourceChanged` read another class's private fields through module-local functions assigned in each class's `static {}` block (ES2022, `tsconfig.build.json`'s `target`). Cost: a private field `#equals: (previous: TValue, next: TValue) => boolean` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>` (checked with this repo's `tsc` 5.6.3), so the erased link of open decision 19 (a) no longer type-checks; (b) needs open decision 19 (c) or a cast at each link. A node cannot be wrapped in a `Proxy` (AGENTS.md, TypeScript).
 - (c) Opaque public types: the index exports `SourceNode<TValue>` and `DerivedNode<TValue>` as branded types with no visible fields, and `graph.ts` casts each to its field type. Cost: a cast in every engine function that receives a node.
 
 ### 22. `storeSnapshot` and scalar records
