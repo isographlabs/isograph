@@ -168,12 +168,12 @@ export {
 ```ts
 // from libs/reactive-graph/src/graph.ts
 /** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
- * while a computation runs (open decision 2). Created by `createGraph`; every
+ * while a computation or an equality runs (open decision 2). Created by `createGraph`; every
  * public function but the constructors and `sourceValue` takes it first. */
 export type Graph = {
-  /** The number of computations running. Incremented and decremented only by `compute`. A count,
-   * not a two-state enum, because `readDerived` recomputes a node inside the computation that
-   * reads it. */
+  /** The number of computations and equalities running. Incremented and decremented only by
+   * `guarded`. A count, not a two-state enum, because `readDerived` recomputes a node inside the
+   * computation that reads it, and that recomputation calls the node's `equal`. */
   computingDepth: number;
 };
 
@@ -182,7 +182,8 @@ export type SourceNode<TValue> = {
   /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
   /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
-   * value and the written one. A method signature, as `DerivedNode.equal` is. */
+   * value and the written one, inside `guarded`, so a write or a disposal from it throws. A method
+   * signature, as `DerivedNode.equal` is. */
   equal(previous: TValue, next: TValue): boolean;
   /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
@@ -192,8 +193,9 @@ export type SourceNode<TValue> = {
 export type DerivedNode<TValue> = {
   readonly computation: Computation<TValue>;
   /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
-   * node's previous value and the value its computation just returned. A method signature, so that
-   * a `DerivedNode<T>` is an `AnyDerivedNode` (open decision 5). */
+   * node's previous value and the value its computation just returned, inside `guarded`, so a write
+   * or a disposal from it throws. A method signature, so that a `DerivedNode<T>` is an
+   * `AnyDerivedNode` (open decision 5). */
   equal(previous: TValue, next: TValue): boolean;
   /** Value, mark, and dependencies. Read and written only through `stateOf`. */
   readonly slot: StateSlot<TValue>;
@@ -293,7 +295,7 @@ export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
 
 /** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
  * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
- * Throws while a computation runs. */
+ * Throws while a computation or an equality runs. */
 export function writeSource<TValue>(
   graph: Graph,
   source: SourceNode<TValue>,
@@ -302,7 +304,7 @@ export function writeSource<TValue>(
 
 /** Marks every dependent of `source` `Dirty` and every node above those `Check`, without changing
  * its value: for a consumer whose source went away or whose value object it changed in place.
- * Throws while a computation runs. */
+ * Throws while a computation or an equality runs. */
 export function markSourceChanged(
   graph: Graph,
   source: SourceNode<unknown>,
@@ -315,7 +317,7 @@ export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
 
 /** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
  * its dependents `Dirty`. A later pull computes it again (open decision 9). Throws while a
- * computation runs. */
+ * computation or an equality runs. */
 export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
 ```
 
@@ -413,15 +415,41 @@ function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
-/** Throws when a computation of `graph` is running. Called first by every public function that
- * writes the graph. */
+/** Throws when a computation or an equality of `graph` is running. Called first by every public
+ * function that writes the graph. */
 function assertNotComputing(graph: Graph): void {
   if (graph.computingDepth > 0) {
     throw new Error(
-      'Cannot write the graph while a computation is running.',
+      'Cannot write the graph while a computation or an equality is running.',
     );
   }
 }
+
+/** Runs `run` with `graph.computingDepth` raised, so that `assertNotComputing` throws inside it. The
+ * only writer of `computingDepth`. Called by `compute` around the computation, by `recompute` around
+ * `node.equal`, and by `writeSource` around `source.equal`. */
+function guarded<TResult>(graph: Graph, run: () => TResult): TResult {
+  graph.computingDepth += 1;
+  try {
+    return run();
+  } finally {
+    graph.computingDepth -= 1;
+  }
+}
+```
+
+An equality runs inside `guarded` because it is user code that runs while the engine is between two writes of its own state: `writeSource` calls `source.equal` before it sets the value, and `recompute` calls `node.equal` after the computation returned and before `setDependencies`. A write from inside either would mark nodes the engine is about to overwrite, as in the trace of Writes during a computation:
+
+```text
+a = source(3); b = source(4)
+sum = derived(read a + read b), with an equal that calls writeSource(graph, a, 100), then returns false
+pull(graph, sum) -> 7; the first computation calls no equality
+writeSource(graph, a, 5) -> sum Dirty
+pull(graph, sum): Dirty -> compute -> 9
+  sum.equal(7, 9) calls writeSource(graph, a, 100)
+    without the guard: a.value = 100 -> markDirty(sum): sum is Dirty -> unchanged
+  equal returns false -> setDependencies -> sum Clean 9, while a + b is 104
+    with the guard: computingDepth is 1 inside equal -> throws before a.value is set
 ```
 
 The message follows pico's "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:193-198`). The engine throws a plain `Error`: no consumer distinguishes the guard's error by type, so no error class exists (AGENTS.md, nothing we do not use).
@@ -436,7 +464,7 @@ export function writeSource<TValue>(
   value: TValue,
 ): void {
   assertNotComputing(graph);
-  if (source.equal(source.value, value)) {
+  if (guarded(graph, () => source.equal(source.value, value))) {
     return;
   }
   source.value = value;
@@ -555,7 +583,10 @@ function recompute<TValue>(
 ): TValue {
   const computed = compute(graph, node.computation);
   const previous = state.previous;
-  if (previous.kind === 'Value' && node.equal(previous.value, computed.value)) {
+  if (
+    previous.kind === 'Value' &&
+    guarded(graph, () => node.equal(previous.value, computed.value))
+  ) {
     setDependencies(node, state.dependencies, computed.dependencies);
     stateOf(node).state = {
       mark: 'Clean',
@@ -580,16 +611,14 @@ type Computed<TValue> = {
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** Runs `computation` with a context that records what it reads, in read order, while
- * `graph.computingDepth` counts it. */
+/** Runs `computation` inside `guarded` with a context that records what it reads, in read order. */
 function compute<TValue>(
   graph: Graph,
   computation: Computation<TValue>,
 ): Computed<TValue> {
   const dependencies: Dependency[] = [];
-  graph.computingDepth += 1;
-  try {
-    const value = computation({
+  const value = guarded(graph, () =>
+    computation({
       readSource: (source) => {
         dependencies.push({ kind: 'Source', source });
         return source.value;
@@ -599,18 +628,16 @@ function compute<TValue>(
         dependencies.push({ kind: 'Derived', node });
         return read;
       },
-    });
-    return { value, dependencies };
-  } finally {
-    graph.computingDepth -= 1;
-  }
+    }),
+  );
+  return { value, dependencies };
 }
 ```
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equal` before `setDependencies`. A throw out of `equal` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
-- The `finally` in `compute` restores `computingDepth` when the computation throws, so the graph accepts writes after a failed pull.
+- The `finally` in `guarded` restores `computingDepth` when the computation or the equality throws, so the graph accepts writes after a failed pull or a failed `writeSource`.
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
 ### Dependencies
@@ -667,7 +694,7 @@ pico-runtime.md's body of `disposeDerivedNode` (The graph) calls `setDependencie
 
 ### Throws
 
-A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. The `finally` in `compute` restores `computingDepth`, so the graph accepts writes after the throw. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
+A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equal` propagates out of `writeSource` before the value is set and before any marking. The `finally` in `guarded` restores `computingDepth`, so the graph accepts writes after the throw. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
 
 pico-runtime.md open decision 3 (a) has the Isograph runtime catch the walk's throw inside its computation and return it as a value, so an Isograph computation does not throw.
 
@@ -725,6 +752,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
+- An equality, of a source or of a derived node, does not write a source or dispose a node; each of those throws while an equality runs.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
@@ -795,7 +823,7 @@ p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
 write s again -> c already Dirty -> stop -> p is never marked
 ```
 
-The guard rejects `writeSource`, `markSourceChanged`, and `disposeDerivedNode` while `graph.computingDepth > 0`. It covers writes only. A read through the context records the dependency. A `sourceValue` or `pull` inside a computation is an untracked read: it records no dependency of the running computation and writes no source (decision 10). Open decision 2.
+The guard rejects `writeSource`, `markSourceChanged`, and `disposeDerivedNode` while `graph.computingDepth > 0`. `computingDepth` is raised around every computation and around every call of an equality (The guard), because an equality is caller code that runs while the engine is between two writes of its own state. The guard covers writes only. A read through the context records the dependency. A `sourceValue` or `pull` inside a computation is an untracked read: it records no dependency of the running computation and writes no source (decision 10). Open decision 2.
 
 ## Comparison with the Rust pico crate
 
@@ -1642,7 +1670,7 @@ import {
 
 const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
-const guardMessage = 'Cannot write the graph while a computation is running.';
+const guardMessage = 'Cannot write the graph while a computation or an equality is running.';
 
 describe('the write-during-computation guard', () => {
   test.each([
@@ -1673,6 +1701,39 @@ describe('the write-during-computation guard', () => {
 
     writeSource(graph, other, 2);
     expect(sourceValue(other)).toBe(2);
+  });
+
+  test('a write inside a derived node’s equality throws and changes nothing', () => {
+    const graph = createGraph();
+    const count = createSourceNode(1, strictEqual);
+    const other = createSourceNode(0, strictEqual);
+    const doubled = createDerivedNode(
+      (context) => context.readSource(count) * 2,
+      (previous, next) => {
+        writeSource(graph, other, 1);
+        return previous === next;
+      },
+    );
+    expect(pull(graph, doubled)).toBe(2);
+
+    writeSource(graph, count, 2);
+    expect(() => pull(graph, doubled)).toThrow(guardMessage);
+    expect(sourceValue(other)).toBe(0);
+
+    writeSource(graph, other, 2);
+    expect(sourceValue(other)).toBe(2);
+  });
+
+  test('a write inside a source’s equality throws and changes nothing', () => {
+    const graph = createGraph();
+    const other = createSourceNode(0, strictEqual);
+    const count = createSourceNode(1, (previous, next) => {
+      writeSource(graph, other, 1);
+      return previous === next;
+    });
+    expect(() => writeSource(graph, count, 2)).toThrow(guardMessage);
+    expect(sourceValue(count)).toBe(1);
+    expect(sourceValue(other)).toBe(0);
   });
 });
 ```
@@ -2065,7 +2126,7 @@ pico-runtime.md is not edited by this doc. These are the differences to apply th
 
 - The engine's public functions take a `Graph` first under open decision 2 (f), and the index exports `createGraph` and `Graph`. pico-runtime.md's The engine's public API, its use without Isograph, and its Which layer owns each item write the signatures without a graph. Which layer owns each item gains `Graph`, `createGraph`, `assertNotComputing`, `neverComputed`, and `dependentsOf`.
 - `disposeDerivedNode` resets the node to never computed (Disposal, open decision 9). pico-runtime.md's body leaves the state, which lets a later pull return a value no source explains.
-- `compute` counts running computations in a `finally`, under open decision 2 (f).
+- `guarded` counts running computations and equalities in a `finally`, under open decision 2 (f); `compute`, `recompute` (around `node.equal`), and `writeSource` (around `source.equal`) call it, and a write or a disposal from inside an equality throws.
 - The tests are the files of Tests instead of one `test/graph.test.ts`, and the package has a `README.md`.
 - The CI step of CI.
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (decision 3). pico-runtime.md open decision 3's engine-side options go.
