@@ -27,28 +27,31 @@ FC reads: root.2, root.3, other.2, other.3
 
 ## The graph
 
-pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. Here every edge is an object reference, and each node holds both directions: a derived node's `dependencies` point down, and every node's `dependents` point up. Deviation reason: marking walks `dependents` from the written node, so a write costs the nodes it reaches, not the live graph (pico's epoch verification walks every dependency under the demanded memo).
+The graph is the engine package's one module, `src/graph.ts` (The engine package). The package's name and directory are open decision 18; snippets write them as `<engine package>` and `libs/<engine directory>`. pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. Here every edge is an object reference, and each node holds both directions: a derived node's `dependencies` point down, and every node's `dependents` point up. Deviation reason: marking walks `dependents` from the written node, so a write costs the nodes it reaches, not the live graph (pico's epoch verification walks every dependency under the demanded memo).
 
 ```ts
-// from libs/isograph-runtime/src/graph.ts
+// from libs/<engine directory>/src/graph.ts
 /** A value set from outside the graph, and the derived nodes whose last computation read it. */
-export type SourceNode<TSourceValue, TValue> = {
-  /** Written only by `writeSource`. */
-  value: TSourceValue;
+export type SourceNode<TValue> = {
+  /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
+  value: TValue;
   /** Written only by `setDependencies`. */
-  readonly dependents: Set<DerivedNode<TValue>>;
+  readonly dependents: Set<AnyDerivedNode>;
 };
 
 /** A computation's value, kept until an input it read changes. */
 export type DerivedNode<TValue> = {
   readonly computation: Computation<TValue>;
   /** Whether two values of this node are equal, for cutoff. */
-  readonly equal: (previous: TValue, next: TValue) => boolean;
+  equal(previous: TValue, next: TValue): boolean;
   /** Value, mark, and dependencies. Read and written only through `stateOf`. */
   readonly slot: StateSlot<TValue>;
   /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
-  readonly dependents: Set<DerivedNode<TValue>>;
+  readonly dependents: Set<AnyDerivedNode>;
 };
+
+/** A derived node of any value type: the element of every `dependents` set and of a `Derived` dependency. */
+export type AnyDerivedNode = DerivedNode<unknown>;
 
 /** The holder of one derived node's state. */
 export type StateSlot<TValue> = { state: DerivedNodeState<TValue> };
@@ -60,14 +63,14 @@ export type DerivedNodeState<TValue> = CleanState<TValue> | CheckState<TValue> |
 export type CleanState<TValue> = {
   readonly mark: 'Clean';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency<TValue>>;
+  readonly dependencies: ReadonlyArray<Dependency>;
 };
 
 /** A derived node this one reads, directly or transitively, is `Dirty`. */
 export type CheckState<TValue> = {
   readonly mark: 'Check';
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency<TValue>>;
+  readonly dependencies: ReadonlyArray<Dependency>;
 };
 
 /** A source node it read changed, or a derived node it read recomputed to a value `equal` rejects,
@@ -75,7 +78,7 @@ export type CheckState<TValue> = {
 export type DirtyState<TValue> = {
   readonly mark: 'Dirty';
   readonly previous: PreviousValue<TValue>;
-  readonly dependencies: ReadonlyArray<Dependency<TValue>>;
+  readonly dependencies: ReadonlyArray<Dependency>;
 };
 
 /** `NoValue`: the node was created and not yet computed. */
@@ -84,31 +87,40 @@ export type PreviousValue<TValue> =
   | { readonly kind: 'Value'; readonly value: TValue };
 
 /** One read of the node's last computation, in read order. */
-export type Dependency<TValue> =
-  | { readonly kind: 'Source'; readonly source: SourceNode<unknown, TValue> }
-  | { readonly kind: 'Derived'; readonly node: DerivedNode<TValue> };
+export type Dependency =
+  | { readonly kind: 'Source'; readonly source: SourceNode<unknown> }
+  | { readonly kind: 'Derived'; readonly node: AnyDerivedNode };
 
-/** A derived node's computation. It reports every node it reads through `context`. */
-export type Computation<TValue> = (context: ComputeContext<TValue>) => TValue;
+/** A derived node's computation. It reads every node through `context`. */
+export type Computation<TValue> = (context: ComputeContext) => TValue;
 
-export type ComputeContext<TValue> = {
-  /** Records that the computation read `source`. */
-  readSource(source: SourceNode<unknown, TValue>): void;
+export type ComputeContext = {
+  /** Records that the computation read `source`, and returns its value. */
+  readSource<TValue>(source: SourceNode<TValue>): TValue;
   /** Pulls `node`, records the dependency, and returns its value. */
-  readDerived(node: DerivedNode<TValue>): TValue;
+  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
 };
 ```
 
-The marks are Reactively's `CacheClean`, `CacheCheck`, and `CacheDirty` (`packages/core/src/core.ts` of `milomg/reactively`); MobX's `UP_TO_DATE_`, `POSSIBLY_STALE_`, and `STALE_` are the same scheme (`packages/mobx/src/core/derivation.ts`). Only a `Clean` node becomes `Check`, so `CheckState` always has a value; a `Dirty` node created and never computed has none. `TValue` is one type per graph: `ResolverResult<unknown>` in the core (Equality).
+The marks are Reactively's `CacheClean`, `CacheCheck`, and `CacheDirty` (`packages/core/src/core.ts` of `milomg/reactively`); MobX's `UP_TO_DATE_`, `POSSIBLY_STALE_`, and `STALE_` are the same scheme (`packages/mobx/src/core/derivation.ts`). Only a `Clean` node becomes `Check`, so `CheckState` always has a value; a `Dirty` node created and never computed has none.
 
-`graph.ts` imports nothing from the store, the reader, or the environment, and names no record, key, or artifact.
+`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links between nodes hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equal` is a method signature so that a `DerivedNode<number>` is an `AnyDerivedNode`: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equal: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `node.equal` only in `recompute`, with the node's previous value and the value its own computation just returned, so the bivariance admits no call the engine makes with a value of another type. Open decision 19. In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
+
+`readSource` returns the value it records, so a computation never reads `source.value` itself. Code outside a computation reads a source's value with `sourceValue`, which records nothing. No code outside `graph.ts` reads or writes `value`, `dependents`, or `slot`.
+
+`graph.ts` imports nothing, and names no record, key, artifact, or Isograph type.
 
 ```ts
-// from libs/isograph-runtime/src/graph.ts
+// from libs/<engine directory>/src/graph.ts
 /** The slot of `node`'s state. Every read and write of a node's value, mark, and dependencies goes
- * through it. */
-export function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
+ * through it. Not exported from the package. */
+function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
   return node.slot;
+}
+
+/** A source node holding `value`, read by no derived node. */
+export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
+  return { value, dependents: new Set() };
 }
 
 /** A derived node that was never computed: `Dirty`, no value, no dependencies. */
@@ -124,17 +136,19 @@ export function createDerivedNode<TValue>(
   };
 }
 
+/** The value of `source`, read outside a computation. Records nothing. */
+export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
+  return source.value;
+}
+
 /** Sets `source.value` and marks its dependents. The caller decided the value changed. */
-export function writeSource<TSourceValue, TValue>(
-  source: SourceNode<TSourceValue, TValue>,
-  value: TSourceValue,
-): void {
+export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
   source.value = value;
   markSourceChanged(source);
 }
 
 /** Marks every dependent of `source` `Dirty` and every node above those `Check`. Runs no computation. */
-export function markSourceChanged<TValue>(source: SourceNode<unknown, TValue>): void {
+export function markSourceChanged(source: SourceNode<unknown>): void {
   source.dependents.forEach(markDirty);
 }
 
@@ -142,18 +156,25 @@ export function markSourceChanged<TValue>(source: SourceNode<unknown, TValue>): 
 export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 
 /** Removes `node` from the dependents of everything it read, and marks its dependents `Dirty`. */
-export function disposeDerivedNode<TValue>(node: DerivedNode<TValue>): void {
+export function disposeDerivedNode(node: AnyDerivedNode): void {
   setDependencies(node, stateOf(node).state.dependencies, []);
   node.dependents.forEach(markDirty);
 }
+
+/** `===`: the equality of a node whose value is compared by identity. */
+export function sameValue(previous: unknown, next: unknown): boolean {
+  return previous === next;
+}
 ```
+
+`sameValue` was `storedResults.ts`'s private default output equality (Stored resolver results); it is generic, so it is the engine's, and `resolverNodeAt` imports it. Which comparison it makes is open decision 20.
 
 `stateOf` is the one accessor of per-node state so that Later: a DAG of graphs can give a node one slot per layer by changing `stateOf` alone. `computation`, `equal`, and `dependents` are not per world and stay on the node.
 
 ### Mark
 
 ```ts
-// from libs/isograph-runtime/src/graph.ts
+// from libs/<engine directory>/src/graph.ts
 /** `Clean`: becomes `Dirty` and marks its dependents `Check`. `Check`: becomes `Dirty`; its dependents
  * are already marked. `Dirty`: unchanged. */
 function markDirty<TValue>(node: DerivedNode<TValue>): void {
@@ -191,7 +212,7 @@ Invariant, outside a pull: every dependent of a node that is not `Clean` is not 
 ### Pull
 
 ```ts
-// from libs/isograph-runtime/src/graph.ts
+// from libs/<engine directory>/src/graph.ts
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   const state = stateOf(node).state;
   switch (state.mark) {
@@ -245,15 +266,16 @@ function recompute<TValue>(node: DerivedNode<TValue>, state: DirtyState<TValue>)
 
 type Computed<TValue> = {
   readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency<TValue>>;
+  readonly dependencies: ReadonlyArray<Dependency>;
 };
 
 /** Runs `computation` with a context that collects what it reads, in read order. */
 function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
-  const dependencies: Dependency<TValue>[] = [];
+  const dependencies: Dependency[] = [];
   const value = computation({
     readSource: (source) => {
       dependencies.push({ kind: 'Source', source });
+      return source.value;
     },
     readDerived: (node) => {
       const read = pull(node);
@@ -265,10 +287,10 @@ function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
 }
 
 /** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`. */
-function setDependencies<TValue>(
-  node: DerivedNode<TValue>,
-  previous: ReadonlyArray<Dependency<TValue>>,
-  next: ReadonlyArray<Dependency<TValue>>,
+function setDependencies(
+  node: AnyDerivedNode,
+  previous: ReadonlyArray<Dependency>,
+  next: ReadonlyArray<Dependency>,
 ): void;
 ```
 
@@ -289,6 +311,8 @@ The store is the set of source nodes. A record is a container that holds its sou
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
+import { createSourceNode, type DerivedNode, type SourceNode, sourceValue } from '<engine package>';
+
 /** Every record container: `EntityName`, then record id. */
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
 
@@ -306,7 +330,7 @@ export type RecordContainer = {
  * source node or derived node of a record the store does not hold. */
 export type RecordPresence = 'Present' | 'Absent';
 
-export type StoreSourceNode = SourceNode<StoreValue | Missing, ResolverResult<unknown>>;
+export type StoreSourceNode = SourceNode<StoreValue | Missing>;
 export type ResolverNode = DerivedNode<ResolverResult<unknown>>;
 
 /** A source node's value when the record holds no value under its key: missing data. */
@@ -324,7 +348,7 @@ export type StoreRecord = Map<StoreKey, StoreValue>;
 
 This is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `=== MISSING` narrows with no cast.
 
-There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` is the whole graph.
+There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` is the whole graph. The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `ComputeContext.readSource`; no store function reads or writes a node's fields.
 
 ### Accessors
 
@@ -356,13 +380,14 @@ export function presentContainerAt(store: Store, link: StoreLink): RecordContain
 /** The source node of `key` on `link`, inserted with `MISSING` (and its container `Absent`) when
  * absent. Callers: `normalize`'s `writeValue` and the graph read's `readValue` hook. */
 export function sourceNodeAt(store: Store, link: StoreLink, key: StoreKey): StoreSourceNode {
-  return getOrInsert(containerAt(store, link).sources, key, () => ({ value: MISSING, dependents: new Set() }));
+  return getOrInsert(containerAt(store, link).sources, key, () => createSourceNode<StoreValue | Missing>(MISSING));
 }
 
 /** The value of `key` on `link`, or `MISSING`; inserts nothing and records nothing. Callers: v1's read
  * hooks, `check`, the garbage collector's mark, `storeSnapshot`. */
 export function storeValue(store: Store, link: StoreLink, key: StoreKey): StoreValue | Missing {
-  return recordContainer(store, link)?.sources.get(key)?.value ?? MISSING;
+  const source = recordContainer(store, link)?.sources.get(key);
+  return source === undefined ? MISSING : sourceValue(source);
 }
 
 /** `Absent` when the store has no container at `link`. Callers: `check`, the garbage collector's mark. */
@@ -382,7 +407,7 @@ export type PlainStore = Map<EntityName, Map<RecordId, Map<StoreKey, StoreValue>
 export function deleteRecord(store: Store, link: StoreLink): void;
 ```
 
-`?? MISSING` is safe because a stored value is never `undefined` (`JsonValue` and `CompositeValue` exclude it). `storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store.
+`storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store.
 
 What each consumer becomes:
 
@@ -409,7 +434,7 @@ A resolver selected on an absent record (a parent reads a link to `Pet:9`, and `
 
 ### Equality
 
-Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equal(previous, next)` holds. The default is `===`.
+Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equal(previous, next)` holds. The default is the engine's `sameValue`, `===` (open decision 20).
 
 Correctness: an equality function only decides whether the dependents recompute. One that answers unequal for equal values makes them recompute from equal inputs to their old values, which costs work and never yields a wrong value. One that answers equal for unequal values yields a wrong value, so every rule other than `===` must answer equal only when every position a reader can observe is `===`.
 
@@ -543,6 +568,8 @@ function evaluatingHooks(store: Store): ReadHooks<never> {
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
+import { type Computation, type ComputeContext, createDerivedNode, pull, sameValue } from '<engine package>';
+
 /** The stored result of `artifact` on `root` with `variables`, pulled. */
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
   store: Store,
@@ -586,16 +613,9 @@ function resolverComputation(
 }
 
 /** Hooks that report each source node read to `context` and read each nested resolver as a derived node. */
-function contextHooks(
-  store: Store,
-  context: ComputeContext<ResolverResult<unknown>>,
-): ReadHooks<ReadResolverThrew> {
+function contextHooks(store: Store, context: ComputeContext): ReadHooks<ReadResolverThrew> {
   return {
-    readValue: (record, key) => {
-      const source = sourceNodeAt(store, record, key);
-      context.readSource(source);
-      return source.value;
-    },
+    readValue: (record, key) => context.readSource(sourceNodeAt(store, record, key)),
     readResolver: (artifact, root, variables) => context.readDerived(resolverNodeAt(store, artifact, root, variables)),
   };
 }
@@ -608,11 +628,6 @@ function callResolver(
   data: SelectionSetData,
   variables: Variables,
 ): ResolverResult<unknown>;
-
-/** `===`, the default output equality. */
-function sameValue(previous: unknown, next: unknown): boolean {
-  return previous === next;
-}
 ```
 
 The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
@@ -656,6 +671,8 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
+import { sourceValue, writeSource } from '<engine package>';
+
 /** A value `normalize` writes, with the shape its selection gives it. */
 type WrittenValue =
   | { readonly kind: 'Leaf'; readonly value: LeafValue }
@@ -665,7 +682,8 @@ type WrittenValue =
  * stored value is unchanged by `isUnchanged`. */
 function writeValue(normalization: Normalization, link: StoreLink, key: StoreKey, written: WrittenValue): void {
   const source = sourceNodeAt(normalization.store, link, key);
-  if (source.value === MISSING || !isUnchanged(source.value, written)) {
+  const stored = sourceValue(source);
+  if (stored === MISSING || !isUnchanged(stored, written)) {
     writeSource(source, written.value);
   }
 }
@@ -1196,3 +1214,35 @@ react.md and the landed runtime create a component's subscription at render unde
 ### 17. Who calls `garbageCollectEnvironment`
 
 It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:62-66`); releasing a request does not collect (network-and-subscriptions.md). It is the only function that deletes records and, with `collect`, disposes derived nodes. When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`): after every disposal, never automatically, or upstream's buffer of 10. This doc adds no option of its own.
+
+### 18. The engine package's name
+
+The name is the user's choice (AGENTS.md, Conflicts). Until it is decided, snippets write the package as `<engine package>` and its directory as `libs/<engine directory>`.
+
+Names in use. This workspace's packages are `isograph` (the root `package.json`), `@isograph/babel-plugin`, `@isograph/disposable-types`, `@isograph/runtime`, `@isograph/plugin-swc` (`libs/*/package.json`), `pet-demo` (`demos/pet-demo/package.json`), and `docs` (`docs-website/package.json`); `vscode-extension/package.json`, outside `pnpm-workspace.yaml`, is also `isograph`. Upstream's are `@isograph/babel-plugin`, `@isograph/compiler`, `@isograph/disposable-types`, `@isograph/react`, `@isograph/react-disposable-state`, `@isograph/reference-counted-pointer`, and `@isograph/plugin-swc` (`../isograph/libs/*/package.json`). Every library directory is `libs/isograph-<name>`. Upstream already ships Isograph-independent utilities under `@isograph`: `@isograph/disposable-types` has no dependencies, and `@isograph/reference-counted-pointer` depends only on it.
+
+The npm registry is not checked. The local npm cache (`~/.npm/_cacache`) and pnpm metadata cache (`~/Library/Caches/pnpm`) hold metadata only for packages this machine installed; of names starting with `pico` they hold `picocolors` and `picomatch`. So whether unscoped `pico` or any candidate below exists on npm is not verified. None of upstream's seven `package.json` files is `private`, so upstream publishes under `@isograph`, and a name under that scope is available to that scope's publishers only.
+
+- `@isograph/pico`, `libs/isograph-pico`. In use by no workspace or upstream package. Conflict: the Rust crate `pico` (`crates/pico/Cargo.toml`, `name = "pico"`; upstream's `crates/pico/Cargo.toml` is the same crate), which AGENTS.md and `docs-website/docs/design-docs/pico.md` call pico. The engine follows pico's model of source and derived nodes and differs from it: object references in both directions instead of ids and forward edges, marks instead of epochs, and no database (The graph). With this name, "pico" in code, docs, and review names two engines, and a sentence that cites pico's behavior (open decision 2 cites `Database::set`) needs the crate path to say which.
+- `@isograph/reactive-graph`, `libs/isograph-reactive-graph`. In use by no workspace or upstream package. No local conflict found.
+- `@isograph/derived-graph`, `libs/isograph-derived-graph`. In use by no workspace or upstream package. No local conflict found.
+- `@isograph/incremental`, `libs/isograph-incremental`. In use by no workspace or upstream package. Conflict: Jane Street's Incremental, an OCaml library of the same kind that this doc cites (open decision 8), so the name suggests its API, which this engine does not have (no heights, no stabilize).
+- An unscoped name (`pico`, `pico-graph`). Not in use locally; its registry state is not verified, and it is outside the scope upstream publishes under.
+
+Not held.
+
+### 19. How the engine types the links between nodes of different value types
+
+A standalone engine holds nodes of different value types in one graph (a `DerivedNode<string>` that reads a `DerivedNode<number>`), so every `dependents` set and every `Derived` dependency holds a node whose value type is erased.
+
+- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equal` a method signature so that `DerivedNode<T>` is assignable to it (The graph). Held, not decided. Reason: no cast and no wrapper; the engine calls `equal` only with two values the node's own computation produced. Cost: TypeScript's method bivariance also accepts a call such as `(node as AnyDerivedNode).equal('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it, and the API gives such code no reason to call `equal`.
+- (b) One value type per graph, the previous revision's `SourceNode<TSourceValue, TValue>` and `DerivedNode<TValue>` with `TValue` shared by every node. Cost: a project whose nodes have different value types declares a union and narrows every `readDerived` result; Isograph's own later runtime-defined computations widen `ResolverResult` the same way (Later: other derived node kinds).
+- (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
+
+### 20. The engine's identity equality
+
+`sameValue` is `===`. The Equality section's correctness rule says an equality may answer equal only when every position a reader can observe is the same. `===` answers equal for `0` and `-0`, which a reader can tell apart (`Object.is(x, -0)`, `1 / x`), so a computation whose value moves from `0` to `-0` cuts off and its readers keep the old value. `===` answers unequal for `NaN` and `NaN`, which recomputes the readers from equal inputs: work, never a wrong value.
+
+- (a) `===`, upstream's comparison of resolver values (`areEqualWithDeepComparison.ts:84-95`). The body is written for (a) until this is decided. Cost: the `0` and `-0` cutoff above.
+- (b) `Object.is`. Held, not decided. Reason: it is the comparison the Equality section's rule admits; it answers equal for `NaN` and `NaN` (indistinguishable) and unequal for `0` and `-0` (distinguishable). Cost: a deviation from upstream's `===` for resolver values, and a resolver that returns `-0` and then `0` marks its readers.
+- (c) No engine default: `createDerivedNode` callers write their own. Cost: every caller restates `===` or `Object.is`; Isograph's `resolverNodeAt` and the usage example need one anyway.
