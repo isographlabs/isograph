@@ -930,7 +930,7 @@ function compute<TValue>(
 - The context closes in `compute`'s `finally`. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array. A read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) would otherwise add an entry to the stored list with no matching `dependents` edge, so a later write to what it read would not mark the node. The closed context throws instead.
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
-`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about seven frames per level on the `recompute` path (`pull`, `recompute`, `compute`, `guarded`, its arrow, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so a pull traverses on the order of 1,000 levels of derived nodes; larger frames in a computation lower that. The engine does not raise the limit and does not catch the `RangeError`. A pull that overflows throws on its descent, from a `pull`, `verify`, `compute`, or computation frame, before the node at the overflowing depth computes. Every state write a pull makes follows a completed computation or verification, so a pull along one chain writes no state before it throws, and on a pull with branches the nodes that completed before the throw are `Clean` and correct (Throws). The throw leaves through `guarded`'s `finally` and the context's `finally` as a throw out of a computation does. A first pull of a chain taller than the limit cannot complete; the consumer pulls such a chain from the bottom up, one level per pull, as the marking test in `recompute.test.ts` does.
+`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about seven frames per level on the `recompute` path (`pull`, `recompute`, `compute`, `guarded`, its arrow, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 1,000 levels of derived nodes; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
 ### Dependencies
 
@@ -987,6 +987,8 @@ Without the reset, a `Clean` node disposed by `setDependencies` and marking alon
 ### Throws
 
 A computation and an equality must not throw. A throw out of either is a programmer error, and the engine defines no behavior for the node that threw: no retry, no stored error, no value. The engine guarantees only that its own state is not corrupted. A throw out of a computation propagates out of `compute`, and a throw out of `equal` propagates out of `recompute`, before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was before the throwing run. A throw out of a source's `equal` propagates out of `writeSource` before the value is set and before any marking. The `finally` in `guarded` restores `computingDepth`, so the graph accepts writes after the throw. Nodes pulled inside the failed computation before the throw are `Clean` and correct, because each pull completed.
+
+A `RangeError` from a pull that exceeds the call stack is the one throw this guarantee does not cover (Pull, open decision 12). It can leave from inside `setDependencies`, after some edges moved, so after it the engine's state is not guaranteed. Pull depth is a contract: a graph whose pull depth stays well below the stack limit never overflows.
 
 pico-runtime.md open decision 3 (decided) keeps the contract in the Isograph runtime: `callResolver` catches a resolver's own throw into a `ResolverThrew` value, so a resolver's throw does not leave an Isograph computation. A throw out of the walk (a store that disagrees with the reader AST, a missing variable) is a broken programmer invariant and propagates out of `pull`, as this section describes, and so does `GraphWriteDuringComputationError`, which `callResolver` rethrows (pico-runtime.md open decision 30).
 
@@ -1051,6 +1053,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 - A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
+- Keep the chain of derived nodes below any node you pull well below the call stack limit, an estimated 1,000 levels in Node with its default stack. A pull past the limit throws `RangeError`, and after it the engine does not guarantee its own state. Writes never overflow, at any height.
 ````
 
 The README's rules restate the engine's behavior under the options the body is written for: open decision 2 (f) and 9 (a). Each decision that changes names the README line it changes.
@@ -2480,6 +2483,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - Disposal resets the node to never computed (Disposal, open decision 9).
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
+- Pull depth is a contract on the consumer; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
 - The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equal` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
 - A `sourceValue` or `pull` inside a computation is an untracked read, and the guard covers writes only (decision 10).
 
@@ -2520,7 +2524,7 @@ pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure 
 
 ### 3. A throw out of a computation or an equality (decided)
 
-A computation and an equality must not throw; a throw is a programmer error (Throws). The engine guarantees only that its own state is not corrupted, which holds because the throw leaves before any state is written (pico-runtime.md open decision 3).
+A computation and an equality must not throw; a throw is a programmer error (Throws). The engine guarantees only that its own state is not corrupted, which holds because the throw leaves before any state is written (pico-runtime.md open decision 3). A `RangeError` from a pull that overflows the call stack is outside this guarantee (decision 12).
 
 ### 4. A cycle of derived nodes (decided)
 
@@ -2564,3 +2568,7 @@ Allowed. `sourceValue(source)`, and a `pull` called inside a computation outside
 ### 11. Whether the package ships before its first caller (decided)
 
 The package ships alone, as its own change (pico-runtime.md core change 4), with its tests and before the Isograph runtime uses it. Its reader is the user's stated goal that the engine is usable by projects outside Isograph (Readers before the Isograph runtime depends on it).
+
+### 12. Pull depth (decided)
+
+Pull depth is a contract on the consumer. `pull`, `verify`, `recompute`, and `compute` recurse once per level of derived nodes below the pulled node, so a graph's pull depth must stay well below the host's call stack limit, an estimated 1,000 derived levels in Node 24 with its default stack (Pull). Marking is iterative and never overflows (Mark). A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its state: at the limit, a node's edges may be partly moved by `setDependencies` (Throws). The engine has no iterative pull. In the Isograph runtime, pull depth is bounded by client field nesting.
