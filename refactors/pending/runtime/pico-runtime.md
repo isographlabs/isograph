@@ -247,18 +247,70 @@ export function recordPresence(store: Store, link: StoreLink): RecordPresence {
 }
 
 /** The store's server data as plain values: every `Present` record with every value that is not
- * `MISSING`. Callers: serialization, and tests comparing a store. */
-export function storeSnapshot(store: Store): PlainStore;
+ * `MISSING`, and no entity that has no `Present` record. Callers: serialization, and tests comparing
+ * a store. */
+export function storeSnapshot(store: Store): PlainStore {
+  return new Map(
+    [...store.records].flatMap(
+      ([entityName, containers]): ReadonlyArray<[EntityName, Map<RecordId, Map<StoreKey, StoreValue>>]> => {
+        const records = new Map(
+          [...containers]
+            .filter(([, container]) => container.presence === 'Present')
+            .map(([id, container]): [RecordId, Map<StoreKey, StoreValue>] => [id, presentValues(container)]),
+        );
+        return records.size === 0 ? [] : [[entityName, records]];
+      },
+    ),
+  );
+}
+
+/** Every value of `container`'s source nodes that is not `MISSING`, by store key. */
+function presentValues(container: RecordContainer): Map<StoreKey, StoreValue> {
+  return new Map(
+    [...container.sources].flatMap(([key, source]): ReadonlyArray<[StoreKey, StoreValue]> => {
+      const value = sourceValue(source);
+      return value === MISSING ? [] : [[key, value]];
+    }),
+  );
+}
 
 /** v1's `Store` shape, as data. */
 export type PlainStore = Map<EntityName, Map<RecordId, Map<StoreKey, StoreValue>>>;
 
 /** Marks every dependent of each source node of the container at `link`, disposes each derived node
- * it owns, and removes the container. Caller: `garbageCollect`'s sweep. */
-export function deleteRecord(store: Store, link: StoreLink): void;
+ * it owns, and removes the container, and its entity's map when that map is then empty, as v1's sweep
+ * does (`libs/isograph-runtime/src/garbageCollection.ts:32-41`). No container at `link`: nothing.
+ * Caller: `garbageCollect`'s sweep. */
+export function deleteRecord(store: Store, link: StoreLink): void {
+  const containers = store.records.get(link.entityName);
+  const container = containers?.get(link.id);
+  if (containers === undefined || container === undefined) {
+    return;
+  }
+  container.sources.forEach((source) => markSourceChanged(store.graph, source));
+  container.derived.forEach((node) => disposeDerivedNode(store.graph, node));
+  containers.delete(link.id);
+  if (containers.size === 0) {
+    store.records.delete(link.entityName);
+  }
+}
 ```
 
-`storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store.
+`storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store. `deleteRecord`'s `container.derived` line arrives with `derived` in core change 8; in core change 5 the container has no `derived` map.
+
+The sweep, after (`libs/isograph-runtime/src/garbageCollection.ts:32-41`):
+
+```ts
+// from libs/isograph-runtime/src/garbageCollection.ts
+  store.records.forEach((containers, entityName) => {
+    const kept = reachable.get(entityName);
+    containers.forEach((_container, id) => {
+      if (kept?.has(id) !== true) {
+        deleteRecord(store, { entityName, id });
+      }
+    });
+  });
+```
 
 What each consumer becomes:
 
@@ -299,11 +351,117 @@ The resolver node's equality:
 export function resolverResultsEqual(
   artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   outputEqual: (previous: unknown, next: unknown) => boolean,
-): (previous: ResolverResult<unknown>, next: ResolverResult<unknown>) => boolean;
+): (previous: ResolverResult<unknown>, next: ResolverResult<unknown>) => boolean {
+  return (previous, next) => {
+    switch (previous.kind) {
+      case 'Ok':
+        return next.kind === 'Ok' && okResultsEqual(artifact, outputEqual, previous, next);
+      case 'MissingData':
+        return next.kind === 'MissingData' && missingDataAreEqual(previous, next);
+      case 'ResolverThrew':
+        return next.kind === 'ResolverThrew' && previous.error === next.error;
+    }
+  };
+}
+
+/** Both `WalkData`: `selectionSetDataAreEqual` over the artifact's reader AST at its parent entity.
+ * Both `ResolverValue`: `outputEqual`. Origins differ: unequal. */
+function okResultsEqual(
+  artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
+  outputEqual: (previous: unknown, next: unknown) => boolean,
+  previous: ReadResolverOk<unknown>,
+  next: ReadResolverOk<unknown>,
+): boolean {
+  switch (previous.origin) {
+    case 'WalkData':
+      return (
+        next.origin === 'WalkData' &&
+        isSelectionSetData(previous.value) &&
+        isSelectionSetData(next.value) &&
+        selectionSetDataAreEqual(artifact.tables, artifact.parentEntityName, artifact.readerAst, previous.value, next.value)
+      );
+    case 'ResolverValue':
+      return next.origin === 'ResolverValue' && outputEqual(previous.value, next.value);
+  }
+}
+
+/** Equal `reason`, `recordLink` entity and id, and `nestedReason`, recursively; an absent
+ * `nestedReason` equals only an absent one. */
+function missingDataAreEqual(previous: ReadMissingData, next: ReadMissingData): boolean {
+  return (
+    previous.reason === next.reason &&
+    previous.recordLink.entityName === next.recordLink.entityName &&
+    previous.recordLink.id === next.recordLink.id &&
+    (previous.nestedReason === undefined || next.nestedReason === undefined
+      ? previous.nestedReason === next.nestedReason
+      : missingDataAreEqual(previous.nestedReason, next.nestedReason))
+  );
+}
 ```
 
+A `WalkData` value is the `SelectionSetData` the walk assembled (`callResolver`), so `isSelectionSetData` (`areEqualWithDeepComparison.ts:69-71`, exported for this) holds for both; `ReadResolverOk<T>` types `value` as `T`, so the narrowing is a check, not a cast.
+
+The structural rule over tables:
+
+```ts
+// from libs/isograph-runtime/src/areEqualWithDeepComparison.ts
+/** Whether two reads of `selections` at a record of `entity` hold equal values: each selection by its
+ * entry in `entity`'s table, as the walk reads it. */
+export function selectionSetDataAreEqual(
+  tables: EntityTables,
+  entity: EntityName,
+  selections: ReaderSelectionSet,
+  delivered: SelectionSetData,
+  read: SelectionSetData,
+): boolean {
+  const table = tableOf(tables, entity);
+  return selections.every((selection) =>
+    selectionValuesAreEqual(tables, table, entity, selection, delivered[selection.alias], read[selection.alias]),
+  );
+}
+
+function selectionValuesAreEqual(
+  tables: EntityTables,
+  table: EntityTable,
+  entity: EntityName,
+  selection: ReaderSelection,
+  delivered: unknown,
+  read: unknown,
+): boolean {
+  const field = fieldOf(table, entity, selection.fieldName);
+  switch (field.kind) {
+    case 'Source':
+      return valuesAreEqual(delivered, read, (a, b) => targetValuesAreEqual(tables, field.target, selection.selections, a, b));
+    case 'Derived': {
+      const target = field.target;
+      return target === null
+        ? delivered === read
+        : valuesAreEqual(delivered, read, (a, b) => targetValuesAreEqual(tables, target, selection.selections, a, b));
+    }
+  }
+}
+
+/** A value read at a record of `entity`: by `selections` recursively, or with `selections: null` by
+ * `===` (a scalar's `__value`, or `EMPTY_DATA`). */
+function targetValuesAreEqual(
+  tables: EntityTables,
+  entity: EntityName,
+  selections: ReaderSelectionSet | null,
+  delivered: unknown,
+  read: unknown,
+): boolean {
+  return selections === null
+    ? delivered === read
+    : isSelectionSetData(delivered) &&
+        isSelectionSetData(read) &&
+        selectionSetDataAreEqual(tables, entity, selections, delivered, read);
+}
+```
+
+Before (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-44`): `selectionSetDataAreEqual(selections, delivered, read)` and a `switch` on `selection.kind`. `valuesAreEqual` (`:48-67`) is unchanged, and `isSelectionSetData` (`:69-71`) is exported. `fieldOf` and `tableOf` are exported from `read.ts` for this file. Core change 6 changes it; core change 7 adds the `Self` case.
+
 - A resolver's return value: `outputEqual`, `===` unless the field supplies one (open decision 7). A primitive or a reused object cuts off; a new object marks the dependents.
-- Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual(tables, entity, selections, previous, next)` (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-67`), which reads each selection's entry in the entity's table as the walk does: a `Derived` entry with target `null` compares by `===`; a `Source` entry, a `Derived` entry with a target, and `__self` compare `null` to `null`, lists by length and item at any depth, and each linked record's value by its selections recursively (at the entry's target) or, with `selections: null`, by `===` (a scalar's `__value`, or `EMPTY_DATA`). That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, a link moved to a record with equal data cuts off, and an opaque derived output is never compared structurally.
+- Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` over the artifact's tables at its parent entity (below), which reads each selection's entry in the entity's table as the walk does: a `Derived` entry with target `null` compares by `===`; a `Source` entry, a `Derived` entry with a target, and `__self` compare `null` to `null`, lists by length and item at any depth, and each linked record's value by its selections recursively (at the entry's target) or, with `selections: null`, by `===` (a scalar's `__value`, or `EMPTY_DATA`). That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, a link moved to a record with equal data cuts off, and an opaque derived output is never compared structurally.
 - Source writes: each store source node compares a written value with the stored one by `isUnchanged` (The store): `leafUnchanged` for `__value` and `compositeUnchanged` for every other key, as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
 
 ```ts
@@ -453,6 +611,10 @@ The index exports `ReaderSelection`, `ReaderSelectionSet`, `EntityTable`, `Field
 
 ```ts
 // from libs/isograph-runtime/src/artifacts.ts
+/** The tables of the entities one reader artifact's walk reads at, or one normalization AST writes
+ * records of, by entity name. */
+export type EntityTables = { readonly [entityName: string]: () => EntityTable };
+
 /** What every reader and every normalization of one entity needs: each field's origin, and how a
  * record of the entity gets its id. The default export of an `entity_table.ts` artifact is a function
  * returning it. */
@@ -568,9 +730,6 @@ A refinement `asPet` on `Node` is a derived field the compiler generates on `Nod
 
 ```ts
 // from libs/isograph-runtime/src/read.ts
-/** The tables of the entities one reader artifact's walk reads at, by entity name. */
-type EntityTables = { readonly [entityName: string]: () => EntityTable };
-
 /** What a bare selection of a composite entity reads: one frozen empty object, so that two reads
  * compare `===`. */
 export const EMPTY_DATA: Readonly<Record<PropertyKey, never>> = Object.freeze({});
@@ -705,7 +864,7 @@ export type NormalizationAst<TEntityName extends EntityName = EntityName> = {
   readonly root: NormalizationRootRecord<TEntityName>;
   readonly selections: NormalizationSelectionSet;
   /** The table of every entity whose records `normalize` writes with this AST, for its `storage`. */
-  readonly tables: { readonly [entityName: string]: () => EntityTable };
+  readonly tables: EntityTables;
 };
 
 export type NormalizationSelection = {
@@ -773,10 +932,22 @@ export function recordId(
   variables: Variables,
 ): RecordId;
 
-/** `tables[entityName]().storage`. Throws when the AST has no table for it: the response names an
- * entity the compiled schema does not have. */
+/** `normalization.tables[entityName]().storage`. Throws when the AST has no table for it: the response
+ * names an entity the compiled schema does not have. */
 export function storageOf(normalization: Normalization, entityName: EntityName, path: ResponsePath): RecordStorage;
+
+// from libs/isograph-runtime/src/normalize.ts
+/** What every step of one `normalize` call reads besides its position. */
+type Normalization = {
+  readonly store: Store;
+  readonly discriminatorResponseKey: string;
+  readonly variables: Variables;
+  /** `ast.tables`, which `storageOf` reads. */
+  readonly tables: EntityTables;
+};
 ```
+
+`Normalization` before (`libs/isograph-runtime/src/normalize.ts:20-25`) has no `tables`; `normalize` sets `tables: ast.tables` beside `discriminatorResponseKey: ast.discriminatorResponseKey` (`:37-41`).
 
 `omittedRecordId` is `recordId`'s `Omit` branch (`libs/isograph-runtime/src/recordId.ts:109-114`), extracted verbatim; `recordId`'s `FromParent` arm calls it, its `OwnId` arm is the `Select` branch (`:95-108`), and its `Fixed` arm the `Fixed` branch (`:93-94`). A scalar record has the id an id-less object at the same place has: `Pet:1.name`, `Pet:1.tags.0`, `Pet:1.checkins____limit___2.0.location`. Its collisions are those of `Omit` ids (store.md).
 
@@ -1075,7 +1246,7 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
   readonly selectableName: string;
   readonly readerAst: ReaderSelectionSet;
   /** The table of every entity the walk of `readerAst` reads at, by entity name (Entity tables). */
-  readonly tables: { readonly [entityName: string]: () => EntityTable };
+  readonly tables: EntityTables;
   resolver(param: TParam): TOutput;
 };
 ```
@@ -1277,6 +1448,9 @@ Each is one commit, in order; each is independently shippable.
      return selection.target == null ? leafUnchanged : compositeUnchanged;
    }
    ```
+
+   Tests, in `libs/isograph-runtime/test/normalize.test.ts`: "normalizing the same response twice keeps every stored list and link object" (`toBe` on every value under `Query:__ROOT` and `Pet:1` after a second `normalize` of `petDetailResponse()`); "a changed link and a changed leaf are written, and the unchanged ones keep their stored objects"; "a leaf list equal by length and item keeps its stored list"; "a JSON object leaf is written again" (`===` only); "an absent key is written".
+
 2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged. `MISSING`, `Missing`, and `storeValue` land here on the plain store, for `readStoreValue` and `evaluatingHooks` (The reader walk); core change 5 gives `storeValue` the container body of The store, Accessors, with the same signature:
 
    ```ts
@@ -1292,6 +1466,9 @@ Each is one commit, in order; each is independently shippable.
      return value === undefined ? MISSING : value;
    }
    ```
+
+   Tests, in `libs/isograph-runtime/test/read.test.ts`: "a read of an absent root record is missing data on the root" (`:519`) and "an absent root is missing data on the root" (`:701`) assert `reason: 'No value for pet____id___"1" on Query:__ROOT'` where they assert `'No record for Query:__ROOT'` (`:524`, `:708`); "a field with an empty reader AST is missing data on an absent record" (`:564`) becomes "a field with an empty reader AST is Ok on an absent record", asserting `Ok` with `data: {}` and one call of its resolver where it asserts the reason `'No record for Pet:9'` (`:575`). New: "a read of a present record without the key and a read of an absent record give the same MissingData".
+
 3. Prefactor: scalar records on v1's reader AST (linked-only-selections.md, change 1; Scalar records). The normalization AST's `Leaf` target with its entity and list depth, `VALUE_KEY`, `omittedRecordId`, `leafRecords` (ids by `omittedRecordId` directly, before entity tables exist), and `check`'s and the mark's `Leaf` case. v1's `Scalar` case reads the link under its key, then `__value` at each linked record, lists mapped. Observable: the store is v1's nested map until core change 5, so the tests compare it with `storeOf(..)` as they do today (`storeSnapshot` arrives with the containers); after normalizing `PetDetail`'s response (`petDetailResponse()`, `test/fixtures.ts:98-102`) the store holds `Pet:1.name` as the link `{ entityName: 'String', id: 'Pet:1.name' }`, and `String:Pet:1.name` with `__value` `'Rex'`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged. On the plain store, the leaf comparison is chosen by the key, `writeValue` writes a record, and `leafRecords` takes the id from `omittedRecordId` and the record from `recordAt`; core change 5 replaces `writeValue` and `isUnchanged` with the source-node forms (`normalize` writes source nodes; The store, Accessors), and core change 6 replaces the id with `recordId(.., storageOf(..))` (Scalar records):
 
    ```ts
@@ -1331,11 +1508,26 @@ Each is one commit, in order; each is independently shippable.
      writeValue(recordAt(normalization.store, link), VALUE_KEY, value);
      return link;
    ```
+
+   Tests and fixtures. Every `storeOf(..)` that holds a leaf lists it as a link under the parent's key plus the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), and `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated with `Leaf` targets. New tests: in `test/normalize.test.ts`, "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", and "a custom scalar's JSON array below its list depth is one __value"; in `test/check.test.ts`, "a missing __value is missing its scalar record"; in `test/garbageCollection.test.ts`, "a scalar record no retained query reaches is deleted".
+
 4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/reactive-engine.md`: `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package), in the form of whichever option of its open decision 2 is decided. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
 5. Prefactor: the store becomes record containers (`Store` with `graph` and `records`, `createStore`, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
+
+   Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every store a test builds with `new Map()` is `createStore()` (`test/check.test.ts:36`, `:44`, `:48`; `test/garbageCollection.test.ts:34`, `:44`, `:105`; `test/network.test.ts:44`, `:332`; `test/environment.test.ts:23`, `:38`, `:61`; `test/read.test.ts:97`, `:521`, `:703`; `test/subscribe.test.ts:50`, `:610`, `:634`). Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(store.graph, sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
+
 6. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection` as `{ alias, fieldName, arguments, selections }`, an `entity_table.ts` per entity a reader artifact or normalization AST imports, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field (`Node/asPet/`) per selected refinement; the normalization AST loses `identity`. The runtime gains `EntityTable`, the walk of Selections in the Isograph layer (`fieldOf`, `tableOf`, `readAt`, `EMPTY_DATA`), `recordId` over `RecordStorage` and `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables; the four v1 selection kinds and `NormalizationIdentity` go. Observable: every generated artifact is regenerated in the new shape; every read returns the values it returned before; a `Node`-typed `node(id:)` selection of `asPet { name }` on a `Checkin` record is `null`; the pet script's output is unchanged.
+
+   Tests. Every generated artifact under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` is regenerated: reader ASTs in the minimal shape, one `entity_table.ts` per imported entity, `parentEntityName`, `selectableName`, and `tables` on each reader artifact, and `tables` on each normalization AST. The landed tests of `test/read.test.ts`, `test/normalize.test.ts`, `test/check.test.ts`, `test/garbageCollection.test.ts`, and `test/subscribe.test.ts` keep their assertions. New: in `test/read.test.ts`, "a Node-typed node(id:) selection of asPet on a Checkin record is null", "asPet on a Pet record reads the selections at the record as Pet", and "a Source entry missing from the entity table throws"; in `test/normalize.test.ts`, "the record id comes from the entity table's storage", and "a response naming an entity with no table throws"; in `test/subscribe.test.ts`, "a link moved to a record with equal data is equal".
+
 7. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, client fields on scalar entities, and `__self`. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `EMPTY_DATA` or `null`.
+
+   Tests. The store fixture gains the Example's fields (`field Query.PetDetailPage`, `field String.toUppercase`, linked-only-selections.md, Generated files for the example). New: in `test/read.test.ts`, "PetDetailPage reads n1, n2 through toUppercase, and bestFriend", "a bare bestFriend is EMPTY_DATA, or null when the link is null", "a bare __self on a scalar record is its value", and "__self with a selection set reads at the same record".
+
 8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, identical)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
+
+   Tests, in a new `libs/isograph-runtime/test/storedResults.test.ts`, each counting resolver calls with `vi.fn` as `test/read.test.ts` does: "a second read with no write calls no resolver and returns the same object"; "after a write to Pet:2.name, PetDetailPage runs and toUppercase does not"; "a write that leaves toUppercase's result equal reruns a reader that reads n1, and not a reader without n1"; "a resolver that throws is stored as ResolverThrew and is not called again until an input changes"; "a resolver that normalizes into the store throws GraphWriteDuringComputationError out of readStoredResult, and the store is unchanged" (open decision 30); "MissingData on an absent record becomes Ok after normalize writes the record"; "deleting a record disposes the nodes it owns and the next read recomputes their readers"; "a refinement node is computed once and not marked by a write to its record"; "two selections of one field with equal arguments on one record share one node"; "F____n___2 with no variables and F with { n: 2 } are two nodes" (open decision 1); and, degenerate, "a resolver with an empty reader AST on an absent record is Ok and computed once". `demos/pet-demo/src/fetchAndRead.ts`'s output is unchanged.
+
 9. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way re-reads the subscriptions over the writes it made (open decision 4), and `garbageCollectEnvironment` calls `callSubscriptions` after the sweep, so a subscription that read a deleted record is re-read. Neither call depends on subscriptions being derived nodes. `callSubscriptions` never throws (`libs/isograph-runtime/src/subscribe.ts:92-95`; `readSubscription` catches a throwing pull as `ReadErr`, `:126-130`), so `normalize`'s throw still reaches the `.catch`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback; a response that changes `Pet:0.tagline` and then throws delivers the new tagline to the subscription; a collection that deletes a record a subscription read delivers that subscription's `MissingData`.
 
    ```ts
@@ -1380,6 +1572,82 @@ Each is one commit, in order; each is independently shippable.
    ```
 
    `environment.ts` imports `callSubscriptions` from `./subscribe`, which imports only types from `./environment`.
+
+   ```ts
+   // from libs/isograph-runtime/src/storedResults.ts
+   /** Hooks that read each value with nothing recorded and each nested resolver as its stored result,
+    * pulled. Caller: `readSubscription`. */
+   export function storedResultHooks(store: Store): ReadHooks<ReadResolverThrew> {
+     return {
+       readValue: (record, key) => storeValue(store, record, key),
+       readResolver: (artifact, root, variables) => readStoredResult(store, artifact, root, variables),
+     };
+   }
+
+   // from libs/isograph-runtime/src/subscribe.ts
+   /** What a subscription delivers: the reader's data, `MissingData`, a nested resolver's throw, or a
+    * broken store invariant. */
+   export type SubscriptionResult =
+     | ReadOk<SelectionSetData>
+     | ReadMissingData
+     | ReadResolverThrew
+     | ReadErr;
+
+   /** A read that threw: a store invariant broke (store.md, Errors), or the engine's guard rejected a
+    * write (open decision 30). */
+   export type ReadErr = {
+     readonly kind: 'Err';
+     readonly error: unknown;
+   };
+
+   // readSubscription, before (libs/isograph-runtime/src/subscribe.ts:126-130):
+     try {
+       return readButDoNotEvaluate(environment.store, artifact, root, variables);
+     } catch (error: unknown) {
+       return { kind: 'Err', error };
+     }
+   // after:
+     try {
+       return readData(storedResultHooks(environment.store), artifact, root, variables);
+     } catch (error: unknown) {
+       return { kind: 'Err', error };
+     }
+
+   // subscriptionResultsAreEqual, after core change 6 and this change (before: subscribe.ts:135-155):
+   /** `Ok` results by the reader AST's rule; two `MissingData` are equal; two `ResolverThrew` or two
+    * `Err` when their errors are `===`; different kinds never. */
+   function subscriptionResultsAreEqual(
+     artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
+     delivered: SubscriptionResult,
+     result: SubscriptionResult,
+   ): boolean {
+     switch (delivered.kind) {
+       case 'Ok':
+         return (
+           result.kind === 'Ok' &&
+           selectionSetDataAreEqual(artifact.tables, artifact.parentEntityName, artifact.readerAst, delivered.value, result.value)
+         );
+       case 'MissingData':
+         return result.kind === 'MissingData';
+       case 'ResolverThrew':
+         return result.kind === 'ResolverThrew' && delivered.error === result.error;
+       case 'Err':
+         return result.kind === 'Err' && delivered.error === result.error;
+     }
+   }
+   ```
+
+   Core change 6 changes the `Ok` arm's call from `selectionSetDataAreEqual(artifact.readerAst, ..)` to the tables form (Equality); this change adds the `ResolverThrew` arm. The index exports `storedResultHooks`'s readers only through `readAndSubscribe` and `callSubscriptions`; `storedResultHooks` itself is not exported from the package index.
+
+   Tests, in `libs/isograph-runtime/test/subscribe.test.ts`. The landed tests that change:
+
+   - "a nested resolver that throws at subscribe gives an Err snapshot" (`:444`) becomes "a nested resolver that throws at subscribe gives a ResolverThrew snapshot": `kind: 'ResolverThrew'` where it asserts `kind: 'Err'` (`:453-456`).
+   - "a nested resolver that throws at a re-read delivers Err, and other subscriptions are still called" (`:459`) becomes "a nested resolver that throws at a re-read delivers ResolverThrew, and other subscriptions are still called": `kind: 'ResolverThrew'` at `:475-478`; and the `callSubscriptions` with no write between (`:481-483`) leaves `onThrowingResult` at one call, because the stored node returns the same `ResolverThrew` and its error is `===`.
+   - "a read that throws after a response leaves the request Ok" (`:631`) asserts `'ResolverThrew'` where it asserts `'Err'` (`:657`).
+   - "nested resolvers that return new objects make every re-read unequal" (`:175`) becomes "nested resolvers that return new objects are not called again after an unrelated write": after `writePet9`, `onResult` has no call (`:202-203`), because no node `PetSummary`'s nested resolvers own read what `writePet9` writes.
+   - "a stored non-link under a composite store key delivers Err with the store message" (`:486`) still asserts `Err`: a broken store invariant is a throw out of the walk.
+
+   New tests: "a re-read after an unrelated write calls no nested resolver and not the callback"; "a response that changes a value and then throws delivers the changed value" (open decision 4); "a collection that deletes a record a subscription read delivers MissingData"; "a nested resolver that writes the store delivers Err with GraphWriteDuringComputationError" (open decision 30).
 
 ## Later: retention and the fetch decision
 
