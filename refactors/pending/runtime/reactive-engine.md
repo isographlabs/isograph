@@ -469,7 +469,7 @@ export function writeSource<TValue>(
     return;
   }
   source.value = value;
-  source.dependents.forEach(markDirty);
+  markDirty(source.dependents);
 }
 
 export function markSourceChanged(
@@ -477,13 +477,20 @@ export function markSourceChanged(
   source: SourceNode<unknown>,
 ): void {
   assertNotComputing(graph);
-  source.dependents.forEach(markDirty);
+  markDirty(source.dependents);
 }
 
-/** `Clean`: becomes `Dirty` and marks its dependents `Check`. `Check`: becomes `Dirty`; its
- * dependents are already marked. `Dirty`: unchanged. Called by `writeSource`, `markSourceChanged`,
- * `recompute` (on the dependents of a node whose value changed), and `disposeDerivedNode`. */
-function markDirty<TValue>(node: DerivedNode<TValue>): void {
+/** Marks each of `nodes` `Dirty` and every `Clean` node above them `Check`. Called with
+ * `source.dependents` by `writeSource` and `markSourceChanged`, and with `node.dependents` by
+ * `recompute` (a node whose value changed) and `disposeDerivedNode`. */
+function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
+  markCheck([...nodes].flatMap(markOneDirty));
+}
+
+/** `Clean`: becomes `Dirty`, and returns its dependents, which `markDirty` marks `Check`. `Check`:
+ * becomes `Dirty` and returns none, because its dependents are already marked. `Dirty`: unchanged,
+ * returns none. Called only by `markDirty`. */
+function markOneDirty(node: AnyDerivedNode): ReadonlyArray<AnyDerivedNode> {
   const slot = stateOf(node);
   const state = slot.state;
   switch (state.mark) {
@@ -493,38 +500,44 @@ function markDirty<TValue>(node: DerivedNode<TValue>): void {
         previous: { kind: 'Value', value: state.value },
         dependencies: state.dependencies,
       };
-      node.dependents.forEach(markCheck);
-      return;
+      return [...node.dependents];
     case 'Check':
       slot.state = {
         mark: 'Dirty',
         previous: { kind: 'Value', value: state.value },
         dependencies: state.dependencies,
       };
-      return;
+      return [];
     case 'Dirty':
-      return;
+      return [];
   }
 }
 
-/** A `Clean` node becomes `Check` and marks its dependents `Check`. A marked node is left as is.
- * Called only by `markDirty` and by itself. */
-function markCheck<TValue>(node: DerivedNode<TValue>): void {
-  const slot = stateOf(node);
-  const state = slot.state;
-  if (state.mark !== 'Clean') {
-    return;
+/** Marks every `Clean` node of `start`, and every `Clean` node above those, `Check`. A marked node
+ * is left as is, and the nodes above it are not visited. Walks an explicit work list, so the call
+ * stack does not grow with the height of the graph. Called only by `markDirty`. */
+function markCheck(start: ReadonlyArray<AnyDerivedNode>): void {
+  const work = [...start];
+  let node = work.pop();
+  while (node !== undefined) {
+    const slot = stateOf(node);
+    const state = slot.state;
+    if (state.mark === 'Clean') {
+      slot.state = {
+        mark: 'Check',
+        value: state.value,
+        dependencies: state.dependencies,
+      };
+      node.dependents.forEach((dependent) => work.push(dependent));
+    }
+    node = work.pop();
   }
-  slot.state = {
-    mark: 'Check',
-    value: state.value,
-    dependencies: state.dependencies,
-  };
-  node.dependents.forEach(markCheck);
 }
 ```
 
-`markDirty` and `markCheck` never add or remove an element of a `dependents` set, so iterating a set while marking is safe.
+`markDirty` and `markCheck` never add or remove an element of a `dependents` set, and each copies a set into an array before it marks, so no set is iterated while marking.
+
+Marking does not recurse. `markCheck` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive `markCheck` would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `work` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
 
 ### Pull
 
@@ -602,7 +615,7 @@ function recompute<TValue>(
     value: computed.value,
     dependencies: computed.dependencies,
   };
-  node.dependents.forEach(markDirty);
+  markDirty(node.dependents);
   return computed.value;
 }
 
@@ -661,6 +674,8 @@ function compute<TValue>(
 - The context closes in `compute`'s `finally`. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array. A read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) would otherwise add an entry to the stored list with no matching `dependents` edge, so a later write to what it read would not mark the node. The closed context throws instead.
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
+`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about seven frames per level on the `recompute` path (`pull`, `recompute`, `compute`, `guarded`, its arrow, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so a pull traverses on the order of 1,000 levels of derived nodes; larger frames in a computation lower that. The engine does not raise the limit and does not catch the `RangeError`. A pull that overflows throws on its descent, from a `pull`, `verify`, `compute`, or computation frame, before the node at the overflowing depth computes. Every state write a pull makes follows a completed computation or verification, so a pull along one chain writes no state before it throws, and on a pull with branches the nodes that completed before the throw are `Clean` and correct (Throws). The throw leaves through `guarded`'s `finally` and the context's `finally` as a throw out of a computation does. A first pull of a chain taller than the limit cannot complete; the consumer pulls such a chain from the bottom up, one level per pull, as the marking test in `recompute.test.ts` does.
+
 ### Dependencies
 
 ```ts
@@ -702,7 +717,7 @@ export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
   const slot = stateOf(node);
   setDependencies(node, slot.state.dependencies, []);
   slot.state = neverComputed();
-  node.dependents.forEach(markDirty);
+  markDirty(node.dependents);
 }
 ```
 
@@ -965,6 +980,7 @@ import {
   createDerivedNode,
   createGraph,
   createSourceNode,
+  type DerivedNode,
   pull,
   writeSource,
 } from '../src';
@@ -1292,6 +1308,21 @@ describe('marking and the short circuit', () => {
     expect(pull(graph, left)).toBe(3);
     expect(pull(graph, right)).toBe(4);
     expect(calls).toEqual({ left: 2, right: 2, bottom: 2 });
+  });
+
+  test('marking a chain of 100,000 nodes completes', () => {
+    const graph = createGraph();
+    const count = createSourceNode(0, strictEqual);
+    const chain: ReadonlyArray<DerivedNode<number>> = Array.from({ length: 100_000 }, (_, index) =>
+      createDerivedNode((context) => {
+        const below = chain[index - 1];
+        return below === undefined ? context.readSource(count) : context.readDerived(below) + 1;
+      }, strictEqual),
+    );
+    expect(chain.map((node) => pull(graph, node)).at(-1)).toBe(99_999);
+
+    expect(() => writeSource(graph, count, 1)).not.toThrow();
+    expect(chain.map((node) => pull(graph, node)).at(-1)).toBe(100_000);
   });
 
   test('top-level pull order changes neither values nor what runs', () => {
