@@ -8,7 +8,7 @@ Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit 
 
 Everything is graph. A server value is a source node in the store, and a resolver result is a derived node beside it in the same record container. Every edge is an object reference in both directions. A write sets a source node's value and marks the derived nodes above it, and runs no resolver. A read pulls: it brings a marked derived node up to date, and recomputes it only when an input it read changed value (short circuit). A resolver is called again on a pull only when its node is `Dirty`: a source node its last computation read was written with a value `normalize` found changed, a derived node it read recomputed to a value its `equal` rejected, the record container of a source node it read was deleted, a derived node it read was disposed, or the record that owns its node was deleted (the next read creates a new node).
 
-The engine is independent of Isograph and usable on its own by other projects (the user's goal). The engine is the graph: source nodes, derived nodes, marks, marking, pull with short circuit, dependency recording, per-node equality, and disposal. It ships as its own package with no runtime dependencies (The engine package), imports nothing from the Isograph runtime, and names no Isograph type in its API, so a project that has no store, no reader AST, and no resolver uses it with values of its own types. Everything Isograph-specific (record containers, absent records and `MISSING`, the reader walk and its hooks, resolver nodes and their keys, `normalize`'s marking, resolver result equality, record deletion, and garbage collection) lives in the Isograph runtime and calls the engine's public API (The engine and the Isograph runtime).
+The engine is independent of Isograph and usable on its own by other projects (the user's goal). The engine is the graph: source nodes, derived nodes, marks, marking, pull with short circuit, dependency recording, per-node equality, and disposal. It ships as its own package with no runtime dependencies (reactive-engine.md, The package), imports nothing from the Isograph runtime, and names no Isograph type in its API, so a project that has no store, no reader AST, and no resolver uses it with values of its own types. Everything Isograph-specific (record containers, absent records and `MISSING`, the reader walk and its hooks, resolver nodes and their keys, `normalize`'s marking, resolver result equality, record deletion, and garbage collection) lives in the Isograph runtime and calls the engine's public API (The engine). `refactors/pending/runtime/reactive-engine.md` is the engine's specification.
 
 The core is a single graph with reads and short circuit. Everything that keeps values up to date without a read (observers, subscriptions as derived nodes, effects), retention, the collection of unreached derived nodes, and optimistic layers are later sections, built on the core and not part of its first implementation.
 
@@ -25,477 +25,51 @@ FC reads: root.2, root.3, other.2, other.3
 
 `root.2` is the source node of key `2` on record `root`. `FP` and `FC` are the derived nodes of those fields on `root`. `X.dependents` is the set of derived nodes whose last computation read `X`. The traces are in Traces, after the types.
 
-## The graph
+## The engine
 
-The graph is the engine package's one module, `src/graph.ts` (The engine package). The package is `@isograph/reactive-graph` in `libs/reactive-graph` (open decision 18). pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. Here every edge is an object reference, and each node holds both directions: a derived node's `dependencies` point down, and every node's `dependents` point up. Deviation reason: marking walks `dependents` from the written node, so a write costs the nodes it reaches, not the live graph (pico's epoch verification walks every dependency under the demanded memo).
+The engine is `refactors/pending/runtime/reactive-engine.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction and plain reads, The guard, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/reactive-graph` in `libs/reactive-graph` (open decision 18).
 
-```ts
-// from libs/reactive-graph/src/graph.ts
-/** One graph of source and derived nodes. It holds the guard that rejects a write while a computation
- * runs (open decision 2). Created by `createGraph`; every public function that writes the graph, and
- * `pull`, take it first. */
-export type Graph = {
-  /** The number of computations running. Written only by `compute`. A count, not a two-state enum,
-   * because `readDerived` recomputes a node inside the computation that reads it. */
-  computingDepth: number;
-};
+pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (reactive-engine.md, Reverse edges, no epochs).
 
-/** A value set from outside the graph, and the derived nodes whose last computation read it. */
-export type SourceNode<TValue> = {
-  /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
-  value: TValue;
-  /** Whether a written value equals the stored one, so that `writeSource` marks nothing. A method
-   * signature, as `DerivedNode.equal` is. */
-  equal(previous: TValue, next: TValue): boolean;
-  /** Written only by `setDependencies`. */
-  readonly dependents: Set<AnyDerivedNode>;
-};
+The engine's signatures depend on its open decision 2, which is not decided (reactive-engine.md open decision 2; this doc's open decision 2). Every engine call in this doc follows reactive-engine.md's form for whichever option is decided. This doc writes the calls in the (f) form of reactive-engine.md, The public API: `createSourceNode(value, equal)`, `createDerivedNode(computation, equal)`, `writeSource(store.graph, source, value)`, `markSourceChanged(store.graph, source)`, `pull(store.graph, node)`, `disposeDerivedNode(store.graph, node)`. Under (g), the held option, the constructors take `store.graph` first and the other four calls drop it (reactive-engine.md, Option (g)). The Isograph layer is otherwise the same under both.
 
-/** A computation's value, kept until an input it read changes. */
-export type DerivedNode<TValue> = {
-  readonly computation: Computation<TValue>;
-  /** Whether two values of this node are equal, for cutoff. */
-  equal(previous: TValue, next: TValue): boolean;
-  /** Value, mark, and dependencies. Read and written only through `stateOf`. */
-  readonly slot: StateSlot<TValue>;
-  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
-  readonly dependents: Set<AnyDerivedNode>;
-};
+### The engine and the Isograph runtime
 
-/** A derived node of any value type: the element of every `dependents` set and of a `Derived` dependency. */
-export type AnyDerivedNode = DerivedNode<unknown>;
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function reads or writes a node's `value`, `dependents`, `slot`, or a graph's `computingDepth`, and no Isograph function calls an engine function the index does not export (`stateOf`, `neverComputed`, `assertNotComputing`, `guarded`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`, `dependentsOf`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, dependencies recorded per computation, and a write during a computation failing (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
 
-/** The holder of one derived node's state. */
-export type StateSlot<TValue> = { state: DerivedNodeState<TValue> };
+The calls the Isograph runtime makes, by export of the engine's index (reactive-engine.md, The public API):
 
-/** What the node's last computation established, and whether it is still current. */
-export type DerivedNodeState<TValue> = CleanState<TValue> | CheckState<TValue> | DirtyState<TValue>;
+- `createGraph`: `createStore` (The store).
+- `createSourceNode`: `sourceNodeAt`, with `MISSING` and `isUnchanged(key)` (The store).
+- `sourceValue`: `storeValue` and `storeSnapshot` (The store).
+- `writeSource`: `normalize`'s `writeValue` (`normalize` writes source nodes), and `storeFrom` in `test/fixtures.ts`.
+- `markSourceChanged`: `deleteRecord`, for each source node of the deleted container (The store).
+- `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, identical)` (Stored resolver results).
+- `pull`: `readStoredResult` (Stored resolver results).
+- `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
+- The types `Graph`, `SourceNode`, `DerivedNode`, `Computation`, and `ComputeContext`: `store.ts` and `storedResults.ts`.
 
-/** `value` is what a computation would return now. */
-export type CleanState<TValue> = {
-  readonly mark: 'Clean';
-  readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
-};
-
-/** A derived node this one reads, directly or transitively, is `Dirty`. */
-export type CheckState<TValue> = {
-  readonly mark: 'Check';
-  readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
-};
-
-/** A source node it read changed, or a derived node it read recomputed to a value `equal` rejects,
- * or it was never computed, or it was disposed. */
-export type DirtyState<TValue> = {
-  readonly mark: 'Dirty';
-  readonly previous: PreviousValue<TValue>;
-  readonly dependencies: ReadonlyArray<Dependency>;
-};
-
-/** `NoValue`: the node was never computed, or it was disposed. */
-export type PreviousValue<TValue> =
-  | { readonly kind: 'NoValue' }
-  | { readonly kind: 'Value'; readonly value: TValue };
-
-/** One read of the node's last computation, in read order. */
-export type Dependency =
-  | { readonly kind: 'Source'; readonly source: SourceNode<unknown> }
-  | { readonly kind: 'Derived'; readonly node: AnyDerivedNode };
-
-/** A derived node's computation. It reads every node through `context`. */
-export type Computation<TValue> = (context: ComputeContext) => TValue;
-
-export type ComputeContext = {
-  /** Records that the computation read `source`, and returns its value. */
-  readSource<TValue>(source: SourceNode<TValue>): TValue;
-  /** Pulls `node`, records the dependency, and returns its value. */
-  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
-};
-```
-
-The marks are Reactively's `CacheClean`, `CacheCheck`, and `CacheDirty` (`packages/core/src/core.ts` of `milomg/reactively`); MobX's `UP_TO_DATE_`, `POSSIBLY_STALE_`, and `STALE_` are the same scheme (`packages/mobx/src/core/derivation.ts`). Only a `Clean` node becomes `Check`, so `CheckState` always has a value; a `Dirty` node created and never computed has none.
-
-`TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links between nodes hold `AnyDerivedNode` and `SourceNode<unknown>`, and the engine's functions are generic in the node they receive, so a node reached through `dependents` is handled at `TValue = unknown`. `equal` is a method signature so that a `DerivedNode<number>` is an `AnyDerivedNode`: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equal: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `node.equal` only in `recompute`, with the node's previous value and the value its own computation just returned, so the bivariance admits no call the engine makes with a value of another type. Open decision 19. In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
-
-A write of an equal value does not propagate: `writeSource` compares with the source's own `equal` and marks nothing when it accepts, as pico's `set` does not advance the epoch for an equal value (`set_source`, `crates/pico/src/database.rs:310-329`). `equal` is required: the engine cannot know what equal means for a consumer's values (open decision 23).
-
-`readSource` returns the value it records, so a computation never reads `source.value` itself. Code outside a computation reads a source's value with `sourceValue`, which records nothing. No code outside `graph.ts` reads or writes `value`, `dependents`, or `slot`.
-
-`graph.ts` imports nothing, and names no record, key, artifact, or Isograph type.
-
-```ts
-// from libs/reactive-graph/src/graph.ts
-/** The slot of `node`'s state. Every read and write of a node's value, mark, and dependencies goes
- * through it. Not exported from the package. */
-function stateOf<TValue>(node: DerivedNode<TValue>): StateSlot<TValue> {
-  return node.slot;
-}
-
-/** A graph with no computation running. */
-export function createGraph(): Graph {
-  return { computingDepth: 0 };
-}
-
-/** Throws when a computation of `graph` is running. Called first by every public function that writes
- * the graph. */
-function assertNotComputing(graph: Graph): void {
-  if (graph.computingDepth > 0) {
-    throw new Error('Cannot write the graph while a computation is running.');
-  }
-}
-
-/** A source node holding `value`, read by no derived node, whose writes compare by `equal`. */
-export function createSourceNode<TValue>(
-  value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
-): SourceNode<TValue> {
-  return { value, equal, dependents: new Set() };
-}
-
-/** A derived node that was never computed: `Dirty`, no value, no dependencies. */
-export function createDerivedNode<TValue>(
-  computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
-): DerivedNode<TValue> {
-  return {
-    computation,
-    equal,
-    slot: { state: neverComputed() },
-    dependents: new Set(),
-  };
-}
-
-/** The state of a node that was never computed or was disposed. */
-function neverComputed<TValue>(): DirtyState<TValue> {
-  return { mark: 'Dirty', previous: { kind: 'NoValue' }, dependencies: [] };
-}
-
-/** The value of `source`, read outside a computation. Records nothing. */
-export function sourceValue<TValue>(source: SourceNode<TValue>): TValue {
-  return source.value;
-}
-
-/** Sets `source.value` and marks its dependents, unless `source.equal` accepts `value`, in which case
- * the stored value object stays and nothing is marked. Throws while a computation runs. */
-export function writeSource<TValue>(graph: Graph, source: SourceNode<TValue>, value: TValue): void {
-  assertNotComputing(graph);
-  if (source.equal(source.value, value)) {
-    return;
-  }
-  source.value = value;
-  source.dependents.forEach(markDirty);
-}
-
-/** Marks every dependent of `source` `Dirty` and every node above those `Check`. Runs no computation.
- * Throws while a computation runs. */
-export function markSourceChanged(graph: Graph, source: SourceNode<unknown>): void {
-  assertNotComputing(graph);
-  source.dependents.forEach(markDirty);
-}
-
-/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Allowed inside a
- * computation, where it records nothing on the reading node, as `sourceValue` does. */
-export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
-
-/** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
- * its dependents `Dirty`. A later pull computes it again (open decision 24). Throws while a computation
- * runs. */
-export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
-  assertNotComputing(graph);
-  const slot = stateOf(node);
-  setDependencies(node, slot.state.dependencies, []);
-  slot.state = neverComputed();
-  node.dependents.forEach(markDirty);
-}
-```
-
-The engine defines no equality and exports no comparison: `equal` is a required argument of `createSourceNode` and `createDerivedNode` (open decision 20).
-
-Disposal resets the node's state as well as its edges. A node that kept its `Clean` state after leaving every `dependents` set would return its old value on every later pull, because no write reaches it. The reset drops the value (`NoValue`), so the engine holds no reference to it, and leaves the state listing no dependency that does not list the node back. The dependents' lists still name the disposed node and `node.dependents` still names them, so the inverse holds until their next recomputation.
-
-`stateOf` is the one accessor of per-node state so that Later: a DAG of graphs can give a node one slot per layer by changing `stateOf` alone. `computation`, `equal`, and `dependents` are not per world and stay on the node.
-
-### Mark
-
-```ts
-// from libs/reactive-graph/src/graph.ts
-/** `Clean`: becomes `Dirty` and marks its dependents `Check`. `Check`: becomes `Dirty`; its dependents
- * are already marked. `Dirty`: unchanged. */
-function markDirty<TValue>(node: DerivedNode<TValue>): void {
-  const slot = stateOf(node);
-  const state = slot.state;
-  switch (state.mark) {
-    case 'Clean':
-      slot.state = { mark: 'Dirty', previous: { kind: 'Value', value: state.value }, dependencies: state.dependencies };
-      node.dependents.forEach(markCheck);
-      return;
-    case 'Check':
-      slot.state = { mark: 'Dirty', previous: { kind: 'Value', value: state.value }, dependencies: state.dependencies };
-      return;
-    case 'Dirty':
-      return;
-  }
-}
-
-/** A `Clean` node becomes `Check` and marks its dependents `Check`. A marked node is left as is. */
-function markCheck<TValue>(node: DerivedNode<TValue>): void {
-  const slot = stateOf(node);
-  const state = slot.state;
-  if (state.mark !== 'Clean') {
-    return;
-  }
-  slot.state = { mark: 'Check', value: state.value, dependencies: state.dependencies };
-  node.dependents.forEach(markCheck);
-}
-```
-
-A write marks the direct dependents of each source node it changed `Dirty` and their transitive dependents `Check`, stopping at a node already marked, and runs no resolver. Marking is transitive because nothing computes during a write: whether a derived node's value changes is known only by computing it.
-
-Invariant, outside a pull: every dependent of a node that is not `Clean` is not `Clean`. Marking keeps it, because a node that leaves `Clean` marks its dependents. A dependent is added only by a computation, which pulled the node first, and a pulled node ends `Clean`. So `markCheck` may stop at a marked node, and a second write to a source costs one step per direct dependent.
-
-### Pull
-
-```ts
-// from libs/reactive-graph/src/graph.ts
-export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue {
-  const state = stateOf(node).state;
-  switch (state.mark) {
-    case 'Clean':
-      return state.value;
-    case 'Check':
-      return verify(graph, node, state);
-    case 'Dirty':
-      return recompute(graph, node, state);
-  }
-}
-
-/** Pulls each `Derived` dependency in recorded order until one recomputes to a value its `equal`
- * rejects, which marks `node` `Dirty`; then recomputes. Otherwise `node` ends `Clean` without running. */
-function verify<TValue>(graph: Graph, node: DerivedNode<TValue>, state: CheckState<TValue>): TValue {
-  state.dependencies.some((dependency) => {
-    if (dependency.kind === 'Derived') {
-      pull(graph, dependency.node);
-    }
-    return stateOf(node).state.mark === 'Dirty';
-  });
-  const after = stateOf(node).state;
-  switch (after.mark) {
-    case 'Dirty':
-      return recompute(graph, node, after);
-    case 'Check':
-      stateOf(node).state = { mark: 'Clean', value: after.value, dependencies: after.dependencies };
-      return after.value;
-    case 'Clean':
-      return after.value;
-  }
-}
-
-/** Runs the computation, compares its value with the previous one, replaces the dependencies, and
- * stores the new value unless `equal` accepted it, in which case the previous value object stays. A
- * new value marks the dependents `Dirty`. A throw out of the computation or out of `equal` leaves the
- * state and every `dependents` set untouched. */
-function recompute<TValue>(graph: Graph, node: DerivedNode<TValue>, state: DirtyState<TValue>): TValue {
-  const computed = compute(graph, node.computation);
-  const previous = state.previous;
-  if (previous.kind === 'Value' && node.equal(previous.value, computed.value)) {
-    setDependencies(node, state.dependencies, computed.dependencies);
-    stateOf(node).state = { mark: 'Clean', value: previous.value, dependencies: computed.dependencies };
-    return previous.value;
-  }
-  setDependencies(node, state.dependencies, computed.dependencies);
-  stateOf(node).state = { mark: 'Clean', value: computed.value, dependencies: computed.dependencies };
-  node.dependents.forEach(markDirty);
-  return computed.value;
-}
-
-type Computed<TValue> = {
-  readonly value: TValue;
-  readonly dependencies: ReadonlyArray<Dependency>;
-};
-
-/** Runs `computation` with a context that collects what it reads, in read order, while
- * `graph.computingDepth` counts it. */
-function compute<TValue>(graph: Graph, computation: Computation<TValue>): Computed<TValue> {
-  const dependencies: Dependency[] = [];
-  graph.computingDepth += 1;
-  try {
-    const value = computation({
-      readSource: (source) => {
-        dependencies.push({ kind: 'Source', source });
-        return source.value;
-      },
-      readDerived: (node) => {
-        const read = pull(graph, node);
-        dependencies.push({ kind: 'Derived', node });
-        return read;
-      },
-    });
-    return { value, dependencies };
-  } finally {
-    graph.computingDepth -= 1;
-  }
-}
-
-/** Removes `node` from the dependents of each of `previous` and adds it to those of each of `next`. */
-function setDependencies(
-  node: AnyDerivedNode,
-  previous: ReadonlyArray<Dependency>,
-  next: ReadonlyArray<Dependency>,
-): void;
-```
-
-- `Clean` returns. `Dirty` recomputes. `Check` brings its derived dependencies up to date in recorded order, stops at the first whose value changed (that dependency's `recompute` marked this node `Dirty`), and recomputes; when none changed, it ends `Clean` without running. That is the short circuit, the cutoff on the pull, which is the user's specification.
-- Source dependencies are never checked during the walk. A changed source already marked its readers `Dirty`, so a `Check` node's sources did not change.
-- The walk in recorded order is sound when a recomputation would read other nodes: a computation's later reads depend only on what it read earlier, so up to the first dependency whose value changed, the recorded reads are the reads a recomputation would make.
-- A node recomputes at most once per write. After its pull it is `Clean`, and during pulls only `recompute`'s marking of dependents runs, which reaches only nodes that are not `Clean` (the invariant). The parent whose read reached the node is verifying or computing: marking it `Dirty` makes a verifying parent recompute, and a computing parent reads the new value.
-- Top-level pull order does not affect values. The graph is a DAG and every computation is pure, so the first pull that reaches a marked node brings it up to date and every later pull finds it `Clean`. Which nodes run and how often is the same in any order.
-- No order is stored: a pull brings a node's inputs up to date before the node uses them, through `readDerived` and `verify`.
-- `setDependencies` is the only writer of `dependents`. Removing every old edge and adding every new one is `O(old + new)`; a dependency read twice is one member of each set. A violation of "the dependents sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
-- `compute` decrements `computingDepth` in a `finally`, so the count is restored when a computation throws and the graph accepts writes afterwards.
-- The context is a parameter built per computation; there is no ambient current computation (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`).
-
-A computation must not throw, and neither must an equality. A throw out of either is a broken programmer invariant, not behavior the engine supports. The engine guarantees only that such a throw does not corrupt its state: it leaves `compute` or `recompute` before `setDependencies` and before any state is written, so every mark, value, dependency list, and `dependents` set is as it was, and `compute`'s `finally` restores `computingDepth`. `recompute` calls `equal` before `setDependencies` for that reason: called after, a throw from `equal` would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones. Calling `equal` first changes nothing else: `equal` compares two values and reads no node, and both branches store `computed.dependencies`, so a link that moved to a record with equal data still cuts off and the node depends on the new record.
-
-## The engine and the Isograph runtime
-
-The engine is `graph.ts` in its own package (The engine package). It imports nothing. The Isograph runtime imports the engine's public API and nothing else from it: no Isograph function reads or writes a node's `value`, `dependents`, or `slot`, and no Isograph function calls `stateOf`, `markDirty`, `markCheck`, `verify`, `recompute`, `compute`, or `setDependencies`. The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, dependencies recorded per computation, and (open decision 2) a write during a computation failing. Reverse edges and marks are internal, as pico's epochs are.
-
-### The engine's public API
-
-```ts
-// from libs/reactive-graph/src/index.ts
-export {
-  type Computation,
-  type ComputeContext,
-  createDerivedNode,
-  createGraph,
-  createSourceNode,
-  type DerivedNode,
-  disposeDerivedNode,
-  type Graph,
-  markSourceChanged,
-  pull,
-  type SourceNode,
-  sourceValue,
-  writeSource,
-} from './graph';
-```
-
-```ts
-// from libs/reactive-graph/src/graph.ts
-export type Graph = { computingDepth: number };
-export type SourceNode<TValue> = {
-  value: TValue;
-  equal(previous: TValue, next: TValue): boolean;
-  readonly dependents: Set<AnyDerivedNode>;
-};
-export type DerivedNode<TValue> = {
-  readonly computation: Computation<TValue>;
-  equal(previous: TValue, next: TValue): boolean;
-  readonly slot: StateSlot<TValue>;
-  readonly dependents: Set<AnyDerivedNode>;
-};
-export type Computation<TValue> = (context: ComputeContext) => TValue;
-export type ComputeContext = {
-  readSource<TValue>(source: SourceNode<TValue>): TValue;
-  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
-};
-
-export function createGraph(): Graph;
-export function createSourceNode<TValue>(
-  value: TValue,
-  equal: (previous: TValue, next: TValue) => boolean,
-): SourceNode<TValue>;
-export function createDerivedNode<TValue>(
-  computation: Computation<TValue>,
-  equal: (previous: TValue, next: TValue) => boolean,
-): DerivedNode<TValue>;
-export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
-export function writeSource<TValue>(graph: Graph, source: SourceNode<TValue>, value: TValue): void;
-export function markSourceChanged(graph: Graph, source: SourceNode<unknown>): void;
-export function pull<TValue>(graph: Graph, node: DerivedNode<TValue>): TValue;
-export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void;
-```
-
-The functions are written under open decision 2 (f): `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take the graph and throw while a computation runs, and `pull` takes the graph because `compute` counts running computations on it. Every export has a caller in the Isograph runtime: `createGraph` in `createStore`, `createSourceNode` and `sourceValue` in `store.ts`, `writeSource` in `normalize.ts` and `test/fixtures.ts`, `markSourceChanged` and `disposeDerivedNode` in `deleteRecord`, `createDerivedNode` and `pull` in `storedResults.ts`, and the five types in `store.ts` and `storedResults.ts`. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, its three states, `PreviousValue`, and `Dependency` are exported from `graph.ts` for the declaration of `DerivedNode`, and not from the package index: no caller names them. Open decision 21 covers that a consumer can still write a node's fields.
-
-### A use without Isograph
-
-Two sources and two derived nodes of different value types:
-
-```ts
-// from libs/reactive-graph/test/recompute.test.ts
-import { expect, test } from 'vitest';
-import { createDerivedNode, createGraph, createSourceNode, pull, writeSource } from '../src';
-
-const sameValue = (previous: unknown, next: unknown): boolean => previous === next;
-
-test('a write recomputes what changed and cuts off at an equal value', () => {
-  const graph = createGraph();
-  const calls = { sum: 0, parity: 0, label: 0 };
-  const a = createSourceNode(1, sameValue);
-  const b = createSourceNode(2, sameValue);
-  const sum = createDerivedNode((context) => {
-    calls.sum += 1;
-    return context.readSource(a) + context.readSource(b);
-  }, sameValue);
-  const parity = createDerivedNode((context) => {
-    calls.parity += 1;
-    return context.readDerived(sum) % 2 === 0 ? 'even' : 'odd';
-  }, sameValue);
-  const label = createDerivedNode((context) => {
-    calls.label += 1;
-    return `the sum is ${context.readDerived(parity)}`;
-  }, sameValue);
-
-  const first = pull(graph, label);
-  expect(first).toBe('the sum is odd');
-  expect(calls).toEqual({ sum: 1, parity: 1, label: 1 });
-
-  writeSource(graph, a, 3);
-  expect(calls).toEqual({ sum: 1, parity: 1, label: 1 });
-  expect(pull(graph, label)).toBe(first);
-  expect(calls).toEqual({ sum: 2, parity: 2, label: 1 });
-});
-```
-
-```text
-read label: Dirty, no value -> recompute label
-  parity: Dirty, no value -> recompute parity
-    sum: Dirty, no value -> recompute sum
-      a -> a.dependents = {sum}
-      b -> b.dependents = {sum}
-      sum Clean 3
-    sum.dependents = {parity}
-    parity Clean "odd"
-  parity.dependents = {label}
-  label Clean "the sum is odd"
-write a = 3 -> a.dependents = {sum} -> sum Dirty -> sum.dependents = {parity} -> parity Check
-            -> parity.dependents = {label} -> label Check
-read label: Check -> parity Check -> sum Dirty -> recompute sum: a, b -> 5 !== 3 -> sum Clean 5
-  -> sum.dependents = {parity} -> parity Dirty
-  -> recompute parity: sum Clean -> "odd" === "odd" -> parity Clean, keeps "odd" -> label Clean without running
-```
-
-The write runs nothing. The read runs `sum` and `parity` once each and not `label`, and returns the same string.
+Every export has a caller in the Isograph runtime. The computation of a resolver node reads only through its `ComputeContext` (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
 
 ### Which layer owns each item
 
-Engine (`libs/reactive-graph/src/graph.ts`):
+Engine (`libs/reactive-graph/src/graph.ts`), as reactive-engine.md's Types, The guard, and The implementation define them:
 
-- Types: `Graph`, `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
-- Marks `Clean`, `Check`, `Dirty`; `markDirty`, `markCheck`; `markSourceChanged`.
-- `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`, `neverComputed`.
-- `createGraph`, `assertNotComputing`, `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`.
-- The write-during-computation guard: `Graph.computingDepth` and `assertNotComputing` (open decision 2 (f)).
+- Types: `Graph`, `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`, `ContextStatus`.
+- The marks `Clean`, `Check`, and `Dirty`.
+- Construction and plain reads: `createGraph`, `createSourceNode`, `createDerivedNode`, `neverComputed`, `sourceValue`, `stateOf`.
+- The guard: `Graph.computingDepth`, `assertNotComputing`, `guarded`.
+- Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
+- Pull: `pull`, `verify`, `recompute`, `compute` (the context, its `ContextStatus`, and dependency recording).
+- Dependencies: `setDependencies`, `dependentsOf`.
+- Disposal: `disposeDerivedNode`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
 
 - `store.ts`: `Store`, `createStore`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING`, `Missing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
 - `read.ts`: `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`, `ReadHooks`, `readData`, `readStoreValue`, `readButDoNotEvaluate`, `evaluatingHooks`, `read`, `readSelection`, `linkTargetValue`, `eachLink`, `nested`.
-- `artifacts.ts`: the reader AST (`ReaderSelection`), `EntityTable`, `FieldEntry`, `EntityShape`, `RecordStorage`, `NormalizationTarget`, and `NormalizationAst.tables`. `store.ts`: `VALUE_KEY`. `read.ts`: `EMPTY_DATA`, `readAt`, `fieldOf`, `tableOf`, `derivedLink`. `recordId.ts`: `omittedRecordId`, `recordId` over `RecordStorage`. `normalize.ts`: `leafRecords`, `storageOf`.
+- `artifacts.ts`: the reader AST (`ReaderSelection`), `EntityTable`, `EntityTables`, `FieldEntry`, `EntityShape`, `RecordStorage`, `NormalizationTarget`, and `NormalizationAst.tables`. `store.ts`: `VALUE_KEY`. `read.ts`: `EMPTY_DATA`, `readAt`, `fieldOf`, `tableOf`, `derivedLink`. `recordId.ts`: `omittedRecordId`, `recordId` over `RecordStorage`. `normalize.ts`: `leafRecords`, `storageOf`, `Normalization.tables`.
 - `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
 - `storeKey.ts`: `resolverStoreKey`. `artifacts.ts`: `ReaderArtifact.parentEntityName`, `ReaderArtifact.selectableName`, `ReaderArtifact.tables`.
 - `normalize.ts`: `writeValue`. `store.ts`: `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
@@ -505,104 +79,16 @@ Isograph runtime (`libs/isograph-runtime/src`):
 ### What resists the split
 
 - `stateOf` and layering. Later: a DAG of graphs gives a node one slot per world by changing `stateOf`, and a source one value per world. That holds across the package boundary only if the Isograph runtime never reads a node's fields, so the runtime reads a source through `readSource` and `sourceValue` and never calls `stateOf`, which the package does not export. Layers are then the engine's (Later: a DAG of graphs).
-- The write-during-computation guard. It is engine state, because a standalone consumer has no store: an engine `Graph` that every engine write takes (open decision 2 (f), the body), and the Isograph `Store` holds the graph beside its records.
-- Equality defaults. The engine has none: every node's `equal` is a constructor argument. `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
-- One value type per graph. The previous revision typed every node of a graph with one `TValue`, `ResolverResult<unknown>` in the core. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (The graph, open decision 19).
-- Throws. A computation must not throw (Pull). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching the resolver's own throw into `ResolverThrew` (Stored resolver results).
+- The write-during-computation guard. It is engine state, because a standalone consumer has no store (reactive-engine.md, The guard). The Isograph `Store` holds the engine `Graph` beside its records under both (f) and (g) (open decision 2).
+- Equality defaults. The engine has none: every node's `equal` is a constructor argument (reactive-engine.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
+- One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (reactive-engine.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
+- Throws. A computation must not throw (reactive-engine.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching the resolver's own throw into `ResolverThrew` (Stored resolver results).
 - Field visibility. A consumer outside this repo can write a node's fields; open decision 21.
-- Construction. `sourceNodeAt` built a source node as an object literal; it calls `createSourceNode`, so the Isograph runtime builds no engine object by hand.
+- Construction. `sourceNodeAt` calls `createSourceNode` and `resolverNodeAt` calls `createDerivedNode`, so the Isograph runtime builds no engine object by hand.
 
-## The engine package
+### The engine package and the runtime
 
-The engine is a workspace library beside the Isograph runtime, at `libs/reactive-graph` (open decision 18), covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s, without the Babel plugin, which only the runtime's fixtures need.
-
-```text
-libs/reactive-graph/
-  package.json
-  README.md                the package README (reactive-engine.md, The package README)
-  tsconfig.json            references tsconfig.package.json and tsconfig.test.json
-  tsconfig.package.json    extends ../../tsconfig.build.json, includes src/**/*.ts
-  tsconfig.test.json       extends ../../tsconfig.build.json, includes test/**/*.ts
-  tsdown.config.ts         merges ../../tsdown.config.ts, dts.build true
-  vitest.config.ts         typecheck enabled with tsconfig.test.json
-  src/graph.ts
-  src/index.ts
-  test/recompute.test.ts      chains, reuse, cutoff, marking and short circuit, pull order, diamond
-  test/dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
-  test/errors.test.ts         a throwing computation leaves the graph's state unchanged
-  test/disposal.test.ts       disposal
-  test/guard.test.ts          the write-during-computation guard (open decision 2 (f))
-  test/degenerate.test.ts     degenerate nodes, sources, and values
-  test/graph.test-d.ts        types
-```
-
-```json
-// from libs/reactive-graph/package.json
-{
-  "name": "@isograph/reactive-graph",
-  "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
-  "private": true,
-  "main": "./dist/index.cjs",
-  "types": "./dist/index.d.cts",
-  "license": "MIT",
-  "scripts": {
-    "compile-libs": "tsdown",
-    "watch-libs": "tsdown --watch",
-    "test": "vitest run",
-    "test-watch": "vitest watch",
-    "coverage": "vitest run --coverage",
-    "prepack": "pnpm run test && pnpm run compile-libs",
-    "tsc": "tsc -b",
-    "tsc-force": "tsc --build --clean && tsc --build --force"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "typescript": "5.6.3",
-    "vitest": "^2.1.2"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/isographlabs/isograph.git",
-    "directory": "libs/reactive-graph"
-  },
-  "sideEffects": false,
-  "module": "./dist/index.mjs",
-  "exports": {
-    ".": {
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.mjs"
-    },
-    "./package.json": "./package.json"
-  }
-}
-```
-
-Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned.
-
-```ts
-// from libs/reactive-graph/tsconfig.test.json
-{
-  "extends": "../../tsconfig.build.json",
-  "compilerOptions": {
-    "noUnusedLocals": false
-  },
-  "include": ["test/**/*.ts"],
-  "exclude": ["**/node_modules", "**/dist"]
-}
-```
-
-```ts
-// from libs/reactive-graph/vitest.config.ts
-import { defineConfig } from 'vitest/config';
-
-export default defineConfig({
-  test: { typecheck: { enabled: true, tsconfig: './tsconfig.test.json' } },
-});
-```
-
-`tsconfig.json`, `tsconfig.package.json`, and `tsdown.config.ts` are the runtime's, byte for byte. Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin.
-
-The Isograph runtime depends on the engine:
+The package's files, its two pre-commit hooks, and its CI step are reactive-engine.md, The package. Core change 4 ships them. Core change 5 adds the runtime's dependency on the engine:
 
 ```json
 // from libs/isograph-runtime/package.json
@@ -612,39 +98,7 @@ The Isograph runtime depends on the engine:
   },
 ```
 
-The runtime resolves the engine through `node_modules` to its `dist`, as it resolves `@isograph/disposable-types`: `tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps to a directory without the `isograph-` prefix, which does not exist. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked.
-
-`.pre-commit-config.yaml` gains two hooks, and the runtime's three hooks match the engine's directory:
-
-```yaml
-# from .pre-commit-config.yaml
-      - id: engine-test
-        name: engine test
-        entry: pnpm --filter @isograph/reactive-graph test
-        language: system
-        files: '^libs/reactive-graph/'
-        pass_filenames: false
-      - id: engine-typecheck
-        name: engine typecheck
-        entry: pnpm --filter @isograph/reactive-graph tsc
-        language: system
-        files: '^(libs/reactive-graph/|tsconfig\.build\.json$)'
-        pass_filenames: false
-      # runtime-dependencies-build and runtime-typecheck, files:
-        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/reactive-graph/|tsconfig\.build\.json$)'
-      # runtime-test, files:
-        files: '^libs/(isograph-runtime|isograph-disposable-types|reactive-graph)/'
-```
-
-The engine's tests are the files of `refactors/pending/runtime/reactive-engine.md`, Tests, which also lists the ports of the Rust pico crate's tests; the use without Isograph (The engine and the Isograph runtime) is in `test/recompute.test.ts`. Each test counts computation calls and asserts values with `toBe` and `toEqual`. The `README.md` is reactive-engine.md's The package README.
-
-CI: `.github/workflows/js.yml`'s `babel-plugin` job runs `pnpm compile-libs`, which turbo runs for every workspace package with a `compile-libs` script, so the engine is type-checked and built there with no change. The job gains one step after "Test @isograph/disposable-types":
-
-```yaml
-# from .github/workflows/js.yml
-      - name: Test @isograph/reactive-graph
-        run: pnpm --filter @isograph/reactive-graph test
-```
+The runtime resolves the engine through `node_modules` to its `dist`, as it resolves `@isograph/disposable-types`: `tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps to a directory without the `isograph-` prefix, which does not exist. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked. In the same change the runtime's three pre-commit hooks match the engine's directory (reactive-engine.md, Pre-commit hooks).
 
 ## The store
 
@@ -1476,7 +930,7 @@ delete Pet:1 -> Pet:1.derived = {Node.asPet} -> dispose asPet -> F Dirty
 
 On a `Checkin` record the same selection reads `Node.asPet` on `Checkin:7`, whose resolver returns `null`, and `asPet` is `null`.
 
-Duplicate dependency entries. A computation that reads one node twice records it twice (`PetDetailPage` reads `Pet:1.name` for `n1` and for `n2`). The `dependents` set holds the reader once (Pull, `setDependencies`). `verify` skips `Source` entries and finds a second `Derived` entry of the same node `Clean`, one step. The list is kept as read: deduplicating costs a set per computation on every read to shorten a list by entries that cost one step each.
+Duplicate dependency entries. A computation that reads one node twice records it twice (`PetDetailPage` reads `Pet:1.name` for `n1` and for `n2`). The `dependents` set holds the reader once (reactive-engine.md, Dependencies). `verify` skips `Source` entries and finds a second `Derived` entry of the same node `Clean`, one step. The list is kept as read: deduplicating costs a set per computation on every read to shorten a list by entries that cost one step each.
 
 ## Stored resolver results
 
@@ -1551,7 +1005,7 @@ function callResolver(
 
 The computation closes over `store`, the environment's `Map`, which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
-A resolver computation keeps the engine's contract that a computation must not throw (Pull): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
+A resolver computation keeps the engine's contract that a computation must not throw (reactive-engine.md, Throws): `callResolver` catches the resolver's own throw into `ResolverThrew`, a value. Any other throw out of `resolverComputation` or out of `resolverResultsEqual` is a broken programmer invariant: a store that disagrees with the reader AST (`linkAt` on a non-link, `libs/isograph-runtime/src/store.ts:74-86`), a missing variable (`variableValue`, `storeKey.ts:56-63`), or a field-supplied `outputEqual` that throws (open decision 7). It propagates out of `readStoredResult`; `readSubscription`'s `try` (`libs/isograph-runtime/src/subscribe.ts:126-130`) catches what escapes a subscription re-read as `ReadErr`.
 
 Every read inside a computation goes through the walk, so none goes unrecorded. User code never receives a `ComputeContext` or the store. A resolver that reaches the store through a closure is open decision 2.
 
@@ -1748,8 +1202,8 @@ Each is one commit, in order; each is independently shippable.
 1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and core change 5 moves the same comparison into the source nodes' `equal`, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched.
 2. Prefactor: the walk takes `ReadHooks`; an absent record reads as all keys missing; `noRecord`'s two checks go (Absent records). `read` and `readButDoNotEvaluate` use `evaluatingHooks`. Observable: an absent root's `MissingData` reads "No value for pet____id___"1" on Query:__ROOT"; `Constant` on an absent record is `Ok`. The pet script's output is unchanged.
 3. Prefactor: scalar records on v1's reader AST (linked-only-selections.md, change 1; Scalar records). The normalization AST's `Leaf` target with its entity and list depth, `VALUE_KEY`, `omittedRecordId`, `leafRecords` (ids by `omittedRecordId` directly, before entity tables exist), and `check`'s and the mark's `Leaf` case. v1's `Scalar` case reads the link under its key, then `__value` at each linked record, lists mapped. Observable: `storeSnapshot` after normalizing `PetDetail`'s response holds `Pet:1.name` as a link to `String:Pet:1.name` with `__value` `"Ricky"`; every read returns the values it returned before; normalizing a response that changes only `Pet:1.name` writes only `String:Pet:1.name.__value`; the pet script's output is unchanged.
-4. Prefactor: the engine package (The engine package), shipped alone before the Isograph runtime uses it (open decision 26): `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as The graph and The engine's public API write them, its test files and `README.md`, its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
-5. Prefactor: the store becomes record containers (`Store` with `graph` and `records`, `createStore`, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
+4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/reactive-engine.md`: `libs/reactive-graph` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package), in the form of whichever option of its open decision 2 is decided. Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/reactive-graph test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
+5. Prefactor: the store becomes record containers (`Store` with `graph` and `records`, `createStore`, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equal`, `storeValue` and `storeSnapshot` call `sourceValue`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceChanged` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceChanged` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 6. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection` as `{ alias, fieldName, arguments, selections }`, an `entity_table.ts` per entity a reader artifact or normalization AST imports, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field (`Node/asPet/`) per selected refinement; the normalization AST loses `identity`. The runtime gains `EntityTable`, the walk of Selections in the Isograph layer (`fieldOf`, `tableOf`, `readAt`, `EMPTY_DATA`), `recordId` over `RecordStorage` and `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables; the four v1 selection kinds and `NormalizationIdentity` go. Observable: every generated artifact is regenerated in the new shape; every read returns the values it returned before; a `Node`-typed `node(id:)` selection of `asPet { name }` on a `Checkin` record is `null`; the pet script's output is unchanged.
 7. Prefactor: linked-only selections (linked-only-selections.md, change 3). Validation, query generation, and reader generation accept bare object selections, selection sets on scalars, client fields on scalar entities, and `__self`. Observable: `read` of the Example's `PetDetailPage` on the store fixture returns `{ pet: { n1: "Ricky", n2: { toUppercase: "RICKY" }, bestFriend: { name: "Mango" } } }`, calling `toUppercase` on every read; a bare `bestFriend` is `EMPTY_DATA` or `null`.
 8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, identical)`), `resolverComputation`, `contextHooks` (`context.readSource`, `context.readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
@@ -1906,7 +1360,7 @@ Not part of the core: optimistic layers and forks. The base graph is the core's 
 
 - Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `value` or `slot` directly (The engine and the Isograph runtime), so giving `readSource`, `sourceValue`, and `stateOf` a world changes the engine alone. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
 - Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `StateSlot` for a derived node).
-- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup; no other code changes (The graph).
+- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup; no other code changes (reactive-engine.md, Construction and plain reads).
 - Placement. A node computed in `W` is stored in the deepest layer on `W`'s path that supplied any of its inputs, a source value or a derived input's slot. That is usually lower than `W`'s top: a node that read nothing the top layer overrides is stored in the base, shared with every world. Valid because the value is a function of its inputs: every world whose path holds that layer reads the same value for each input, unless a deeper layer on its path overrides one, and that override's write marked the node in the deeper layer (next bullet), whose shadow state that world reads first.
 - Writes mark in the layer where they happen. A write in layer `L` gives each node above the written source a marked shadow state in `L` (`Dirty` for direct dependents, `Check` above), copied from the state its worlds through `L` read. A base write marks the base states and also the shadow states that descendant layers hold for those nodes.
 - Reverse edges are the union across layers: a node is in a source's or node's `dependents` while any layer's slot lists that dependency. Each layer records its contributions, so discarding it removes them.
@@ -1932,7 +1386,7 @@ A source other than a server field is a source node its owner holds, written wit
   ```
 
   A block is allowed when its entity's record is determined by the node's key: the parent entity, or a singleton whose identity is `Fixed` (`CompletedIdentity::Fixed(FixedRecordId)`, `crates/isograph_compiler/src/merged_selection.rs:1450-1458`). A client root's type is static and its values come from a provider `createIsographEnvironment` requires per declared root; each provider selectable is a source node and its subscription writes it. Relay's live resolvers are the precedent: a `LiveState<T>` with `read()` and `subscribe(cb)` (Relay docs, Live Fields). Upstream has no client root and no client-only source.
-- Runtime-defined computations (Follow-ups 10) and the suspension decision of react.md are derived nodes whose computations call `ComputeContext` directly; their values are not `ResolverResult`s, and each is a `DerivedNode` of its own value type (The graph, open decision 19).
+- Runtime-defined computations (Follow-ups 10) and the suspension decision of react.md are derived nodes whose computations call `ComputeContext` directly; their values are not `ResolverResult`s, and each is a `DerivedNode` of its own value type (reactive-engine.md, Types; open decision 19).
 
 A derived node whose computation reads nothing (a refinement, Selections in the Isograph layer) could later be evaluated in the walk without a node.
 
@@ -2000,7 +1454,7 @@ A resolver that calls `readStoredResult` through a closure reads with no depende
 - (c) (b) for writes only. pico guards writes this way: `Database::set`, `remove`, and garbage collection assert an empty dependency stack, panicking with "Cannot modify database while a memoized function is being invoked." (`crates/pico/src/database.rs:151-170`, `:193-198`). Cost: (b)'s field; an inner `readStoredResult` still records nothing on the outer node.
 - (d) A write counter read at the start and end of `compute`; when it moved, `recompute` leaves the node `Dirty`. Cost: a counter visible to every write; it repairs the stale `Clean` only.
 - (e) After `setDependencies`, `recompute` leaves the node `Dirty` when a recorded derived dependency is not `Clean`. Cost: one check per dependency per recompute; a source the outer computation read before the inner write changed it is not covered.
-- (f) A guard in the engine, on an engine object: `Graph` and `createGraph` (The graph). `computingDepth` is a count, not a two-state enum, because `readDerived` recomputes a node inside the computation that reads it; `compute` increments it before the computation runs and decrements it after. The guard throws on writes during a computation only: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take the graph first and throw while `computingDepth > 0`, as pico asserts an empty dependency stack before every write (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`); `deleteRecord` reaches the guard through `markSourceChanged` and `disposeDerivedNode`. Untracked reads are not guarded: the engine allows `sourceValue` and a public `pull` inside a computation by decision (open decision 25), and `pull` takes the graph only because `compute` counts on it. The Isograph layer makes no untracked read inside a computation: every read in `resolverComputation` goes through `contextHooks`. In the Isograph runtime, `Store` is `{ readonly graph: Graph; readonly records: Map<EntityName, Map<RecordId, RecordContainer>> }` (The store). The guard is not a module static, so two environments do not share it. Cost: every engine write and `pull` takes a `Graph`; `Store` is an object instead of the bare `Map`; `deleteRecord` of a container with no source and no derived node reaches no engine call and is not guarded, which loses nothing, since no computation read such a container.
+- (f) A guard in the engine, on an engine object: `Graph` and `createGraph` (reactive-engine.md, The guard). `computingDepth` is a count, not a two-state enum, because `readDerived` recomputes a node inside the computation that reads it; `compute` increments it before the computation runs and decrements it after. The guard throws on writes during a computation only: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take the graph first and throw while `computingDepth > 0`, as pico asserts an empty dependency stack before every write (`assert_empty_dependency_stack`, `crates/pico/src/database.rs:193-198`, called from `set`, `remove`, `remove_singleton`, and `run_garbage_collection`, `:151-170`); `deleteRecord` reaches the guard through `markSourceChanged` and `disposeDerivedNode`. Untracked reads are not guarded: the engine allows `sourceValue` and a public `pull` inside a computation by decision (open decision 25), and `pull` takes the graph only because `compute` counts on it. The Isograph layer makes no untracked read inside a computation: every read in `resolverComputation` goes through `contextHooks`. In the Isograph runtime, `Store` is `{ readonly graph: Graph; readonly records: Map<EntityName, Map<RecordId, RecordContainer>> }` (The store). The guard is not a module static, so two environments do not share it. Cost: every engine write and `pull` takes a `Graph`; `Store` is an object instead of the bare `Map`; `deleteRecord` of a container with no source and no derived node reaches no engine call and is not guarded, which loses nothing, since no computation read such a container.
 - (g) As (f), but each node holds its graph: `SourceNode.graph` and `DerivedNode.graph`, set by the constructors, which take the graph first. `pull`, `writeSource`, `markSourceChanged`, and `disposeDerivedNode` drop their `graph` parameter and read `node.graph`. Cost: one field per node, and only the constructors take a graph; `sourceNodeAt` and `resolverNodeAt` pass `store.graph`, so `Store` is still (f)'s object. A computation of a node in one graph that reads a node of another is detectable and throws.
 
 Every graph mutation passes through the engine's `writeSource`, `markSourceChanged`, or `disposeDerivedNode` (`normalize` calls `writeSource`; `garbageCollect`'s sweep calls `deleteRecord`, which calls `markSourceChanged` and `disposeDerivedNode`; a later owner of a source node calls `writeSource` or `markSourceChanged`, Later: other derived node kinds), and every read through `readStoredResult` passes through the engine's `pull`. Each of those takes a node, not the environment. `normalize` and `garbageCollect` are exported from the package index (`libs/isograph-runtime/src/index.ts:42`, `:44`), and `environment.store` is a public field (`libs/isograph-runtime/src/environment.ts:10`). So a closure that holds the store or the environment reaches those functions without passing an environment-level check, and the guards of (b) and (c) are bypassable. A guard that no caller can bypass is checked in the engine's write functions, which is where (f) and (g) put it. Because the engine is usable without Isograph, the guard belongs to the engine: a guard in the Isograph runtime would leave a standalone consumer's write during a computation unguarded.
@@ -2009,7 +1463,7 @@ Not decided between (f) and (g). The body is written under (f), as `refactors/pe
 
 ### 3. A throw inside a computation outside its resolver (decided)
 
-Decided by the user: a computation must not throw (Pull; Stored resolver results).
+Decided by the user: a computation must not throw (reactive-engine.md, Throws; Stored resolver results).
 
 ### 4. A response that throws part-way
 
@@ -2112,13 +1566,13 @@ It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:6
 
 ### 18. The engine package's name (decided)
 
-Decided by the user: `@isograph/reactive-graph`, directory `libs/reactive-graph`. No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (The engine package), so nothing is published under it.
+Decided by the user: `@isograph/reactive-graph`, directory `libs/reactive-graph`. No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (reactive-engine.md, The package), so nothing is published under it.
 
 ### 19. How the engine types the links between nodes of different value types
 
 A standalone engine holds nodes of different value types in one graph (a `DerivedNode<string>` that reads a `DerivedNode<number>`), so every `dependents` set and every `Derived` dependency holds a node whose value type is erased.
 
-- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equal` a method signature so that `DerivedNode<T>` is assignable to it (The graph). Held, not decided. Reason: no cast and no wrapper; the engine calls `equal` only with two values the node's own computation produced. Cost: TypeScript's method bivariance also accepts a call such as `(node as AnyDerivedNode).equal('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it, and the API gives such code no reason to call `equal`.
+- (a) `AnyDerivedNode = DerivedNode<unknown>`, with `equal` a method signature so that `DerivedNode<T>` is assignable to it (reactive-engine.md, Types). Held, not decided. Reason: no cast and no wrapper; the engine calls `equal` only with two values the node's own computation produced. Cost: TypeScript's method bivariance also accepts a call such as `(node as AnyDerivedNode).equal('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it, and the API gives such code no reason to call `equal`.
 - (b) One value type per graph, the previous revision's `SourceNode<TSourceValue, TValue>` and `DerivedNode<TValue>` with `TValue` shared by every node. Cost: a project whose nodes have different value types declares a union and narrows every `readDerived` result; Isograph's own later runtime-defined computations widen `ResolverResult` the same way (Later: other derived node kinds).
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
@@ -2128,9 +1582,9 @@ Decided by the user: the engine has no default equality and exports no compariso
 
 ### 21. Whether a consumer can write a node's fields
 
-`SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every consumer of the package. A consumer that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (Pull, `setDependencies`), and the result is a silently stale value.
+`SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every consumer of the package. A consumer that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (reactive-engine.md, Dependencies), and the result is a silently stale value.
 
-- (a) Plain object types; each field's comment names its only reader and writer (The graph). Held, not decided. Reason: (b) and (c) each cost a cast or a sound-but-slower link type. Cost: the field comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes", once the engine has consumers outside this repo.
+- (a) Plain object types; each field's comment names its only reader and writer (reactive-engine.md, Types). Held, not decided. Reason: (b) and (c) each cost a cast or a sound-but-slower link type. Cost: the field comments are the only guard, against AGENTS.md's "Never rely on discipline what we can enforce with newtypes", once the engine has consumers outside this repo.
 - (b) Classes with ES private fields (AGENTS.md, TypeScript): `class SourceNode<TValue> { #value; #dependents }` and `class DerivedNode<TValue> { #computation; #equal; #slot; #dependents }`. `setDependencies` and `markSourceChanged` read another class's private fields through module-local functions assigned in each class's `static {}` block (ES2022, `tsconfig.build.json`'s `target`). Cost: a private field `#equal: (previous: TValue, next: TValue) => boolean` makes `DerivedNode<number>` not assignable to `DerivedNode<unknown>` (checked with this repo's `tsc` 5.6.3), so the erased link of open decision 19 (a) no longer type-checks; (b) needs open decision 19 (c) or a cast at each link. A node cannot be wrapped in a `Proxy` (AGENTS.md, TypeScript).
 - (c) Opaque public types: the index exports `SourceNode<TValue>` and `DerivedNode<TValue>` as branded types with no visible fields, and `graph.ts` casts each to its field type. Cost: a cast in every engine function that receives a node.
 
@@ -2141,13 +1595,13 @@ Decided by the user: the engine has no default equality and exports no compariso
 
 ### 23. Whether `writeSource` compares the new value with the old (decided)
 
-`refactors/pending/runtime/reactive-engine.md` open decision 8. Decided by the user: writing an equal value does not propagate. `createSourceNode(value, equal)` takes a required equality and `writeSource` marks nothing when it accepts (The graph). The store passes `isUnchanged(key)` for every source node (The store), so `normalize` compares nothing itself.
+`refactors/pending/runtime/reactive-engine.md` open decision 8. Decided by the user: writing an equal value does not propagate. `createSourceNode(value, equal)` takes a required equality and `writeSource` marks nothing when it accepts (reactive-engine.md, Mark). The store passes `isUnchanged(key)` for every source node (The store), so `normalize` compares nothing itself.
 
 ### 24. A pull of a disposed node
 
 `refactors/pending/runtime/reactive-engine.md` open decision 9.
 
-- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges (The graph). Held. Reason: pico's behavior; the next call of a collected memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`). Cost: a consumer that pulls a node it disposed gets a working node again instead of an error. In the Isograph runtime no code pulls a node after `deleteRecord` disposed it: the node is removed from its container's `derived`, and the next read creates a new node.
+- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges (reactive-engine.md, Disposal). Held. Reason: pico's behavior; the next call of a collected memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`). Cost: a consumer that pulls a node it disposed gets a working node again instead of an error. In the Isograph runtime no code pulls a node after `deleteRecord` disposed it: the node is removed from its container's `derived`, and the next read creates a new node.
 - (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
 
 ### 25. An untracked read inside a computation (decided)
