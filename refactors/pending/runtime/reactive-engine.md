@@ -982,7 +982,7 @@ export function disposeDerivedNode(graph: Graph, node: AnyDerivedNode): void {
 - Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their dependency lists still name the disposed node, and `node.dependents` still names them, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes them from `node.dependents`.
 - Disposing a node that was never computed or was already disposed changes nothing but marking its dependents, of which a never-computed node has none.
 
-pico-runtime.md's body of `disposeDerivedNode` (The graph) calls `setDependencies` and marks dependents but leaves the state as it was. A `Clean` node disposed that way keeps its value and its dependency list while no source lists it, so a later pull returns its old value forever. The reset closes that.
+Without the reset, a `Clean` node disposed by `setDependencies` and marking alone would keep its value and its dependency list while no source lists it, so a later pull would return its old value forever. The reset closes that.
 
 ### Throws
 
@@ -2542,7 +2542,7 @@ Writing an equal value does not propagate. A source takes a required equality, a
 
 ### 9. A pull of a disposed node
 
-New. pico-runtime.md's body leaves a disposed node's state as it was, so a `Clean` node pulled after disposal returns its old value although no source lists it; that is a defect, not an option. pico removes a collected memo's revision, and the next call of the memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`).
+A disposal that leaves the node's state as it was is not an option: a `Clean` node pulled after it returns its old value although no source lists it (Disposal). pico removes a collected memo's revision, and the next call of the memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`).
 
 - (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. The body of this doc. Held. Reason: pico's behavior. Cost: a consumer that pulls a node it disposed gets a working node again instead of an error.
 - (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
