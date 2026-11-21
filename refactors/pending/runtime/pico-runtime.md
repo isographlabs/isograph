@@ -417,12 +417,15 @@ Settled (open decision 12). Changes 2 to 4 are written for it.
 
 ```text
 environment  IsographEnvironment { store, graph, retainedQueries, networkFunction, networkRequestCache, subscriptions }
-             normalizeData, garbageCollectEnvironment, readStoredResult, dispose, listen, snapshot
+             normalizeData, garbageCollectEnvironment, readStoredResult, storedResultHooks, retainEntrypoint, dispose, listen, snapshot
 store        Store = Map<EntityName, Map<RecordId, StoreRecord>>
-             normalize, check, garbageCollect, read, readButDoNotEvaluate
-graph        RecomputationGraph<ResolverResult<unknown>> { derivedNodes, sourceDependents, owned, observers, valuesEqual }
-             track, markChanged, deleteSource, retainRoot, collect, settle, observe, valueOf, notify
+             normalize, check, garbageCollect, read, readButDoNotEvaluate, readData
+graph        RecomputationGraph<ResolverResult<unknown>> { derivedNodes, sourceDependents, owned, valuesEqual, observers, createdObserved, pendingTeardowns }
+             DerivedNode { id, owner, computation, state, dependents, rootCount, effect }
+             createGraph, track, markChanged, deleteSource, retainRoot, collect, settle, observe, valueOf, notify, notifyCreated, reconcileEffects, flushTeardowns
 ```
+
+By change: `derivedNodes`, `sourceDependents`, `owned`, `valuesEqual`, `createGraph`, `track`, `markChanged`, and `deleteSource` are change 2a's; `readData`, `readStoredResult`, and `storedResultHooks` change 2b's; `rootCount`, `retainRoot`, `collect`, `retainEntrypoint`, and `dispose` change 3's; `observers`, `createdObserved`, `settle`, `observe`, `valueOf`, `notify`, `notifyCreated`, `listen`, and `snapshot` change 4's; `effect`, `pendingTeardowns`, `reconcileEffects`, and `flushTeardowns` are Values with lifecycles', which is not in changes 1 to 4.
 
 - The store is store.md's nested map, unchanged. Its functions take the `Store` and import nothing from the graph or the environment. `normalize` returns the changes it made (change 1), `garbageCollect` returns the records it deleted (change 2), and the reader's walk reports each read to the `ReadHooks` its caller passes (change 2).
 - The engine, `graph.ts`, knows two kinds of id, `SourceId` and `DerivedNodeId`, both opaque and both minted by its caller (change 2). It imports nothing from the store, the reader, or the environment. Its state is one value, `RecomputationGraph`.
@@ -440,7 +443,7 @@ What this keeps:
 
 What this costs:
 
-- Every function that needs both the store and the graph takes the environment: `normalizeData`, `garbageCollectEnvironment`, `readStoredResult`, `dispose`, `listen`, and `snapshot`. A test of memoization builds an environment with a network function it never calls (`deferredNetwork().networkFunction`, `test/fixtures.ts`).
+- Every function that needs both the store and the graph takes the environment: `normalizeData`, `garbageCollectEnvironment`, `readStoredResult`, `storedResultHooks`, `retainEntrypoint`, `dispose`, `listen`, and `snapshot`. A test of memoization builds an environment with a network function it never calls (`deferredNetwork().networkFunction`, `test/fixtures.ts`).
 - `normalize` returns a list of changes instead of marking during the write: one `StoreChange` per changed value and per created record, held until it returns. A throw part-way through must still deliver the changes made before it (open decision 17).
 - A `ReadHooks` parameter on every function of the reader's walk, and one hooks object per computation.
 - A caller that writes `environment.store` with `normalize` directly, and not through `normalizeData`, leaves the derived nodes that read what it changed unmarked, and they return their old results until another write reaches them. From change 2b the package index exports `normalizeData` and not `normalize` (open decision 17), so such a caller is code inside the package. `normalize` stays a module export that `environment.ts` and the tests import, as store.md's helpers are (store.md, The package). This is network-and-subscriptions.md's rule for `callSubscriptions` (Why the store-only functions stay store-only): a write through the environment is `normalizeData`.
