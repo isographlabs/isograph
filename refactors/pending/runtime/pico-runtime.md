@@ -56,11 +56,11 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`, `ContextStatus`.
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `ComputeContext`, `Computed`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction and plain reads: `createSourceNode`, `createDerivedNode`, `neverComputed`, `sourceValue`, `stateOf`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
-- Pull: `pull`, `verify`, `recompute`, `compute` (the context, its `ContextStatus`, and dependency recording).
+- Pull: `pull`, `verify`, `recompute`, `compute` (the context and dependency recording).
 - Dependencies: `setDependencies`, `dependentsOf`.
 - Disposal: `disposeDerivedNode`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).

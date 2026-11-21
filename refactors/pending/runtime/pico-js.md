@@ -245,8 +245,7 @@ export type Dependency =
 export type Computation<TValue> = (context: ComputeContext) => TValue;
 
 /** The reads a computation makes. Built per computation by `compute`; there is no ambient current
- * computation. Valid only until its computation returns or throws; a read through it after that
- * throws. */
+ * computation. Read only while its computation runs (Pull). */
 export type ComputeContext = {
   /** Records that the computation read `source`, and returns its value. */
   readSource<TValue>(source: SourceNode<TValue>): TValue;
@@ -503,47 +502,28 @@ type Computed<TValue> = {
   readonly dependencies: ReadonlyArray<Dependency>;
 };
 
-/** Whether a computation's context still records reads. `Open` until the computation returns or
- * throws, then `Closed`. */
-type ContextStatus = 'Open' | 'Closed';
-
-/** Runs `computation` with a context that records what it reads, in read order. The context closes
- * when the computation returns or throws. */
+/** Runs `computation` with a context that records what it reads, in read order. */
 function compute<TValue>(computation: Computation<TValue>): Computed<TValue> {
   const dependencies: Dependency[] = [];
-  let status: ContextStatus = 'Open';
-  const assertOpen = (): void => {
-    if (status === 'Closed') {
-      throw new Error(
-        'Cannot read through a context after its computation returned.',
-      );
-    }
-  };
-  try {
-    const value = computation({
-      readSource: (source) => {
-        assertOpen();
-        dependencies.push({ kind: 'Source', source });
-        return source.value;
-      },
-      readDerived: (node) => {
-        assertOpen();
-        const read = pull(node);
-        dependencies.push({ kind: 'Derived', node });
-        return read;
-      },
-    });
-    return { value, dependencies };
-  } finally {
-    status = 'Closed';
-  }
+  const value = computation({
+    readSource: (source) => {
+      dependencies.push({ kind: 'Source', source });
+      return source.value;
+    },
+    readDerived: (node) => {
+      const read = pull(node);
+      dependencies.push({ kind: 'Derived', node });
+      return read;
+    },
+  });
+  return { value, dependencies };
 }
 ```
 
 - `verify` reads the node's state again after each dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `equal` before `setDependencies`. A throw out of `equal` then leaves the node's dependency list and every `dependents` set consistent. Called after, a throw would leave the node in the `dependents` sets of the new dependencies while its state lists the old ones, and a later `setDependencies` from the old list would never remove it from the sets only the failed run added. Both branches store `computed.dependencies`, so a node whose value came back equal still depends on what it read this time.
-- The context closes in `compute`'s `finally`. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array. A read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) would otherwise add an entry to the stored list with no matching `dependents` edge, so a later write to what it read would not mark the node. The closed context throws instead.
+- A computation is synchronous, and a read through its context after it returned breaks the contract. `recompute` stores the array `compute` returned as the node's dependency list, and `readSource` and `readDerived` push onto that array, so a read after the computation returned (from an `async` computation after an `await`, or through a context the computation stored) adds an entry to the stored list with no matching `dependents` edge, and a later write to what it read does not mark the node. The engine does not check it (decision 2).
 - The context is a parameter built per computation. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation's reads cannot be recorded on the wrong node, and two graphs never share tracking state.
 
 `pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and three on the `verify` path (`pull`, `verify`, the `some` callback). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 1,000 levels of derived nodes; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
@@ -658,7 +638,7 @@ pull(banner); // 'Free shipping' (runs all three)
 ## Rules
 
 - A computation reads nodes only through its `context`: `context.readSource(source)` and `context.readDerived(node)`. A read through a closure or `sourceValue` is not recorded, and the node will not recompute when that value changes.
-- A computation is synchronous. Every read through its `context` happens before it returns; a read through a context after its computation returned throws, so an `async` computation that reads after an `await` throws.
+- A computation is synchronous. Every read through its `context` happens before it returns. The engine does not check this: a read through a context after its computation returned, such as a read after an `await`, is recorded with no edge, and the node does not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
@@ -689,7 +669,7 @@ A source is not collected by the engine. It lives as long as the consumer and th
 
 A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equal)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
-The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. It must be synchronous: the context closes when the computation returns or throws, and a read through a closed context throws, because the dependency list is final when the computation returns. A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
+The computation receives a `ComputeContext` and returns the value. It must be a pure function of what it reads through the context: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
 Two pulls with no write between them run nothing the second time. A pull of a `Clean` node is one step.
 
@@ -1236,7 +1216,6 @@ A test whose comment says "setup as in" repeats that test's setup lines in the f
 // from libs/isograph-pico-js/test/dependencies.test.ts
 import { describe, expect, test } from 'vitest';
 import {
-  type ComputeContext,
   createDerivedNode,
   createSourceNode,
   pull,
@@ -1411,33 +1390,6 @@ describe('recorded dependencies', () => {
     expect(pull(outer)).toBe(2);
     expect(pull(doubled)).toBe(4);
     expect(calls.outer).toBe(1);
-  });
-
-  test('a read through a context after its computation returned throws and records nothing', () => {
-    const calls = { node: 0 };
-    const count = createSourceNode(1, strictEqual);
-    const late = createSourceNode(10, strictEqual);
-    const lateDerived = createDerivedNode((context) => context.readSource(late), strictEqual);
-    const contexts: ComputeContext[] = [];
-    const node = createDerivedNode((context) => {
-      calls.node += 1;
-      contexts.push(context);
-      return context.readSource(count);
-    }, strictEqual);
-    expect(pull(node)).toBe(1);
-
-    const closedMessage = 'Cannot read through a context after its computation returned.';
-    contexts.forEach((context) => {
-      expect(() => context.readSource(late)).toThrow(closedMessage);
-      expect(() => context.readDerived(lateDerived)).toThrow(closedMessage);
-    });
-
-    writeSource(late, 11);
-    expect(pull(node)).toBe(1);
-    expect(calls.node).toBe(1);
-    writeSource(count, 2);
-    expect(pull(node)).toBe(2);
-    expect(calls.node).toBe(2);
   });
 });
 ```
@@ -1952,7 +1904,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 
 - The engine has no write-during-computation check and no graph object; a computation or an equality that writes breaks the contract and leaves values silently stale (Writes during a computation, decision 2). pico-runtime.md's `callResolver` catches every throw of a resolver into `ResolverThrew` (pico-runtime.md open decision 30).
 - Marking walks a work list: `markDirty` over a set, `markOneDirty`, and `markCheck` (Mark).
-- A computation's context closes when the computation returns or throws (`ContextStatus`, Pull).
+- A computation is synchronous; a read through its context after it returned breaks the contract, and the engine does not check it (Pull, decision 2).
 - Disposal resets the node to never computed (Disposal, open decision 9).
 - A computation and an equality must not throw, and the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
