@@ -4,7 +4,7 @@ Status: exploration. Not approved for implementation. Nothing in this doc is dec
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `9b81e0b6`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` and `loadable-hooks/` paths are under `isograph/libs/isograph-react/src`; `disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`; `disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`; `crates/` paths are under `isograph/crates`. i2 paths are relative to the i2 root.
 
-This doc builds on `refactors/pending/runtime/pico-runtime.md` (held 3b, mark then pull; change 3's retention and `rootCount`; change 4's observers; Values with lifecycles; Other derived node kinds; Follow-ups 10 and 11), `refactors/pending/runtime/network-and-subscriptions.md` (the request cache, `fetchEntrypoint`, the two-phase lifetime, Request entries in the store), and `refactors/pending/runtime/components-in-userland.md` (closure fields). It edits none of them; What this changes in other docs lists the amendments.
+This doc builds on `refactors/pending/runtime/pico-runtime.md` (held 3b, mark then pull; change 3's retention and `rootCount`; change 4's observers; Values with lifecycles; Other derived node kinds; Follow-ups 10, 11, and 12), `refactors/pending/runtime/network-and-subscriptions.md` (the request cache, `fetchEntrypoint`, the two-phase lifetime, Request entries in the store), and `refactors/pending/runtime/components-in-userland.md` (closure fields). It edits none of them; What this changes in other docs lists the amendments.
 
 ## The problem
 
@@ -361,7 +361,7 @@ The goal is a tree of worlds: the committed world and pending optimistic or tran
 
 Effects run only in the committed world. Effect roots, the reconciler, and permanent retains exist only there. A pending world may pull any pure node, including inputs nodes and effect-set nodes, for its own render, and may start loaders under temporary retains (Loading during render). It never acquires a permanent retain. When the pending world commits, its mounts become the committed world's effect roots, and the reconciler adopts its temporary retains by key.
 
-pico-runtime.md cites a Follow-ups 12 for forks (Values with lifecycles; The engine (2a), `stateOf`), and its Follow-ups list ends at 11.
+pico-runtime.md's Follow-ups 12 (Forks: a tree of optimistic worlds) states the constraint changes 2 to 4 keep for forks: a derived node's per-world state is one `DerivedNodeState` record, read and written only through `stateOf`, and effects run only in the committed world.
 
 ## End-user experience
 
