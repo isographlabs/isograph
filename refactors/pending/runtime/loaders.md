@@ -169,9 +169,14 @@ An item's value is a source, not the inputs node's value and not the effect-set 
 export function loaderItemSource(key: LoaderInstanceKey): SourceId;
 ```
 
-- After `load` returns, the runtime calls `item.subscribe(onChange)` and stores the unsubscribe in `Loaded.unsubscribe`. `onChange` queues `markChanged([loaderItemSource(key)])` as a write (open decision 7).
+- After `load` returns, the runtime calls `item.subscribe(onChange)` and stores the unsubscribe in `Loaded.unsubscribe`. `onChange` queues `markChanged(environment.graph, [loaderItemSource(key)])` as a write (open decision 7).
 - A reader walk at a `Loader` selection calls `readSource(loaderItemSource(key))` and returns `{ kind: 'Loaded', value: item.read() }` when the instance is `Loaded`, `{ kind: 'NotLoaded' }` when no instance is stored, and `{ kind: 'LoadThrew', error }` otherwise (open decision 2).
-- Releasing an instance calls `unsubscribe`, then `cleanup`, then `deleteSource(loaderItemSource(key))`, which marks every reader `Dirty`; they recompute to `NotLoaded` when pulled.
+- Releasing an instance calls `unsubscribe`, then `cleanup`, then `deleteSource(environment.graph, loaderItemSource(key))`, which marks every reader `Dirty`; they recompute to `NotLoaded` when pulled.
+
+`loaderItemSource` and `urlSource` are `SourceId`s, and `markChanged` and `deleteSource` take the graph, as pico-runtime.md's body is written (open decision 29 (b)). Under its open decision 29 (a) both become cell objects and no `SourceId` is built:
+
+- `loaderItemSource(key)` becomes a `Source<GraphValue>` per `LoaderInstanceKey`, kept in an environment map and inserted by the walk's first read of the key, as `recordCell` inserts an `ABSENT` record cell, because a reader that read `NotLoaded` must be marked when the instance loads. `onChange` and a load call `markChanged([cell])`; a release calls `markChanged([cell])` in place of `deleteSource`, because the item source owns no derived node. The cell is dropped when its `dependents` is empty and no instance is stored at its key, as `garbageCollect` drops a `MISSING` value cell.
+- `urlSource()` becomes one `Source<GraphValue>` the router holds, and the router reports a new URL with `markChanged([urlCell])`.
 
 A pure field downstream of a loader reads the item through the walk, so its dependency is recorded and `markChanged` reaches it. This is the client roots' rule (pico-runtime.md, Other derived node kinds): a source is current only if every write to it reports a change, and `subscribe` is the report.
 
@@ -286,7 +291,7 @@ pull    effect-set node: reads Pet:1.bestFriend -> Pet:3, creates and reads Pet:
         new value { Pet:3/Presence -> inputs "3" }, unequal
 diff    acquire Pet:3/Presence: not stored, load("3"), permanentRetainCount 1
         release Pet:2/Presence: permanentRetainCount 0, temporaryRetainCount 0 -> pushed to teardowns
-flush   Pet:2/Presence: unsubscribe, cleanup, deleteSource(loaderItemSource(Pet:2/Presence))
+flush   Pet:2/Presence: unsubscribe, cleanup, deleteSource(graph, loaderItemSource(Pet:2/Presence))
 ```
 
 A write to `Pet:2.name` marks nothing the effect-set node read, so the pull finds it `Clean` and the reconciler does nothing. If `Presence` also selected `name`, a write to `Pet:3.name` would mark `Pet:3/Presence`'s inputs node `Dirty` and the effect-set node `Check`; the pull recomputes the inputs node, and only if its value changed does the effect-set node recompute and the instance reload.
@@ -315,7 +320,7 @@ export type MountedEntrypoint = {
 };
 ```
 
-A route change is a write: the router reports the new URL with `markChanged([urlSource()])`, the mounted-entrypoints node recomputes, and the reconciler mounts the entrypoints that appeared and unmounts the ones that went. Then each new effect root's effect set is pulled and its instances acquired; each unmounted root releases what it held. A route change is mark, pull, diff, the same three steps as any write.
+A route change is a write: the router reports the new URL with `markChanged(environment.graph, [urlSource()])`, the mounted-entrypoints node recomputes, and the reconciler mounts the entrypoints that appeared and unmounts the ones that went. Then each new effect root's effect set is pulled and its instances acquired; each unmounted root releases what it held. A route change is mark, pull, diff, the same three steps as any write.
 
 Two caveats are open decisions:
 
@@ -520,7 +525,7 @@ The instance's key does not change when its inputs change, so the question is on
   - A window with no resource. Between the old cleanup and the moment the new resource is live (for a socket, until it reconnects), events the outside world sends are delivered to neither; a loader that must not lose them needs its own replay.
   - What readers see. `cleanup` and `load` run in the same synchronous step, and no pull happens between them, so no reader observes `NotLoaded` from the order alone. Readers see the new item's first `read()`, which for a resource that connects asynchronously is its not-ready value; that is the same gap at the item's level. Readers do observe `NotLoaded` (or `LoadThrew`) when the new `load` throws, since the old item is already gone.
   - It is React's `useEffect` order (the previous effect's cleanup runs before the next effect).
-- (b) Load, then cleanup after notify, pico-runtime.md's Reconciliation order. In step 5 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markChanged([loaderItemSource(key)])`, and holds the old `cleanup` for the next pass: step 7 runs the queued write, whose `settle` and `notify` move readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
+- (b) Load, then cleanup after notify, pico-runtime.md's Reconciliation order. In step 5 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markChanged(environment.graph, [loaderItemSource(key)])`, and holds the old `cleanup` for the next pass: step 7 runs the queued write, whose `settle` and `notify` move readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
   - Two live resources for one instance between `load` and the flush. An exclusive resource fails or evicts the old one, and a server that counts connections counts two.
   - A cleanup held for the next pass is one more list on the environment, and After a write's step 6 flushes only the cleanups held from an earlier pass, so the old item is not released before readers moved off it.
 - (c) Per loader, a declaration option. `LoaderArtifact` gains `readonly reloadOrder: ReloadOrder`, with `export type ReloadOrder = 'CleanupThenLoad' | 'LoadThenCleanup'`, written by the compiler from an argument of the loader directive (open decision 1), with a default. It holds up: the right order is a property of the resource, which only the loader's author knows (exclusive resources need (a); a gapless display needs (b)), and both orders use the reconciler's existing steps. Costs: one more directive argument and a default to choose; the built-in loaders each pick one (the fetch loader and `eager` have no exclusive resource, so (b)).
