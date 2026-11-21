@@ -50,3 +50,17 @@ Adopting this rule deviates from upstream. The reason is that a selection's resu
 i2's parser accepts both shapes. `Selection::selection_set` is `Option<WithSpan<SelectionSet>>` (`crates/isograph_parser/src/selections.rs:33`), set by `consume_selection_set` (`crates/isograph_parser/src/selections.rs:89`, called at `:130`) for any selection.
 
 i2's validation rejects both, matching upstream. `target_errors` (`crates/isograph_compiler/src/validation.rs:559`) reports `ValidationError::SelectionSetOnLeaf` for a selection set on a leaf target (`:583`, message "`X` returns a leaf and takes no selection set." at `:40`) and `ValidationError::MissingSelectionSet` for a composite target without one (`:587`, message at `:42`). `parent_error` (`:314`) reports `InvalidEntityError::LeafParent` for a `field` declaration on a leaf parent (`:322`, message at `:75`), and `pointer_target_error` reports `InvalidEntityError::LeafTarget` for a pointer to a leaf (`:343`, message at `:85`).
+
+## Everything is a link
+
+This is a user idea, parked like the rest of this doc.
+
+Every selection follows a link to an entity. A selection with no selection set calls the target entity's default reader. `String`'s default reader returns the raw string. An object entity's default reader returns `{}`. A user-defined entity's default reader returns its `__self` value. A selection with a selection set reads the selected fields on the target entity.
+
+Consequences:
+
+- The reader AST collapses its scalar and linked node kinds into one kind. That kind carries an optional selection set and the target entity's default reader.
+- The engine is unchanged. Each selection is still one `readSource` of the field's source node.
+- A scalar entity has no record. Following the link to a `String` takes the value, and the entity's identity is its value. Under that reading, value-keyed identity (option (b) above) is the natural identity of a client field on `String`. Path-keyed identity (option (a)) still works: the derived node attaches to the record and path that produced the value.
+- The TypeScript type of a selection with no selection set is the target entity's self type.
+- The query text is unchanged.
