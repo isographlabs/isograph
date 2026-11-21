@@ -140,7 +140,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 
 ## The public API
 
-The API is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided. (f) is written because pico-runtime.md establishes that a guard no caller can bypass lives in the engine (its open decision 2, last paragraph), which leaves (f) and (g), and (f) has pico's shape: every pico read and write takes the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`). Under (g) Option (g) lists the deltas; under (a) every `graph` parameter and `Graph` itself drop out.
+The API is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided. (f) is written because pico-runtime.md establishes that a guard no caller can bypass lives in the engine (its open decision 2, last paragraph), which leaves (f) and (g), and (f) has pico's shape: every pico read and write takes the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`). Option (g) below lists the deltas for (g). Under (a) every `graph` parameter and `Graph` itself drop out.
 
 ```ts
 // from libs/<engine directory>/src/index.ts
