@@ -67,7 +67,7 @@ Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The imp
 
 Isograph runtime (`libs/isograph-runtime/src`):
 
-- `store.ts`: `Store`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING`, `Missing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
+- `store.ts`: `Store`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING` (not exported), `Missing`, `isMissing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
 - `read.ts`: `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`, `ReadHooks`, `readData`, `readStoreValue`, `readButDoNotEvaluate`, `evaluatingHooks`, `read`, `readSelection`, `linkTargetValue`, `eachLink`, `nested`.
 - `artifacts.ts`: the reader AST (`ReaderSelection`), `EntityTable`, `EntityTables`, `FieldEntry`, `EntityShape`, `RecordStorage`, `NormalizationTarget`, and `NormalizationAst.tables`. `store.ts`: `VALUE_KEY`. `read.ts`: `EMPTY_DATA`, `readAt`, `fieldOf`, `tableOf`, `derivedLink`. `recordId.ts`: `omittedRecordId`, `recordId` over `RecordStorage`. `normalize.ts`: `leafRecords`, `storageOf`, `Normalization.tables`.
 - `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
@@ -128,9 +128,15 @@ export type StoreSourceNode = SourceNode<StoreValue | Missing>;
 export type ResolverNode = DerivedNode<ResolverResult<unknown>>;
 
 /** A source node's value when the record holds no value under its key: missing data. From core
- * change 2. */
-export const MISSING: unique symbol = Symbol('Missing');
+ * change 2. Not exported. */
+const MISSING: unique symbol = Symbol('Missing');
 export type Missing = typeof MISSING;
+
+/** Whether `value` is `MISSING`. Callers: the walk's `readStoreValue`, `check`, and the garbage
+ * collector's mark. */
+export function isMissing(value: StoreValue | Missing): value is Missing {
+  return value === MISSING;
+}
 ```
 
 Before (`libs/isograph-runtime/src/store.ts:4-8`):
@@ -141,7 +147,7 @@ export type Store = Map<EntityName, Map<RecordId, StoreRecord>>;
 export type StoreRecord = Map<StoreKey, StoreValue>;
 ```
 
-`Store` is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `=== MISSING` narrows with no cast.
+`Store` is the user's `Map<EntityName, Map<RecordId, Map<StoreKey, SourceNode>>>` with two additions. `derived` puts a resolver derived node in the container of the record it was computed on, so that container is its owner: deleting the record disposes it with no `owned` map and no id table. Server keys and resolver store keys are separate maps, so a server field and a client field of one name do not collide. `presence` keeps v1's distinction between a record `normalize` wrote with no values (EmptyStats's `stats {}` writes an empty `PetStats` record, `test/normalize.test.ts:270`) and no record, for the readers that are not computations. `MISSING` is a symbol, so no JSON value equals it, and `isMissing` narrows with no cast. `MISSING` is internal to `store.ts`: `store.ts` holds every write of it (`sourceNodeAt`'s new source node, `storeValue`, and `deleteRecord` under open decision 31 (b)) and every comparison with it (`isUnchanged`, `storeSnapshot`, `isMissing`); every other module tests a value with `isMissing` and names only the type `Missing`; `normalize` writes only present values and never names it. The package index exports none of `MISSING`, `Missing`, and `isMissing`, and no public type names `Missing`: a public result reports an absent key as `MissingData` with its record and key, and `storeSnapshot` omits a key whose source holds `MISSING` (`PlainStore` has no representation of an absent key).
 
 There is no `SourceId`, no `DerivedNodeId`, no `sourceDependents` map, and no `RecomputationGraph` object. The environment's `store` holds every node of the graph. `createIsographEnvironment` keeps its parameters (`libs/isograph-runtime/src/environment.ts:34-45`): it takes `store: Store` and builds no store, and its callers still pass `new Map()` (`demos/pet-demo/src/fetchAndRead.ts:19`, and the tests). The store builds every node with the engine's `createSourceNode` and `createDerivedNode` and reads a source's value with `sourceValue` or `ComputeContext.readSource`; no store function reads or writes a node's fields.
 
@@ -304,7 +310,7 @@ What each consumer becomes:
 
 - `read` and `readButDoNotEvaluate` (v1): the walk's `readValue` hook is `storeValue` (The reader walk).
 - The graph read: `readValue` is `sourceNodeAt`, reported to the computation (The reader walk).
-- `check`: `storeRecord(store, link) === undefined` becomes `recordPresence(store, link) === 'Absent'` (`libs/isograph-runtime/src/check.ts:30`, `:54`), and `record.get(key)` becomes `storeValue(store, link, key)` with `=== MISSING` for `=== undefined` (`:49-50`). Its results are v1's for every input.
+- `check`: `storeRecord(store, link) === undefined` becomes `recordPresence(store, link) === 'Absent'` (`libs/isograph-runtime/src/check.ts:30`, `:54`), and `record.get(key)` becomes `storeValue(store, link, key)` with `isMissing(..)` for `=== undefined` (`:49-50`). Its results are v1's for every input.
 - The garbage collector's mark: the same two replacements (`libs/isograph-runtime/src/garbageCollection.ts:51`, `:70-73`), and one change: a link reached to an `Absent` container keeps that container, and the mark does not recurse into it (Garbage collection in the core). The sweep calls `deleteRecord`.
 - `readDataForOnComplete` (`libs/isograph-runtime/src/network.ts:196-218`): calls `read`, unchanged (open decision 6).
 - Serialization: `storeSnapshot`.
@@ -524,7 +530,7 @@ function readStoreValue(store: Store, root: StoreLink, key: StoreKey): ReadResul
 // after:
 function readStoreValue<TFailure>(hooks: ReadHooks<TFailure>, root: StoreLink, key: StoreKey): ReadResult<StoreValue> {
   const value = hooks.readValue(root, key);
-  if (value === MISSING) {
+  if (isMissing(value)) {
     return { kind: 'MissingData', reason: `No value for ${key} on ${recordName(root)}`, recordLink: root };
   }
   return ok(value);
@@ -1452,9 +1458,14 @@ Each is one commit, in order; each is independently shippable.
    ```ts
    // from libs/isograph-runtime/src/store.ts
    // core change 2, on v1's plain store
-   /** A value the store does not hold: no record at the link, or no value under the key. */
-   export const MISSING: unique symbol = Symbol('Missing');
+   /** A value the store does not hold: no record at the link, or no value under the key. Not exported. */
+   const MISSING: unique symbol = Symbol('Missing');
    export type Missing = typeof MISSING;
+
+   /** Whether `value` is `MISSING`. */
+   export function isMissing(value: StoreValue | Missing): value is Missing {
+     return value === MISSING;
+   }
 
    /** The value of `key` on `link`, or `MISSING`. */
    export function storeValue(store: Store, link: StoreLink, key: StoreKey): StoreValue | Missing {
