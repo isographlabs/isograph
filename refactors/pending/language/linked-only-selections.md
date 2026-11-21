@@ -655,7 +655,7 @@ Before: `selection_value` (`reader_artifact.rs:102-148`) matched `Scalar`, `Link
 
 ### Entity table modules
 
-`generate_artifacts` (`crates/typescript_artifacts/src/lib.rs:63`) prints one `E/entity_table.ts` per `ProjectArtifacts::entity_tables` entry, after `link_types`, from `crates/typescript_artifacts/src/entity_table.rs`. A table module default-exports a function returning the table, as a reader artifact module does, and imports the reader artifact of each `Derived` entry. Field entries are printed in name order. `GeneratedFunction` prints the refinement resolvers:
+`generate_artifacts` (`crates/typescript_artifacts/src/lib.rs:63`) prints one `E/entity_table.ts` per `ProjectArtifacts::entity_tables` entry, after `link_types`, from `crates/typescript_artifacts/src/entity_table.rs`. A table module default-exports a function returning the table, as a reader artifact module does, and imports the reader artifact of each `Derived` entry. Field entries are printed in name order: the iteration order of `EntityTable::fields`, a `BTreeMap<SelectableName, FieldEntry>`. `SelectableName`'s `Ord` is derived over `StringKey` (`crates/string_key_newtype/src/lib.rs:7`), whose `Ord` is derived over `StringId` (`relay-crates/intern/src/string_key.rs:29-31`), which compares the interned strings with `str::cmp` (`relay-crates/intern/src/string.rs:136-140`). That is byte order: uppercase letters, then `_`, then lowercase letters, so a table lists `Constant` and `PetLink` before `__typename`, and `__typename` before `asPet`, `bestFriend`, and `id`. `GeneratedFunction` prints the refinement resolvers:
 
 ```rust
 // from crates/typescript_artifacts/src/module.rs
