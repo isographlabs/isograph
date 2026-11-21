@@ -245,9 +245,9 @@ export type AnyNode = SourceNode<unknown> | AnyDerivedNode;
  * happens before it returns. */
 export type Computation<TValue> = (context: Context) => TValue;
 
-/** The derived node whose computation is running, typed opaque. `compute` passes the node itself;
- * `readSource` and `readDerived` cast it back (The context). */
-export type Context = { readonly [CONTEXT]: 'Context' };
+/** The derived node whose computation is running, branded so that only `compute` produces one (The
+ * context). */
+export type Context = AnyDerivedNode & { readonly [CONTEXT]: true };
 
 /** The brand of `Context`. A type-only declaration: no value exists at runtime. Not exported. */
 declare const CONTEXT: unique symbol;
@@ -515,31 +515,26 @@ const NO_DEPENDENCIES: ReadonlyArray<AnyNode> = [];
  * record each read in `node.reads`, in read order. */
 function compute<TValue>(node: DerivedNode<TValue>): TValue {
   node.reads.length = 0;
-  return node.computation(node as unknown as Context);
+  return node.computation(node as Context);
 }
 
 export function readSource<TValue>(context: Context, source: SourceNode<TValue>): TValue {
-  readerOf(context).reads.push(source);
+  context.reads.push(source);
   return source.value;
 }
 
 export function readDerived<TValue>(context: Context, node: DerivedNode<TValue>): TValue {
   const value = pull(node);
-  readerOf(context).reads.push(node);
+  context.reads.push(node);
   return value;
-}
-
-/** The derived node `compute` passed as `context`. Called only by `readSource` and `readDerived`. */
-function readerOf(context: Context): AnyDerivedNode {
-  return context as unknown as AnyDerivedNode;
 }
 ```
 
 ### The context
 
-A computation's `Context` is the derived node whose computation is running. `compute` passes the node itself, typed as the opaque `Context`, and `readSource` and `readDerived` cast it back and push onto its `reads`. A node allocates no context object and no closure: the node is the context. The two casts, in `compute` and `readerOf`, are the only casts in the engine. A consumer cannot build a `Context` without a cast, so a `Context` that reaches `readSource` or `readDerived` came from `compute` unless the consumer cast.
+A computation's `Context` is the derived node whose computation is running. `Context` is `AnyDerivedNode` intersected with a brand, `[CONTEXT]: true`, where `CONTEXT` is a type-only `unique symbol` that no value carries. `compute` passes the node as a `Context`, and `readSource` and `readDerived` push onto `context.reads` directly. A node allocates no context object and no closure, because the node is the context. The cast `node as Context` in `compute` narrows `DerivedNode<TValue>` to a subtype of `AnyDerivedNode` and is the only cast in the engine. A plain derived node has no brand, so a consumer cannot pass one where a `Context` is expected without a cast, and a `Context` that reaches `readSource` or `readDerived` came from `compute` unless the consumer cast.
 
-A computation uses its `Context` only as the first argument of `readSource` and `readDerived`, and only while it runs. Any other use breaks the contract, and the engine does not check it (decision 2): a cast to read or write the node's fields, a read through the `Context` after the computation returned (from an `async` computation after an `await`, or through a `Context` the computation stored), or a read through the `Context` from inside another node's computation. A read after the computation returned pushes into `node.reads`, which after `commitReads` is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. A read through another node's `Context` records the dependency on that other node.
+A computation uses its `Context` only as the first argument of `readSource` and `readDerived`, and only while it runs. Any other use breaks the contract, and the engine does not check it (decision 2): a read or write of the node's fields through the `Context`, which type-checks because a `Context` is a derived node, a read through the `Context` after the computation returned (from an `async` computation after an `await`, or through a `Context` the computation stored), or a read through the `Context` from inside another node's computation. A read after the computation returned pushes into `node.reads`, which after `commitReads` is the buffer the next `compute` clears, so the read is lost and a later write to what it read does not mark the node; during a later computation of the same node it adds an entry that computation never made. A read through another node's `Context` records the dependency on that other node.
 
 There are two read functions in place of one `read(context, node)` that switches on `node.kind`: every caller knows statically whether it reads a source or a derived node, and a switch would test again what the caller's type already established, at a comparison per read.
 
@@ -680,7 +675,7 @@ pull(banner); // 'Free shipping' (runs all three)
 ## Rules
 
 - A computation reads nodes only with the `context` it receives: `readSource(context, source)` and `readDerived(context, node)`. A read through a closure, `sourceValue`, or `pull` is not recorded, and the node will not recompute when that value changes.
-- The `context` is an opaque token. A computation passes its own `context` only to `readSource` and `readDerived`, and only while it runs. The engine does not check this: a read through a context after its computation returned, such as a read after an `await`, is lost, and the node does not recompute when that value changes.
+- The `context` is the computing node, branded. A computation reads no field of it and passes its own `context` only to `readSource` and `readDerived`, and only while it runs. The engine does not check this: a read through a context after its computation returned, such as a read after an `await`, is lost, and the node does not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
@@ -711,7 +706,7 @@ A source is not collected by the engine. It lives as long as the consumer and th
 
 A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equals)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
-The computation receives a `Context`, which is its own node typed opaque (The context), and returns the value. It must be a pure function of what it reads with `readSource` and `readDerived`: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
+The computation receives a `Context`, which is its own node with a type-only brand (The context), and returns the value. It must be a pure function of what it reads with `readSource` and `readDerived`: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
 Two pulls with no write between them run nothing the second time. A pull of a `Clean` node is one step.
 
@@ -1854,15 +1849,14 @@ test('a derived node of any value type is an AnyDerivedNode', () => {
   expectTypeOf<DerivedNode<ReadonlyArray<string>>>().toMatchTypeOf<AnyDerivedNode>();
 });
 
-test('a Context is opaque, and a node is not a Context', () => {
+test('a derived node is not a Context, and a source is not read with readDerived', () => {
   const count = createSourceNode(1, strictEqual);
   const doubled = createDerivedNode((context) => readSource(context, count) * 2, strictEqual);
-  expectTypeOf<Context>().not.toMatchTypeOf<AnyDerivedNode>();
+  expectTypeOf<Context>().toMatchTypeOf<AnyDerivedNode>();
+  expectTypeOf<AnyDerivedNode>().not.toMatchTypeOf<Context>();
   // @ts-expect-error a derived node passed as a Context
   readSource(doubled, count);
   createDerivedNode((context) => {
-    // @ts-expect-error a Context has no reads field
-    void context.reads;
     // @ts-expect-error a source node read with readDerived
     return readDerived(context, count);
   }, strictEqual);

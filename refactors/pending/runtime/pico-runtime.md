@@ -61,7 +61,7 @@ Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The imp
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction and plain reads: `createSourceNode`, `createDerivedNode`, `sourceValue`, `stateOf`.
 - Mark: `writeSource`, `markSourceChanged`, `markDirty`, `markOneDirty`, `markCheck`.
-- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived`, `readerOf` (pico-js.md, The context).
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The context).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
