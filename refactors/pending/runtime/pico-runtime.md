@@ -1953,7 +1953,7 @@ The user's design notes, recorded for later. None is part of the core, and none 
 
 11. An `Embedded` storage kind: a record of an entity with `Embedded` storage is stored as one value in its parent's source node, with no container of its own (`date { hour }` held whole in `Pet:1.date`). Cost: the walk reads fields out of a value as well as out of a record, a second representation the store does not have in v0, and every reader of `date` is marked together when any field of it changes. Benefit: one container and its source nodes fewer per such object. In v0 such an object is a `FromParent` record (Entity tables).
 
-12. Entity tables loaded as needed. In v0 a reader artifact imports the table of every entity its walk reads at, and a table imports the reader artifact of every derived field it lists, so the bundle that holds one reader holds every client field of those entities that the project selects, and their tables in turn. A table, or each entry's artifact, loaded on demand (`import()`) when the walk first reads at that entity cuts that cost, and needs the walk to wait for a module, which v0's synchronous walk cannot.
+12. Entity tables loaded as needed. In v0 a reader artifact imports the table of every entity its walk reads at, and a table imports the reader artifact of every derived field it lists, so the bundle that holds one reader holds every client field of those entities, and their tables in turn (linked-only-selections.md open decision 4). A table, or each entry's artifact, loaded on demand (`import()`) when the walk first reads at that entity cuts that cost, and needs the walk to wait for a module, which v0's synchronous walk cannot.
 
 ## Docs this doc amends
 
