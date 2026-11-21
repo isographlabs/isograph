@@ -489,7 +489,6 @@ Engine (`libs/reactive-graph/src/graph.ts`):
 - `pull`, `verify`, `recompute`, `compute` (the context and dependency recording), `setDependencies`, `stateOf`, `neverComputed`.
 - `createGraph`, `assertNotComputing`, `createSourceNode`, `createDerivedNode`, `sourceValue`, `writeSource`, `disposeDerivedNode`.
 - The write-during-computation guard: `Graph.computingDepth` and `assertNotComputing` (open decision 2 (f)).
-- A cycle check, if open decision 8 adds one.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` and `sourceValue` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
@@ -1842,11 +1841,15 @@ Decided by the user: a computation must not throw (Pull; Stored resolver results
 
 Upstream compares resolver values by `===` only (`areEqualWithDeepComparison.ts:84-95`).
 
-### 8. A cycle of derived nodes
+### 8. A cycle of derived nodes (decided)
 
-The core cannot form one: a cycle of client field selections is an `InlineCycle` query error (query-generation.md, Cycles), and every runtime dependency goes to a node of a field the reader AST selects, on whichever record a link leads to. An eager client pointer can: `field Pet.Card { bestFriend { Card } }` with `Pet:1` and `Pet:2` each other's best friend makes `Card@Pet:1` read `Card@Pet:2`, which reads `Card@Pet:1`. `pull` then recomputes a node inside its own computation, and `verify` recurses the same way; neither checks. Marking terminates on a cycle, because it stops at a marked node. Incremental fails on a cycle with "adding edge made graph cyclic" (`ensure_height_requirement`, `src/adjust_heights_heap.ml` of `janestreet/incremental`).
+Decided by the user: cycles are avoided at compile time, and the engine has no cycle check. Every runtime edge from one derived node to another, `A@X -> B@Y`, exists only because `A`'s selection set selects `B`: the walk creates or reads a derived node only for a selection in the reader AST it walks, at whichever record a link leads to. So a cycle of nodes at run time, including one that depends on data (`field Pet.Card { bestFriend { Card } }` with `Pet:1` and `Pet:2` each other's best friend), implies a cycle of field selections in the source, which the compiler rejects as `InlineCycle` ("These fields inline each other", `crates/isograph_compiler/src/merged_selection.rs:240`, reported for the field at `:803-809`). `inline_cycle` (`:1352-1383`) searches `inlined_fields` (`:1281-1298`), which lists every client field a field's selection set selects at any depth under protocol selections (`inlined_in_selection`, `:1314-1348`); `Card` selects `Card` under `bestFriend`, so `Pet.Card -> Pet.Card` is reported.
 
-Not decided; it arises with client pointers. A cycle check, if one is added, is the engine's: `pull` and `verify` are where a node is re-entered.
+The other derived fields do not break the argument:
+
+- A generated refinement field (`Node.asPet`, Selections in the Isograph layer) has an empty reader AST, so its node reads no derived node and closes no cycle. The selections under `asPet { .. }` belong to the parent's selection set; a refinement is a protocol selection, so `inlined_in_selection` descends into it (`:1325-1338`).
+- `__self` is not a derived node: the walk reads it as the current record. `__self { F }` inside `field E.F` selects `F` on `E`; the change that adds `__self` (core change 7) adds a `SelfRecord` arm to `inlined_in_selection` that descends into its selection set on the same entity, so `E.F -> E.F` is `InlineCycle`.
+- A client pointer is not read in v0 (`SelectionRead::NotRead`), and `inlined_in_selection` lists nothing under one (`:1346`). The change that reads pointers adds the pointer field and the fields under its selection set to `inlined_fields`, because a pointer node and the fields read at its target are then edges of the reading node.
 
 ### 9. An unreached `Absent` container whose source nodes have readers
 
