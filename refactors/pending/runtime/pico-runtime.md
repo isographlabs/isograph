@@ -3035,7 +3035,7 @@ Under held 3b, a throw out of `compute` propagates out of `recompute` before `se
       readDerivedNode: (id, create) => {
         const node = upToDateDerivedNode(graph, id, create);
         dependencies.push({ kind: 'Derived', node });
-        return node.value;
+        return stateOf(node).value;
       },
     });
     return { value, dependencies };
@@ -3047,7 +3047,7 @@ Under held 3b, a throw out of `compute` propagates out of `recompute` before `se
       readDerivedNode: (id, create) => {
         const node = upToDateDerivedNode(graph, id, create);
         dependencies.push({ kind: 'Derived', node });
-        return node.value;
+        return stateOf(node).value;
       },
     });
     return { value, dependencies };
