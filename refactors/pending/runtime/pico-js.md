@@ -162,7 +162,7 @@ export {
 } from './graph';
 ```
 
-`AnyDerivedNode` is exported from the package index because a computation receives one and passes it to `readSource` and `readDerived`, so a consumer that writes a function over the reader names it (`contextHooks` in pico-runtime.md). `NodeState`, `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` and `NodeState` that name them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
+`AnyDerivedNode` is exported from the package index because a computation receives one and passes it to `readSource` and `readDerived`, so a consumer that writes a function over the reader names it (`contextHooks` in pico-runtime.md). `PrecalculatedValue`, `Status`, and `AnyNode` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
 
 ### Types
 
@@ -181,16 +181,12 @@ export type DerivedNode<TValue> = {
   readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
   equals(previous: TValue, next: TValue): boolean;
-  /** It is `MISSING` when the node was never computed or was disposed, and only `stateOf` reads or writes it. */
   precalculated: Option<PrecalculatedValue<TValue>>;
   reads: AnyNode[];
   readonly dependents: Set<AnyDerivedNode>;
 };
 
 export type AnyDerivedNode = DerivedNode<unknown>;
-
-/** A layered graph keeps this part of a derived node once per layer. */
-export type NodeState<TValue> = Pick<DerivedNode<TValue>, 'precalculated'>;
 
 /** The first computation after creation or disposal allocates it, and later computations write its fields in place. */
 export type PrecalculatedValue<TValue> = {
@@ -255,7 +251,7 @@ In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), 
 
 `graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`, reads or writes its `dependents`, `precalculated`, or `reads`, or calls an unexported function.
 
-### Construction and plain reads
+### Construction
 
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
@@ -278,11 +274,6 @@ export function createDerivedNode<TValue>(
     reads: [],
     dependents: new Set(),
   };
-}
-
-/** Every read and write of `precalculated` goes through `stateOf`, so that a layered graph changes this function alone. */
-function stateOf<TValue>(node: DerivedNode<TValue>): NodeState<TValue> {
-  return node;
 }
 ```
 
@@ -318,7 +309,7 @@ function markDirty(nodes: ReadonlySet<AnyDerivedNode>): void {
 
 /** `markOneDirty` returns the status `node` had before it became `Dirty`, or `MISSING` when it has no precalculated value. */
 function markOneDirty(node: AnyDerivedNode): Option<Status> {
-  const precalculated = stateOf(node).precalculated;
+  const precalculated = node.precalculated;
   if (precalculated === MISSING) {
     return MISSING;
   }
@@ -333,7 +324,7 @@ function markCheck(work: AnyDerivedNode[]): void {
   };
   let node = work.pop();
   while (node !== undefined) {
-    const precalculated = stateOf(node).precalculated;
+    const precalculated = node.precalculated;
     if (precalculated !== MISSING && precalculated.status === 'Clean') {
       precalculated.status = 'Check';
       node.dependents.forEach(push);
@@ -352,7 +343,7 @@ Marking does not recurse. `markCheck` is a loop over a work list, the worklist c
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
-  const precalculated = stateOf(node).precalculated;
+  const precalculated = node.precalculated;
   if (precalculated === MISSING) {
     return computeFirst(node);
   }
@@ -378,7 +369,7 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const dependencies = node.reads;
   setDependencies(node, NO_DEPENDENCIES, dependencies);
   node.reads = [];
-  stateOf(node).precalculated = { value, status: 'Clean', dependencies };
+  node.precalculated = { value, status: 'Clean', dependencies };
   return value;
 }
 
@@ -502,11 +493,10 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 ```ts
 // from libs/isograph-pico-js/src/graph.ts
 export function disposeDerivedNode(node: AnyDerivedNode): void {
-  const state = stateOf(node);
-  const precalculated = state.precalculated;
+  const precalculated = node.precalculated;
   if (precalculated !== MISSING) {
     setDependencies(node, precalculated.dependencies, NO_DEPENDENCIES);
-    state.precalculated = MISSING;
+    node.precalculated = MISSING;
   }
   markDirty(node.dependents);
 }
@@ -694,7 +684,7 @@ The engine takes Reactively's marking and pull, pico's equality and per-computat
 No published library has the engine's contract. Reactively, alien-signals, signal-polyfill, Preact signals, Vue's reactivity, MobX, Solid, Jotai, `@tldraw/state`, and `@liby-tools/salsa` each record reads through ambient tracking state, make equality optional or fix it, and have no explicit disposal of a derived node. alien-signals' `createReactiveSystem` (`src/system.ts:34`) is the only workable base: it holds no module state, and the caller supplies `update`, `notify`, and `unwatched`. The engine does not use it, for five reasons:
 
 - The engine imports nothing (Goal), and a dependency on alien-signals breaks that.
-- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `PrecalculatedValue`, which `stateOf` reaches so that a later layered graph gives a node one slot per layer by changing `stateOf` alone (Types), has no place.
+- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `PrecalculatedValue`, which a later layered graph keeps once per layer, has no place.
 - `link` returns early when the dependency read is the one read just before (`:52-55`), so consecutive repeated reads are merged into one link, where the engine records each read in its dependency list, and a node read twice is listed twice (pico-runtime.md, Example, Duplicate dependency entries).
 - A node whose computation threw is left marked clean, where the engine leaves every mark as it was before the throwing run (Throws).
 - It has had three major versions since its first release in 2024-10 (1.0.0 2025-01, 2.0.0 2025-04, 3.0.0 2025-09).

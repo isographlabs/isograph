@@ -29,7 +29,7 @@ FC reads: root.2, root.3, other.2, other.3
 
 ## The engine
 
-The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction and plain reads, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/isograph-pico-js` (open decision 18).
+The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/isograph-pico-js` (open decision 18).
 
 pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (pico-js.md, Reverse edges, no epochs).
 
@@ -37,7 +37,7 @@ The engine has no graph object and no write-during-computation check (pico-js.md
 
 ### The engine and the Isograph runtime
 
-The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `precalculated`, or `reads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`stateOf`, `markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `precalculated`, or `reads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`markDirty`, `markOneDirty`, `markCheck`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
 
 The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, The public API):
 
@@ -56,14 +56,14 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `NodeState`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
+- Types: `SourceNode`, `DerivedNode`, `AnyDerivedNode`, `PrecalculatedValue`, `Status`, `AnyNode`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
-- Construction and plain reads: `createSourceNode`, `createDerivedNode`, `stateOf`.
+- Construction: `createSourceNode`, `createDerivedNode`.
 - Mark: `writeSource`, `markSourceDirty`, `markDirty`, `markOneDirty`, `markCheck`.
 - Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The reader).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
-- Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, `stateOf(node, world)`, and source overrides read through `readSource` (Later: a DAG of graphs).
+- Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, per-world derived node state, and source overrides read through `readSource` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
 
@@ -78,7 +78,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 ### What resists the split
 
-- `stateOf` and layering. Later: a DAG of graphs gives a node one slot per world by changing `stateOf`, and a source one value per world. The runtime never calls `stateOf`, which the package does not export, so a derived node's per-world slot is the engine's alone. A source's per-world value is not: `storeValue` and `presentValues` read `source.value`, which is the base value, so layering changes those two reads as well as `readSource` (Later: a DAG of graphs).
+- Layering. Later: a DAG of graphs gives a derived node one slot per world and a source one value per world. Every access of `node.precalculated` is in `graph.ts`, so per-world state replaces those accesses there when it is built, and a derived node's per-world slot is the engine's alone. A source's per-world value is not: `storeValue` and `presentValues` read `source.value`, which is the base value, so layering changes those two reads as well as `readSource` (Later: a DAG of graphs).
 - Equality defaults. The engine has none: every node's `equals` is a constructor argument (pico-js.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (pico-js.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
 - Throws. A computation must not throw (pico-js.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching every throw of the resolver into `ResolverThrew` (Stored resolver results, open decision 30).
@@ -1707,9 +1707,9 @@ A computation is pure and runs on every pull, including a pull a discarded rende
 
 Not part of the core: optimistic layers and forks. The base graph is the core's store. Layer graphs sit above it, each with one parent, and form a tree. A world is a path from the base to a layer.
 
-- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `precalculated` (The engine and the Isograph runtime), so giving `readSource` and `stateOf` a world is the engine's change. The runtime's untracked reads of `source.value` in `storeValue` and `presentValues` read the base value, so they change too. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
-- Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `NodeState` for a derived node).
-- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup for a derived node (pico-js.md, Construction and plain reads). For a source, the lookup replaces the read in `readSource` and the runtime's reads of `source.value`.
+- Layers are the engine's. A layer, its source overrides, its shadow states, and world-aware reads live in the engine package; the Isograph runtime never reads `precalculated` (The engine and the Isograph runtime), so giving `readSource` and the `node.precalculated` accesses in `graph.ts` a world is the engine's change. The runtime's untracked reads of `source.value` in `storeValue` and `presentValues` read the base value, so they change too. `normalize` writing into a layer is the Isograph runtime's, through the engine's layer API.
+- Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `precalculated` for a derived node).
+- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. For a derived node, that lookup replaces the `node.precalculated` accesses in `graph.ts` (pico-js.md, The implementation). For a source, the lookup replaces the read in `readSource` and the runtime's reads of `source.value`.
 - Placement. A node computed in `W` is stored in the deepest layer on `W`'s path that supplied any of its inputs, a source value or a derived input's slot. That is usually lower than `W`'s top: a node that read nothing the top layer overrides is stored in the base, shared with every world. Valid because the value is a function of its inputs: every world whose path holds that layer reads the same value for each input, unless a deeper layer on its path overrides one, and that override's write marked the node in the deeper layer (next bullet), whose shadow state that world reads first.
 - Writes mark in the layer where they happen. A write in layer `L` gives each node above the written source a marked shadow state in `L` (`Dirty` for direct dependents, `Check` above), copied from the state its worlds through `L` read. A base write marks the base states and also the shadow states that descendant layers hold for those nodes.
 - Reverse edges are the union across layers: a node is in a source's or node's `dependents` while any layer's slot lists that dependency. Each layer records its contributions, so discarding it removes them.
