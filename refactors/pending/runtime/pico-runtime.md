@@ -10,7 +10,7 @@ Everything is graph. A server value is a source node in the store, and a resolve
 
 The core is a single graph with reads and short circuit. Everything that keeps values up to date without a read (observers, subscriptions as derived nodes, effects), retention, the collection of unreached derived nodes, and optimistic layers are later sections, built on the core and not part of its first implementation.
 
-Upstream stores no resolver result. Its store is plain values per record (`StoreRecord`, `IsographEnvironment.ts:150-158`), a read calls every resolver it reaches (`read.ts:600`), and after a write `callSubscriptions` re-reads every subscription whose records overlap the written ones (`subscribe.ts:63-109`). The deviation is the user's: one structure for values and results, so that one layering mechanism serves A DAG of graphs, and so that every edge is an identity edge.
+Upstream stores no resolver result. Its store is plain values per record (`StoreRecord`, `IsographEnvironment.ts:150-158`), a read calls every resolver it reaches (`read.ts:600`), and after a write `callSubscriptions` re-reads every subscription whose records overlap the written ones (`subscribe.ts:63-109`). The deviation is the user's: one structure for values and results, so that one layering mechanism serves Later: a DAG of graphs, and so that every edge is an identity edge.
 
 ## The running example
 
@@ -146,7 +146,7 @@ export function disposeDerivedNode<TValue>(node: DerivedNode<TValue>): void {
 }
 ```
 
-`stateOf` is the one accessor of per-node state so that A DAG of graphs can give a node one slot per layer by changing `stateOf` alone. `computation`, `equal`, and `dependents` are not per world and stay on the node.
+`stateOf` is the one accessor of per-node state so that Later: a DAG of graphs can give a node one slot per layer by changing `stateOf` alone. `computation`, `equal`, and `dependents` are not per world and stay on the node.
 
 ### Mark
 
@@ -273,7 +273,7 @@ function setDependencies<TValue>(
 - The walk in recorded order is sound when a recomputation would read other nodes: a computation's later reads depend only on what it read earlier, so up to the first dependency whose value changed, the recorded reads are the reads a recomputation would make.
 - A node recomputes at most once per write. After its pull it is `Clean`, and during pulls only `recompute`'s marking of dependents runs, which reaches only nodes that are not `Clean` (the invariant). The parent whose read reached the node is verifying or computing: marking it `Dirty` makes a verifying parent recompute, and a computing parent reads the new value.
 - Top-level pull order does not affect values. The graph is a DAG and every computation is pure, so the first pull that reaches a marked node brings it up to date and every later pull finds it `Clean`. Which nodes run and how often is the same in any order.
-- There are no heights, no queue, and no topological sort: a pull brings a node's inputs up to date before the node uses them, through `readDerived` and `verify`.
+- No order is stored: a pull brings a node's inputs up to date before the node uses them, through `readDerived` and `verify`.
 - `setDependencies` is the only writer of `dependents`. Removing every old edge and adding every new one is `O(old + new)`; a dependency read twice is one member of each set. A violation of "the dependents sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
 - The context is a parameter built per computation; there is no ambient current computation (MobX's `globalState.trackingDerivation`, Reactively's `CurrentReaction`).
 
@@ -401,7 +401,7 @@ A resolver selected on an absent record (a parent reads a link to `Pet:9`, and `
 - `read.test.ts`'s "a read of an absent root record is missing data on the root" and "an absent root is missing data on the root" assert `reason: 'No value for pet____id___"1" on Query:__ROOT'`.
 - A reader AST that reads no key on an absent record is `Ok`. "a field with an empty reader AST is missing data on an absent record" (`test/read.test.ts`) becomes: `Constant` on the absent `Pet:9` is `Ok` with `data: {}` and its resolver is called. v1 already reads an empty linked selection on an absent record as `Ok` (`readLinkedValue` checks no presence, `read.ts:207-229`); now a resolver's root does the same. Upstream checks presence at every record it reads (`read.ts:161-167`); the deviation follows from presence not being a source: a read that reads no key has nothing to depend on, so a `MissingData` it returned could never be marked when the record appears.
 
-`check` and the fetch decision. `check` reads presence through `recordPresence` and is not a computation, so its results do not change. The two places it reads presence (`check.ts:30-34`, `:54-57`) yield the same link a missing first key would, except for an empty selection set. The fetch decision of Retention and the fetch decision reads the root derived node instead, so it fetches less than `check` in two cases: a reader that reads no key on an absent record, and a record a partial write left without its `id`. In both, every value the readers read is present.
+`check` and the fetch decision. `check` reads presence through `recordPresence` and is not a computation, so its results do not change. The two places it reads presence (`check.ts:30-34`, `:54-57`) yield the same link a missing first key would, except for an empty selection set. The fetch decision of Later: retention and the fetch decision reads the root derived node instead, so it fetches less than `check` in two cases: a reader that reads no key on an absent record, and a record a partial write left without its `id`. In both, every value the readers read is present.
 
 ### Equality
 
@@ -824,7 +824,7 @@ What a user observes: after the tagline write, the `HomeRoute` read calls `PetSu
 
 - The mark reads through `storeValue` and `recordPresence`. A link that reaches an `Absent` container keeps it (a reader that followed that link found it absent) and the mark does not recurse into it. The root of a retained query keeps its container whatever its presence.
 - The sweep calls `deleteRecord` for each container the mark did not reach, `Present` or `Absent`: the dependents of every source node are marked `Dirty`, every derived node in `derived` is disposed (its dependents marked `Dirty`), and the container is removed. Open decision 9 covers an unreached `Absent` container whose source nodes still have readers.
-- A derived node lives as long as its record container. A node a read created on a record no retained query reaches is disposed with that record. A node on a retained record lives until that record is deleted, read or not; disposing unreached derived nodes earlier is Collecting derived nodes (later).
+- A derived node lives as long as its record container. A node a read created on a record no retained query reaches is disposed with that record. A node on a retained record lives until that record is deleted, read or not; disposing unreached derived nodes earlier is Later: collecting derived nodes.
 
 Upstream's collection deletes records only and runs only when the base layer is the only layer (`garbageCollection.ts:65-86`).
 
@@ -837,6 +837,165 @@ Each is one commit, in order; each is independently shippable.
 3. Prefactor: the store becomes record containers (`RecordContainer`, `presence`, `sources` of `{ value }`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. `SourceNode` has `value` only in this change. Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 4. The graph: `graph.ts` (`SourceNode.dependents`, `DerivedNode`, `stateOf`, mark, pull with short circuit, `setDependencies`, `disposeDerivedNode`), `RecordContainer.derived`, `writeSource` in `writeValue`, `readStoredResult`, `resolverNodeAt`, `contextHooks`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey`, `ReaderArtifact.selectableName` and the compiler's printing of it, `deleteRecord` disposing owned nodes. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`; `StoreRecord` becomes `RecordContainer`. The pet script reads with `readStoredResult`. Observable: End-user experience above.
 5. The subscription re-read reads nested resolvers through the graph. `readSubscription` reads with `readData(storedResultHooks(store), ..)`, whose `readValue` is `storeValue` (nothing recorded) and whose `readResolver` is `readStoredResult`; `SubscriptionResult` gains `ReadResolverThrew`, `ReadErr` is only a broken store invariant, and `subscriptionResultsAreEqual` compares two `ResolverThrew` by `===` of their errors. Without it, the landed re-read (`libs/isograph-runtime/src/subscribe.ts:120-131`) calls every nested resolver on every write through v1's `read`. Observable: in the pet script, the subscription's re-read after the tagline write calls `PetSummaryCard` on `Pet:0` only, and a re-read after an unrelated write calls no resolver and does not call the callback.
+
+## Later: retention and the fetch decision
+
+Not part of the core. Retaining a query computes nothing: nothing runs at normalization time, and resolvers run when read.
+
+```ts
+// from libs/isograph-runtime/src/graph.ts
+export type DerivedNode<TValue> = {
+  // .. the core's fields, and:
+  /** Root holds: retentions and observers. Read by `collect`. */
+  rootCount: number;
+};
+
+/** Adds one root hold to `node`. Computes nothing. The cleanup removes the hold. */
+export function retainRoot<TValue>(node: DerivedNode<TValue>): CleanupFn;
+```
+
+```ts
+// from libs/isograph-runtime/src/retention.ts
+/** One `retainEntrypoint` call's hold on its query's records and its root resolver node. */
+export type Retention = {
+  readonly ast: NormalizationAst;
+  readonly variables: Variables;
+  readonly root: ResolverNode;
+  readonly releaseRoot: CleanupFn;
+};
+
+/** Gets or creates the root node of `entrypoint` on `variables` (`Dirty`, no value, no dependencies
+ * when created), adds a root hold, and adds the retention to `environment.retainedQueries`. Calls no
+ * resolver. */
+export function retainEntrypoint<TOutput>(
+  environment: IsographEnvironment,
+  entrypoint: Entrypoint<TOutput>,
+  variables: Variables,
+): Retention;
+
+/** Ends `retention`: removes it from `environment.retainedQueries` and releases its root hold. */
+export function dispose(environment: IsographEnvironment, retention: Retention): void;
+
+/** What `retainEntrypoint` needs from an `entrypoint.ts` artifact. */
+export type Entrypoint<TOutput> = {
+  readonly normalizationAst: NormalizationAst;
+  readonly readerArtifact: () => ReaderArtifact<ResolverParam, TOutput, EntityName>;
+};
+```
+
+A `Retention` has `ast` and `variables`, so it is a `RetainedQuery` (`garbageCollection.ts:18-21`), and the store's mark keeps its records. `makeNetworkRequest` and `retainQueryWithoutMakingNetworkRequest` take a `Retention` where they take a `RetainedQuery` (`libs/isograph-runtime/src/network.ts:107-125`, `:163-170`), and their cleanups call `dispose`. This is upstream's `retainQuery` and `unretainQuery` (`garbageCollection.ts:40-63`) with the root hold added.
+
+```text
+retainEntrypoint HomeRoute -> HomeRoute absent -> create Dirty, no value -> rootCount 1
+HomeRoute response -> writes, marks nothing (no node has read anything)
+read HomeRoute -> Dirty -> recompute -> creates and computes PetSummaryCard@Pet:0, @Pet:1, fullName@...
+```
+
+The fetch decision. With `shouldFetch` `IfNecessary`, `fetchEntrypoint` pulls the root node at fetch time, before the network call, and fetches when it is `MissingData`; it serves from the store otherwise. `check` stays a plain exported function (`libs/isograph-runtime/src/index.ts:43`).
+
+```ts
+// from libs/isograph-runtime/src/network.ts
+// fetchEntrypoint, before (libs/isograph-runtime/src/network.ts:95-103):
+    case 'IfNecessary':
+      return check(environment.store, entrypoint.normalizationAst, variables).kind === 'EnoughData'
+        ? retainQueryWithoutMakingNetworkRequest(environment, entrypoint.normalizationAst, variables)
+        : makeNetworkRequest(environment, entrypoint, variables, fetchOptions);
+// after:
+    case 'IfNecessary':
+      return readStoredResult(environment.store, entrypoint.readerArtifact(), entrypoint.normalizationAst.root, variables)
+        .kind === 'MissingData'
+        ? makeNetworkRequest(environment, entrypoint, variables, fetchOptions)
+        : retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
+```
+
+- A repeated call with no write between is a lookup: the root is `Clean`. `check` walks the whole normalization AST on every call.
+- A complete read implies the normalization AST's data is present. The normalization AST is the merge of the reader ASTs the entrypoint reaches (query-generation.md, Merging) plus the discriminator, which has no normalization node, and the identity, which `normalize` writes in the pass that creates a record (`crates/isograph_compiler/src/merged_selection.rs:1555-1560`, `crates/isograph_compiler/src/normalization_ast.rs:135-150`). It fetches less than `check` in the cases Absent records names, and in each, every value a reader reads is present.
+- `ResolverThrew` at the root is open decision 15.
+- A component field's data is read at render (components-in-userland.md), so the root does not cover it; an entrypoint that reaches one needs `check` until that doc settles its open question 3.
+
+## Later: collecting derived nodes
+
+In the core a derived node lives as long as its record container. Later, `collect` disposes every derived node no root reaches through `Derived` dependencies, so a node a plain read created on a retained record, a disposed retention's nodes, and a node a moved link stopped reaching are freed before their records.
+
+```ts
+// from libs/isograph-runtime/src/storedResults.ts
+/** Disposes every derived node in `store` that no node with `rootCount > 0` and no node in `extraRoots`
+ * reaches through `Derived` dependencies, and removes it from its container's `derived`. */
+export function collect(store: Store, extraRoots: Iterable<ResolverNode>): void;
+```
+
+`garbageCollectEnvironment` calls it after `garbageCollect`. The roots are root holds (retentions and observers) and the subscriptions' nodes (open decision 10). When a node is disposed is open decision 11; whether records are kept by live dependencies instead of retained ASTs is open decision 12; who calls `garbageCollectEnvironment` is open decision 17.
+
+## Later: keeping values up to date automatically
+
+Not part of the core. Observers, subscriptions, and effects are derived nodes that are read again as needed. A write marks; whoever needs a value pulls. No resolver runs during a write, and a retained query nobody observes stays marked until something reads it (the user's choice).
+
+- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, context), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `makeNetworkRequest` calls `callSubscriptions` in a `finally` after `normalize`, so a response that throws part-way also re-reads (open decision 4); `garbageCollectEnvironment` calls it after the sweep. This replaces core change 5's re-read.
+- React. `useSyncExternalStore(subscribe, getSnapshot)`: `listen(node, onChange)` adds an observer and a root hold; after a write, `notify` calls each observer whose node is not `Clean`; React then calls `getSnapshot`, which is `pull(node)`. A node whose inputs came back equal is verified without recomputing and returns the same object, so React does not render again. `getSnapshot` pulls during render; an observer whose node stays marked is called on every write until something pulls it.
+- Loaders. loaders.md's effect-set nodes are derived nodes that the runtime pulls after every write (`reconcileEffectRoots`), and its loader items are source nodes (loaders.md, An item that changes over time; After a write).
+- Callback errors. Every callback, listener, and observer runs through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:159-167`): a throw is rethrown in its own microtask and the loop continues (network-and-subscriptions.md, Decisions, 3).
+- Scheduling. Marking is separate from pulling, so a scheduler can decide when each observer's pull runs (Follow-ups 9).
+
+### Values with lifecycles
+
+A computation is pure and runs on every pull, including a pull a discarded render or an uncommitted world (Later: a DAG of graphs) makes. A resource a node's value needs is the node's effect, run apart from its computation: set up when the node is mounted (`listen` at React's commit), torn down when it is unmounted, disposed, or given a new value. After a write, `reconcileEffects` pulls every mounted node with an effect, because an effect whose inputs changed must be replaced even when no reader reads the node. A new effect is set up before the old one is torn down. A replaced or disposed effect is torn down after every observer of that write was notified. A `===` value leaves the effect as is. Effects run only in the committed world. Open decision 13.
+
+## Later: a DAG of graphs
+
+Not part of the core: optimistic layers and forks. The base graph is the core's store. Layer graphs sit above it, each with one parent, and form a tree. A world is a path from the base to a layer.
+
+- Each layer holds source overrides (its value for a source node of the base) and derived shadow states (its `StateSlot` for a derived node).
+- Reading in world `W` takes, for both node kinds, the deepest entry on `W`'s path: a source's value from the deepest layer that overrides it, else the base; a derived node's slot from the deepest layer that holds one, else the base. `stateOf(node, world)` is that lookup; no other code changes (The graph).
+- Placement. A node computed in `W` is stored in the deepest layer on `W`'s path that supplied any of its inputs, a source value or a derived input's slot. That is usually lower than `W`'s top: a node that read nothing the top layer overrides is stored in the base, shared with every world. Valid because the value is a function of its inputs: every world whose path holds that layer reads the same value for each input, unless a deeper layer on its path overrides one, and that override's write marked the node in the deeper layer (next bullet), whose shadow state that world reads first.
+- Writes mark in the layer where they happen. A write in layer `L` gives each node above the written source a marked shadow state in `L` (`Dirty` for direct dependents, `Check` above), copied from the state its worlds through `L` read. A base write marks the base states and also the shadow states that descendant layers hold for those nodes.
+- Reverse edges are the union across layers: a node is in a source's or node's `dependents` while any layer's slot lists that dependency. Each layer records its contributions, so discarding it removes them.
+- Revert discards the layer graph: its overrides and shadow states. The base is untouched, because by the placement rule no base slot read a layer's override.
+- Commit turns the layer's overrides into base writes (`writeSource`, which marks the base), and discards its shadow states. Upstream never commits an optimistic layer: `revertOptimisticStoreLayerAndMaybeReplace` empties it and normalizes the real response into a network response layer in its place, re-executes the layers above, and merges down (`optimisticProxy.ts:393-493`; called on response, error, and dispose, `makeNetworkRequest.ts:305-334`).
+- Garbage collection roots are (node, layer) pairs; a root hold and an observer belong to a world. Upstream collects only when the base is the only layer (`garbageCollection.ts:65-68`).
+- Effects run only in the committed world.
+
+Upstream has stacks, not trees: each layer has one `childStoreLayer` (`optimisticProxy.ts:100-159`); a read walks from the child-most layer to the base and takes the first value, and a `null` record is a deletion (`getStoreRecordProxy`, `optimisticProxy.ts:24-44`; `getMutableStoreRecordProxy`, `:46-98`).
+
+## Later: other derived node kinds
+
+A source other than a server field is a source node its owner holds, written with `writeSource` or marked with `markSourceChanged` by the code that owns the value. User code reaches it only through a selection, so the walk records the read.
+
+- Request state. The state of a request is a source node on its request entry (network-and-subscriptions.md, Request entries in the store). Which request a selection refers to is open decision 14.
+- Browser-owned state (a `localStorage` key, a cookie, the URL): the environment mirrors each value as events arrive and writes the mirror's source node. Such a value is current only when every write to it reports a change: the `storage` event does not fire in the window that made the change (MDN, Window: storage event), and a `document.cookie` assignment fires none (the Cookie Store API's `change` event does, MDN, CookieStore: change event). Polling is not an option (AGENTS.md, Wake on events). Not planned.
+- Client roots through `with` blocks, a possible later direction whose syntax is not decided:
+
+  ```text
+  field User.fullName
+  with User { friendName }
+  with Root1 { url }
+  ```
+
+  A block is allowed when its entity's record is determined by the node's key: the parent entity, or a singleton whose identity is `Fixed` (`CompletedIdentity::Fixed(FixedRecordId)`, `crates/isograph_compiler/src/merged_selection.rs:1450-1458`). A client root's type is static and its values come from a provider `createIsographEnvironment` requires per declared root; each provider selectable is a source node and its subscription writes it. Relay's live resolvers are the precedent: a `LiveState<T>` with `read()` and `subscribe(cb)` (Relay docs, Live Fields). Upstream has no client root and no client-only source.
+- Runtime-defined computations (Follow-ups 10) and the suspension decision of react.md are derived nodes whose computations call `ComputeContext` directly; their values are not `ResolverResult`s, so the graph's value type widens to a union.
+
+## Follow-ups
+
+The user's design notes, recorded for later. None is part of the core, and none is approved.
+
+1. Constructors and destructors at normalization time: a constructor runs when a retained query first reaches a resolver and a destructor when the last reference is released; lifetime follows retain and release, not render. Upstream ties such lifetimes to render (`useDisposableState`, `isograph/libs/isograph-react-disposable-state/src/useDisposableState.ts:16`). It conflicts with retention computing nothing and with Values with lifecycles (open decision 13).
+2. A client pointer is a function plus a follow-up query: its resolver returns an id; when the target lacks the data the selection through the pointer needs, a refetch through `node(id:)` starts, as a retained child of the parent retention.
+3. A pointer whose target is one of the records it read: query generation spreads the target fragment's selections where the pointer read ids, so no follow-up query is needed, at the cost of overfetching and an enforced guarantee. Upstream merges the pointer's reader selections and refetches the target (`isograph/crates/isograph_schema/src/create_merged_selection_set.rs:852-900`, `:1135-1233`).
+4. Handles: a reference-counted handle like `PromiseWrapper` plus a cleanup (`ItemCleanupPair`, `isograph/libs/isograph-disposable-types/src/index.ts:2`), readable during render as a lookup.
+5. Deduplication: two retained queries that reach the same pointer on the same record share one handle; the key is the record container and the resolver store key.
+6. Cancellation: upstream's network function takes no abort signal (`IsographEnvironment.ts:103-106`); one that accepts an `AbortSignal` lets a destructor cancel a follow-up's request.
+7. Deferral: construction defers subscription setup to a caller-supplied scheduler; destruction buffers releases and collects in a batch, as upstream's `gcBuffer` does (`garbageCollection.ts:40-53`, default 10 at `IsographEnvironment.ts:177`).
+8. Pre-memoized selection sets: a selection set read on a record as its own derived node, keyed by a compiler-emitted key, compared by `selectionSetDataAreEqual`. To explore; the user expects it probably does not matter.
+9. Scheduled recalculation: an unobserved node is marked and pulled when read (the core already does this), and a scheduler decides when observed nodes are pulled and at which priority. `useSyncExternalStore` performs a store update as blocking even inside a transition, so deferred rendering needs a deferred snapshot in the React package.
+10. Runtime-defined computations: a memoized computation the runtime or a user defines at run time over other derived nodes, which needs a caller-supplied computation and a wider value type (Later: other derived node kinds).
+
+## Docs this doc amends
+
+- `refactors/pending/runtime/store.md`: `Store` becomes `Map<EntityName, Map<RecordId, RecordContainer>>`; its functions read and write through the accessors; `normalize` skips unchanged values and marks as it writes; `garbageCollect`'s sweep calls `deleteRecord`; its tests compare `storeSnapshot(store)` with `storeOf(..)`, which returns a `PlainStore`.
+- `refactors/pending/runtime/reader-ast.md`: `ReaderArtifact.selectableName`; the walk takes `ReadHooks`; an absent record reads as all keys missing, which changes its two absent-root `reason` assertions and makes `Constant` on an absent record `Ok`; `readStoredResult` is the stored read beside `read`.
+- `refactors/pending/runtime/network-and-subscriptions.md`: its "`Store` stays store.md's nested map" no longer holds; the request entry's state is a source node on the entry, not `requestSource(key): SourceId`; `readSubscription` reads nested resolvers through the graph and `SubscriptionResult` gains `ReadResolverThrew` (core change 5); `makeNetworkRequest` re-reads subscriptions in a `finally` (Later: keeping values up to date automatically).
+- `refactors/pending/runtime/react.md`: `unwrapOrSuspend` throws `result.error` on `ResolverThrew`; `getSnapshot` pulls (Later: keeping values up to date automatically), against its rule that a render reads and computes nothing.
+- `refactors/pending/runtime/components-in-userland.md`: `useClosureData`'s switch gains `case 'ResolverThrew': throw result.error;`; a closure field's wrapper is a derived node in its record container's `derived`, owned and freed with the record.
+- `refactors/pending/runtime/loaders.md`: edited with this rewrite where its references to this doc's sections and `SourceId`s broke.
 
 ## Open decisions
 
@@ -883,7 +1042,7 @@ Not held. The body behaves as (a) by omission.
 - (b) `recompute` catches the throw, restores the node `Clean` with its previous value and dependencies, and rethrows. Cost: the node holds a value no current input explains.
 - (c) Propagate, and leave the node marked with its previous value and dependencies; the next pull retries it. The body and the trace in Traces are written for (c), as the user specified the trace. Cost: every pull of the node and of every node above it throws until a write repairs the store.
 
-A second question arises once something pulls inside a write (Values with lifecycles' `reconcileEffects`; loaders.md's `reconcileEffectRoots`) and does not arise under (a): when `normalize` threw part-way and that pull then throws, which error the caller of the write receives.
+A second question arises once something pulls inside a write (`reconcileEffects`, Values with lifecycles; loaders.md's `reconcileEffectRoots`) and does not arise under (a): when `normalize` threw part-way and that pull then throws, which error the caller of the write receives.
 
 - (i) The pull's error. Cost: the response's error is lost.
 - (ii) The response's error; the pull's error is reported through `reportCallbackError`. Cost: the broken store invariant surfaces in a microtask with no stack frame of the write.
@@ -893,9 +1052,9 @@ A second question arises once something pulls inside a write (Values with lifecy
 
 `normalize` writes in place and throws at the first position that does not match the AST (store.md, Errors).
 
-- (a) `normalize` marks each write as it makes it (`writeValue`), and its throw propagates as v1's error; the writes before it and their marks stand. The caller re-reads subscriptions in a `finally` (Keeping values up to date automatically). Held: upstream keeps a partial write too (`normalizeData` writes in place, `cache.ts:77-85`; a throw reaches `makeNetworkRequest`'s `.catch`, `makeNetworkRequest.ts:299-319`).
+- (a) `normalize` marks each write as it makes it (`writeValue`), and its throw propagates as v1's error; the writes before it and their marks stand. The caller re-reads subscriptions in a `finally` (Later: keeping values up to date automatically). Held: upstream keeps a partial write too (`normalizeData` writes in place, `cache.ts:77-85`; a throw reaches `makeNetworkRequest`'s `.catch`, `makeNetworkRequest.ts:299-319`).
 - (b) `normalize` validates the whole response before it writes. Cost: a second walk of every response.
-- (c) `normalize` writes into a layer (A DAG of graphs) that is committed when the walk ends and discarded on a throw. Cost: needs layers; a malformed response writes nothing.
+- (c) `normalize` writes into a layer (Later: a DAG of graphs) that is committed when the walk ends and discarded on a throw. Cost: needs layers; a malformed response writes nothing.
 
 ### 5. A resolver that throws
 
@@ -926,3 +1085,60 @@ Upstream compares resolver values by `===` only (`areEqualWithDeepComparison.ts:
 The core cannot form one: a cycle of client field selections is an `InlineCycle` query error (query-generation.md, Cycles), and every runtime dependency goes to a node of a field the reader AST selects, on whichever record a link leads to. An eager client pointer can: `field Pet.Card { bestFriend { Card } }` with `Pet:1` and `Pet:2` each other's best friend makes `Card@Pet:1` read `Card@Pet:2`, which reads `Card@Pet:1`. `pull` then recomputes a node inside its own computation, and `verify` recurses the same way; neither checks. Marking terminates on a cycle, because it stops at a marked node. Incremental fails on a cycle with "adding edge made graph cyclic" (`ensure_height_requirement`, `src/adjust_heights_heap.ml` of `janestreet/incremental`).
 
 Not decided; it arises with client pointers.
+
+### 9. An unreached `Absent` container whose source nodes have readers
+
+A reader that found a record absent holds a source node in that record's `Absent` container. When no retained query's links reach the container, the sweep deletes it.
+
+- (a) Delete it and mark its readers, as for any record (`deleteRecord`). The next pull of a reader re-creates the container and recomputes to an equal `MissingData`, which cuts off. Held: the user's rule that deleting a record marks the dependents of each of its source nodes; and upstream deletes every unreached record (`garbageCollection.ts:88-119`). Cost: each collection recomputes the readers of unreached absent records.
+- (b) Keep an unreached `Absent` container while any of its source nodes has a dependent or it owns a derived node; delete it once none does. Cost: a container lives as long as its readers, which `collect` (later) or the readers' recomputation must end.
+
+Deleting it without marking is not an option: a reader left `Clean` holding `MissingData` would never see the record appear, because `normalize` would write a new source node.
+
+### 10. How `collect` keeps the derived nodes subscriptions read
+
+A subscription's node holds no root hold, so without a rule `collect` disposes it and every node below it, and the next re-read recomputes them. Upstream stores no resolver results and has no such rule; its subscriptions record what their last read visited to skip re-reads (`encounteredDataAndRecords`, `IsographEnvironment.ts:49`, `subscribe.ts:160`).
+
+- (a) `garbageCollectEnvironment` passes every current subscription's node to `collect` as `extraRoots`, read from `environment.subscriptions` when it runs. Held, not decided. Reason: unsubscribing needs no release, and nothing is left to balance when a read throws. Cost: a second parameter on `collect`.
+- (b) Each subscription holds a root hold on its node, released on unsubscribe. Cost: a hold per subscription; benefit: `rootCount` is the one root mechanism, which open decision 11 (b) needs.
+
+### 11. When a derived node no root reaches is disposed
+
+- (a) By `collect`, when `garbageCollectEnvironment` runs (held). A marked node that nothing pulls costs nothing until then.
+- (b) By reference count: `rootCount` plus `dependents.size`; at zero the node is disposed, and disposal decrements what it read. Cost: a count kept on every hold, release, and `setDependencies`, and disposal in the middle of a pull. It is what Follow-ups 1's destructors need.
+
+### 12. Records kept by live dependencies
+
+The user's idea, explicitly unsettled: a record is live while a live derived node reads one of its source nodes, so collection needs no AST walk.
+
+- (a) Walk retained normalization ASTs, as v1 and upstream do (`garbageCollection.ts:88-119`). Held.
+- (b) A container is live while a source node in it has a live dependent; the edges already exist. Cost: a record a retained query fetched but no live node read is deleted (fields after a `MissingData`, records a reader stops before), so `check` of that query reports `MissingData` and a refetch follows; retention no longer means what store.md and upstream mean.
+
+### 13. Values with lifecycles
+
+- (a) Computation and effect are split (Values with lifecycles; the user's direction, held). Cost: a resource exists only while its node is mounted, so a retained query nobody renders acquires nothing, which conflicts with Follow-ups 1.
+- (b) The computation constructs: it returns an `ItemCleanupPair` the engine holds and releases when the value is replaced or the node disposed. Not held: a computation runs in every pull, including a discarded render's and an uncommitted world's, so it acquires resources whose release nothing triggers.
+- (c) A registry outside the engine that the resolver's code calls. Cost: nothing releases a handle when the node's value is replaced, so the registry needs its own reachability.
+
+loaders.md places lifecycles per loader instance instead (loaders.md, What this changes in other docs). Not decided: the user's choice.
+
+### 14. Which request a request-state selection refers to
+
+A derived node is keyed by (record, field, variables), not by request, so "the request that fetched me" has no single value for a node shared by two entrypoints. A key the reader's location determines works: a loadable field's request is keyed by its query text and operation variables (network-and-subscriptions.md, The request cache), a function of (record, field, arguments). The state of an entrypoint's own request stays with the caller of `fetchEntrypoint`, which holds the `PromiseWrapper`. Not decided.
+
+### 15. `ResolverThrew` at the root and the fetch decision
+
+The walk stops at a nested `ResolverThrew` (`allOk`), so data missing after the throwing resolver does not show in the root's result.
+
+- (a) `ResolverThrew` counts as present: no fetch. The user's statement. Cost: a fetch `check` would make is skipped, and that fetch could change the throwing resolver's inputs.
+- (b) `ResolverThrew` counts as a reason to fetch. Cost: a request on every call while the resolver throws.
+
+Held (a), not settled.
+
+### 16. Observers at render against react.md's render-time subscription
+
+react.md and the landed runtime create a component's subscription at render under a temporary retain and retain it at commit (`refactors/pending/runtime/react.md:359`, `:864-877`; network-and-subscriptions.md, The two-phase lifetime). `listen` runs in React's `subscribe`, at commit, so between render and commit the node has no root hold and `collect` can dispose it. Candidates: no render-time step; a render-time root hold under react.md's temporary retain, with `listen` adding only the observer at commit. Not held: no doc settles it.
+
+### 17. Who calls `garbageCollectEnvironment`
+
+It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:62-66`); releasing a request does not collect (network-and-subscriptions.md). It is the only function that deletes records and, with `collect`, disposes derived nodes. When the React package calls it is react.md's open decision 1 (`refactors/pending/runtime/react.md:1297-1305`): after every disposal, never automatically, or upstream's buffer of 10. This doc adds no option of its own.
