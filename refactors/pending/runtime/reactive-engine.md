@@ -140,7 +140,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 
 ## The public API
 
-The API is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided. (f) is written because pico-runtime.md establishes that a guard no caller can bypass lives in the engine (its open decision 2, last paragraph), which leaves (f) and (g), and (f) has pico's shape: every pico read and write takes the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`). Option (g) below lists the deltas for (g). Under (a) every `graph` parameter and `Graph` itself drop out.
+The API below is written under open decision 2 option (f): an engine `Graph` object holds the write-during-computation guard, and every public function that reads or writes the graph takes it as its first parameter. Decision 2 is not decided, and (g) is the held option: pico-runtime.md establishes that the guard must be one no caller can bypass and that it lives in the engine (its open decision 2, last paragraph), which leaves (f) and (g), and under (f) a computation that holds a second `Graph` bypasses the guard (open decision 2). (f) has pico's shape, every pico read and write taking the database (`Database::set`, `crates/pico/src/database.rs:151`; a memo's first argument is `&Db`), and the body, the README, and the tests stay in it until decision 2 is decided. Option (g) below is the complete (g) form of the API and of the functions that change. Under (a) every `graph` parameter and `Graph` itself drop out.
 
 ```ts
 // from libs/reactive-graph/src/index.ts
@@ -326,44 +326,291 @@ Callers. In the Isograph runtime (pico-runtime.md, The engine's public API): `cr
 
 ### Option (g): each node holds its graph
 
-Under open decision 2 (g), a node records its graph at construction and the public functions read it from the node.
+Under open decision 2 (g), held and not decided, a node records its graph at construction and every public function but `createGraph` and `sourceValue` reads the graph from the node it receives. This is the complete (g) form of The public API and of every function of The implementation that changes. The package index exports the same names. `AnyDerivedNode`, `StateSlot`, `DerivedNodeState`, `CleanState`, `CheckState`, `DirtyState`, `PreviousValue`, `Dependency`, `Computation`, `Computed`, and `ContextStatus` are the types of Types and Pull, unchanged. `neverComputed`, `stateOf`, `assertNotComputing`, `guarded`, `markDirty`, `markOneDirty`, `markCheck`, `setDependencies`, and `dependentsOf` are the functions of The implementation, unchanged: none of them receives a graph from a public caller.
 
 ```ts
 // from libs/reactive-graph/src/graph.ts
-// under open decision 2 (g); deltas from the API above
+// under open decision 2 (g)
+/** One graph of source and derived nodes. It holds the guard that rejects a write or a disposal
+ * while a computation or an equality of this graph runs. Created by `createGraph`, and passed only to
+ * the constructors; every other public function reads it from a node. */
+export type Graph = {
+  /** The number of computations and equalities of this graph running. Incremented and decremented
+   * only by `guarded`. A count, not a two-state enum, because `readDerived` recomputes a node inside
+   * the computation that reads it, and that recomputation calls the node's `equal`. */
+  computingDepth: number;
+};
+
+/** A value set from outside the graph, and the derived nodes whose last computation read it. */
 export type SourceNode<TValue> = {
+  /** The graph whose guard `writeSource` and `markSourceChanged` check, and the only graph whose
+   * computations may read this source through their context. Set only by `createSourceNode`. */
   readonly graph: Graph;
+  /** Read only by `readSource` and `sourceValue`. Written only by `writeSource`. */
   value: TValue;
+  /** Whether a written value equals the stored one. Called only by `writeSource`, with the stored
+   * value and the written one, inside `guarded`, so a write or a disposal from it throws. A method
+   * signature, as `DerivedNode.equal` is. */
   equal(previous: TValue, next: TValue): boolean;
+  /** Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
+
+/** A computation's value, kept until an input it read changes. */
 export type DerivedNode<TValue> = {
+  /** The graph whose guard `compute` and `recompute` raise and `disposeDerivedNode` checks, and the
+   * only graph whose computations may read this node through their context. Set only by
+   * `createDerivedNode`. */
   readonly graph: Graph;
   readonly computation: Computation<TValue>;
+  /** Whether two values of this node are equal, for cutoff. Called only by `recompute`, with the
+   * node's previous value and the value its computation just returned, inside `guarded`, so a write
+   * or a disposal from it throws. A method signature, so that a `DerivedNode<T>` is an
+   * `AnyDerivedNode` (open decision 5). */
   equal(previous: TValue, next: TValue): boolean;
+  /** Value, mark, and dependencies. Read and written only through `stateOf`. */
   readonly slot: StateSlot<TValue>;
+  /** Every derived node whose dependencies hold this one. Written only by `setDependencies`. */
   readonly dependents: Set<AnyDerivedNode>;
 };
+
+/** The reads a computation makes. Built per computation by `compute`; there is no ambient current
+ * computation. Valid only until its computation returns or throws; a read through it after that
+ * throws. */
+export type ComputeContext = {
+  /** Records that the computation read `source`, and returns its value. Throws when `source` belongs
+   * to another graph than the computing node. */
+  readSource<TValue>(source: SourceNode<TValue>): TValue;
+  /** Pulls `node`, records that the computation read it, and returns its value. Throws when `node`
+   * belongs to another graph than the computing node. */
+  readDerived<TValue>(node: DerivedNode<TValue>): TValue;
+};
+
+/** A graph with no computation running. */
+export function createGraph(): Graph;
+
+/** A source node of `graph` holding `value`, read by no derived node. `equal` decides whether a
+ * later write changes it. */
 export function createSourceNode<TValue>(
   graph: Graph,
   value: TValue,
   equal: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue>;
+
+/** A derived node of `graph` that was never computed: `Dirty`, no value, no dependencies. Its
+ * computation first runs on the first pull that reaches it. */
 export function createDerivedNode<TValue>(
   graph: Graph,
   computation: Computation<TValue>,
   equal: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue>;
-export function writeSource<TValue>(
-  source: SourceNode<TValue>,
-  value: TValue,
-): void;
+
+/** The value of `source`, read without recording a dependency. Inside a computation it is an
+ * untracked read (decision 10). */
+export function sourceValue<TValue>(source: SourceNode<TValue>): TValue;
+
+/** When `source.equal` rejects the stored value and `value`, sets `source`'s value and marks its
+ * dependents; when it accepts, stores nothing and marks nothing (decision 8). Runs no computation.
+ * Throws while a computation or an equality of `source.graph` runs. */
+export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void;
+
+/** Marks every dependent of `source` `Dirty` and every node above those `Check`, without changing
+ * its value. Throws while a computation or an equality of `source.graph` runs. */
 export function markSourceChanged(source: SourceNode<unknown>): void;
+
+/** `node`'s current value: `Clean` returns it, `Check` verifies, `Dirty` recomputes. Inside a
+ * computation it is an untracked read, of a node of any graph (decision 10). A computation or an
+ * equality must not throw (Throws). */
 export function pull<TValue>(node: DerivedNode<TValue>): TValue;
+
+/** Removes `node` from the dependents of everything it read, resets it to never computed, and marks
+ * its dependents `Dirty`. Throws while a computation or an equality of `node.graph` runs. */
 export function disposeDerivedNode(node: AnyDerivedNode): void;
 ```
 
-`compute` reads `node.graph` instead of a parameter. Under (g), a computation of a node in graph `G` that reads a node of graph `H` through its context is representable; `readSource` and `readDerived` throw on it, because a dependents edge across graphs would let a write in `H` mark a node whose guard is `G`'s. Under (f), nodes do not know their graph, so passing a node of one graph to another graph's `pull` is not detected; the guard of the graph passed is the one checked.
+The functions of The implementation that change under (g):
+
+```ts
+// from libs/reactive-graph/src/graph.ts
+// under open decision 2 (g)
+export function createSourceNode<TValue>(
+  graph: Graph,
+  value: TValue,
+  equal: (previous: TValue, next: TValue) => boolean,
+): SourceNode<TValue> {
+  return { graph, value, equal, dependents: new Set() };
+}
+
+export function createDerivedNode<TValue>(
+  graph: Graph,
+  computation: Computation<TValue>,
+  equal: (previous: TValue, next: TValue) => boolean,
+): DerivedNode<TValue> {
+  return {
+    graph,
+    computation,
+    equal,
+    slot: { state: neverComputed() },
+    dependents: new Set(),
+  };
+}
+
+export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
+  assertNotComputing(source.graph);
+  if (guarded(source.graph, () => source.equal(source.value, value))) {
+    return;
+  }
+  source.value = value;
+  markDirty(source.dependents);
+}
+
+export function markSourceChanged(source: SourceNode<unknown>): void {
+  assertNotComputing(source.graph);
+  markDirty(source.dependents);
+}
+
+export function pull<TValue>(node: DerivedNode<TValue>): TValue {
+  const state = stateOf(node).state;
+  switch (state.mark) {
+    case 'Clean':
+      return state.value;
+    case 'Check':
+      return verify(node, state);
+    case 'Dirty':
+      return recompute(node, state);
+  }
+}
+
+function verify<TValue>(node: DerivedNode<TValue>, state: CheckState<TValue>): TValue {
+  state.dependencies.some((dependency) => {
+    if (dependency.kind === 'Derived') {
+      pull(dependency.node);
+    }
+    return stateOf(node).state.mark === 'Dirty';
+  });
+  const after = stateOf(node).state;
+  switch (after.mark) {
+    case 'Dirty':
+      return recompute(node, after);
+    case 'Check':
+      stateOf(node).state = {
+        mark: 'Clean',
+        value: after.value,
+        dependencies: after.dependencies,
+      };
+      return after.value;
+    case 'Clean':
+      return after.value;
+  }
+}
+
+function recompute<TValue>(node: DerivedNode<TValue>, state: DirtyState<TValue>): TValue {
+  const computed = compute(node.graph, node.computation);
+  const previous = state.previous;
+  if (
+    previous.kind === 'Value' &&
+    guarded(node.graph, () => node.equal(previous.value, computed.value))
+  ) {
+    setDependencies(node, state.dependencies, computed.dependencies);
+    stateOf(node).state = {
+      mark: 'Clean',
+      value: previous.value,
+      dependencies: computed.dependencies,
+    };
+    return previous.value;
+  }
+  setDependencies(node, state.dependencies, computed.dependencies);
+  stateOf(node).state = {
+    mark: 'Clean',
+    value: computed.value,
+    dependencies: computed.dependencies,
+  };
+  markDirty(node.dependents);
+  return computed.value;
+}
+
+/** Runs `computation` of a node of `graph` inside `guarded` with a context that records what it
+ * reads, in read order. The context closes when the computation returns or throws, and rejects a
+ * node of another graph. Called only by `recompute`, with `node.graph`. */
+function compute<TValue>(
+  graph: Graph,
+  computation: Computation<TValue>,
+): Computed<TValue> {
+  const dependencies: Dependency[] = [];
+  let status: ContextStatus = 'Open';
+  const assertReadable = (read: Graph): void => {
+    if (status === 'Closed') {
+      throw new Error(
+        'Cannot read through a context after its computation returned.',
+      );
+    }
+    if (read !== graph) {
+      throw new Error('Cannot read a node of another graph inside a computation.');
+    }
+  };
+  try {
+    const value = guarded(graph, () =>
+      computation({
+        readSource: (source) => {
+          assertReadable(source.graph);
+          dependencies.push({ kind: 'Source', source });
+          return source.value;
+        },
+        readDerived: (node) => {
+          assertReadable(node.graph);
+          const read = pull(node);
+          dependencies.push({ kind: 'Derived', node });
+          return read;
+        },
+      }),
+    );
+    return { value, dependencies };
+  } finally {
+    status = 'Closed';
+  }
+}
+
+export function disposeDerivedNode(node: AnyDerivedNode): void {
+  assertNotComputing(node.graph);
+  const slot = stateOf(node);
+  setDependencies(node, slot.state.dependencies, []);
+  slot.state = neverComputed();
+  markDirty(node.dependents);
+}
+```
+
+Deltas from the (f) bodies: each constructor stores `graph`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the graph from the node they receive; `pull`, `verify`, and `recompute` drop the `graph` parameter and `recompute` passes `node.graph` to `compute` and `guarded`; `compute`'s `assertOpen` becomes `assertReadable`, which also throws on a node of another graph.
+
+The guard cannot be bypassed under (g). A write reads the guard from the source it writes, so a computation that holds a second `Graph` reaches the same guard: in the trace of open decision 2 (f), `writeSource(s, 2)` inside `p`'s computation reads `s.graph`, whose `computingDepth` is 1, and throws. A computation of graph `G` may still write a source of another graph `H` through a closure. That write runs `H`'s guard. It cannot corrupt `G`, because no node of `G` reads a node of `H` through its context: `readSource` and `readDerived` throw on it, so no `dependents` edge crosses graphs and a mark in `H` reaches no node of `G`. When a computation of `H` is running beneath the computation of `G` (a computation of `H` pulls a node of `G` untracked, whose computation writes a source of `H`), `H.computingDepth` is positive and the write throws.
+
+`guard.test.ts` under (g) drops the `graph` argument from every call but the constructors, which take it first, and gains one test:
+
+```ts
+// from libs/reactive-graph/test/guard.test.ts
+// under open decision 2 (g)
+  test('a read of a node of another graph throws', () => {
+    const graph = createGraph();
+    const otherGraph = createGraph();
+    const foreignSource = createSourceNode(otherGraph, 0, strictEqual);
+    const foreignNode = createDerivedNode(otherGraph, () => 0, strictEqual);
+    const sourceReader = createDerivedNode(
+      graph,
+      (context) => context.readSource(foreignSource),
+      strictEqual,
+    );
+    const nodeReader = createDerivedNode(
+      graph,
+      (context) => context.readDerived(foreignNode),
+      strictEqual,
+    );
+    const crossGraphMessage = 'Cannot read a node of another graph inside a computation.';
+    expect(() => pull(sourceReader)).toThrow(crossGraphMessage);
+    expect(() => pull(nodeReader)).toThrow(crossGraphMessage);
+
+    writeSource(foreignSource, 1);
+    expect(pull(foreignNode)).toBe(0);
+  });
+```
 
 ## The implementation
 
@@ -1733,7 +1980,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
 ### `guard.test.ts`
 
-Written for open decision 2 (f). Under (g) the calls drop the `graph` argument and the constructors take it. Under (a) the file does not exist.
+Written for open decision 2 (f). Under (g) the calls drop the `graph` argument, the constructors take it, and the file gains the cross-graph read test of Option (g). Under (a) the file does not exist.
 
 ```ts
 // from libs/reactive-graph/test/guard.test.ts
@@ -2231,10 +2478,25 @@ pico-runtime.md open decision 2, restated in engine terms. A computation that re
 - (a) No guard. A write inside a computation is undefined behavior. Cost: the stale `Clean` of the trace, with no error.
 - (d) A write counter on an engine object, read by `compute` before and after the computation; when it moved, `recompute` leaves the node `Dirty`. Cost: the engine object and a counter every write increments; it repairs the computing node only, and the write still ran.
 - (e) After `setDependencies`, `recompute` leaves the node `Dirty` when a recorded derived dependency is not `Clean`. Cost: one check per dependency per recompute; a source the computation read before the write changed it is not covered.
-- (f) `Graph` holds `computingDepth`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take it first and throw while it is positive; `pull` takes it first and does not throw, because a `pull` inside a computation is an untracked read (decision 10). The body of this doc. Cost: every public call but the constructors and `sourceValue` takes a `Graph`; a node passed to another graph's functions is not detected.
-- (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Cost: one field per node; only the constructors change signature; a cross-graph read is detectable and throws.
+- (f) `Graph` holds `computingDepth`; `writeSource`, `markSourceChanged`, and `disposeDerivedNode` take it first and throw while it is positive; `pull` takes it first and does not throw, because a `pull` inside a computation is an untracked read (decision 10). The body of this doc. Cost: every public call but the constructors and `sourceValue` takes a `Graph`; a node passed to another graph's functions is not detected. Consequence: the guard checks the `Graph` the caller passes, and a source has no graph of its own, so a computation that writes through a closure with any other `Graph` object passes the guard and leaves the stale `Clean` of the trace in The design, Writes during a computation, with no error:
 
-pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. Not held. The API is written under (f) (The public API).
+```text
+g = createGraph()
+s = source(1); c = derived(read s); p = derived(read c, then write s through a closure)
+pull(g, p): p Dirty -> recompute p -> compute: g.computingDepth = 1
+  p reads c: pull(g, c) -> c computed, Clean
+  p's computation calls writeSource(createGraph(), s, 2)
+    assertNotComputing checks the new graph: its computingDepth is 0 -> no throw
+    s.value = 2; s.dependents = {c} -> c Dirty; c.dependents = {} (p is added after compute returns)
+  p finishes -> setDependencies: c.dependents = {p} -> p Clean, over a Dirty c
+writeSource(g, s, 3) -> c already Dirty -> stop -> p is never marked
+pull(g, p) -> Clean -> returns the value computed from s = 1
+```
+
+  The same bypass works with any second `Graph` the closure holds. Under (f) the guard stops an accidental write through the graph the consumer passes everywhere, and it does not stop a write through another graph.
+- (g) As (f), but each node holds its graph, set by the constructors (Option (g)). Held, not decided. Reason: the criterion this decision applies is a guard no caller can bypass (pico-runtime.md open decision 2, last paragraph), and only (g) meets it: `writeSource`, `markSourceChanged`, and `disposeDerivedNode` read the guard from the node they receive, so the trace under (f) throws at `writeSource(s, 2)`. (g) also detects cross-graph wiring: `readSource` and `readDerived` throw on a node of another graph, so no `dependents` edge crosses graphs. Cost: one pointer per node; the constructors take a `Graph` and every other public function drops it; one comparison per context read. Steel-man for (f): a closure that builds a second graph to write is deliberate misuse, and pico's database parameter has the shape of (f). The bypass needs no deliberate misuse when a consumer holds two graphs, and the criterion is that no caller can bypass the guard.
+
+pico-runtime.md's (b) and (c) are guards on the Isograph environment. A closure that holds the store reaches the engine's functions without passing them, so they are not engine options. (g) is held, not decided. The body, the README, and the tests are written under (f) until the decision is made (The public API); Option (g) is the complete (g) form.
 
 ### 3. A throw out of a computation or an equality (decided)
 
