@@ -8,7 +8,7 @@ The package is `@isograph/reactive-graph` in `libs/reactive-graph` (decision 1, 
 
 ## Goal
 
-The engine is a graph of values. A source node holds a value that code outside the graph sets. A derived node holds the value of a computation over source nodes and other derived nodes. The engine records which nodes each computation read, marks the derived nodes above a written source, and recomputes a derived node only when it is read and an input it read changed value.
+The engine is a graph of values. A source node holds a value that code outside the graph sets. A derived node holds the value of a computation over source nodes and other derived nodes. The engine records which nodes each computation read, marks the derived nodes above a written source, and recomputes a derived node only when it is read and one of these holds: it was never computed, it was disposed, or a source it read was written to a value that source's equality rejected, or a derived node it read recomputed to a value that node's equality rejected. A source written to a new value and then written back to the old one before a pull still makes its direct readers recompute once; each of them computes the old value, its equality accepts it, and nothing above it recomputes.
 
 The engine imports nothing. It names no store, record, link, key, reader AST, entity, resolver, or other Isograph type. A project with values of its own types uses it with no Isograph code. The Isograph runtime is one consumer: its server values are source nodes and its resolver results are derived nodes (pico-runtime.md, The engine and the Isograph runtime). This doc describes the engine alone.
 
@@ -727,7 +727,7 @@ pull(graph, banner); // 'Free shipping' (runs all three)
 - A computation is a pure function of what it reads. It does not write a source or dispose a node; each of those throws while a computation runs. A `sourceValue` or `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceChanged` marks a source whose value object you changed in place.
-- A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is as it was before that pull.
+- A computation and an equality must not throw. A throw is a programmer error: it propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
 ````
