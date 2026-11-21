@@ -101,6 +101,25 @@ export type LoaderInstanceKey = string & { readonly [loaderInstanceKeyBrand]: tr
 export function loaderInstanceKey(link: StoreLink, storeKey: StoreKey): LoaderInstanceKey;
 ```
 
+The instance's inputs node and a query's effect-set node are derived nodes with ids of their own, built beside `resolverDerivedNode` (pico-runtime.md, The store's side (2b)):
+
+```ts
+// from libs/isograph-runtime/src/sources.ts
+/** The inputs derived node of the loader instance at `storeKey` on `record`: `storeKey` is
+ * `resolverStoreKey(loaderArtifact.selectableName, variables)` with the selection's variables. */
+export function loaderInputsDerivedNode(record: StoreLink, storeKey: StoreKey): DerivedNodeId {
+  return JSON.stringify(['LoaderInputs', record.entityName, record.id, storeKey]) as DerivedNodeId;
+}
+
+/** The effect-set derived node of the query rooted at `record` whose entrypoint field has the
+ * resolver store key `storeKey`: `resolverStoreKey(entrypoint.readerArtifact().selectableName, variables)`. */
+export function effectSetDerivedNode(record: StoreLink, storeKey: StoreKey): DerivedNodeId {
+  return JSON.stringify(['EffectSet', record.entityName, record.id, storeKey]) as DerivedNodeId;
+}
+```
+
+Each id is the JSON of a list of four strings whose first names its kind, and `resolverDerivedNode`'s is a list of three, so no inputs node or effect-set node shares an id with a resolver derived node, the root resolver derived node of the same entrypoint and variables included. `loaderInputsDerivedNode`'s callers are `effectEntries` and the React package's render-time read (Loading during render); `effectSetDerivedNode`'s are `mountQuery` and `reconcileEffectRoots`.
+
 The key is upstream's stable id (`read.ts:332-339`) with the arguments limited to those the selection passes and the field's defaults (pico-runtime.md, The resolver store key). It does not include arguments supplied at a hook call, because the effect set computes keys from data alone (open decision 2).
 
 ### Phases
@@ -175,7 +194,7 @@ export type EffectSetEntry = {
 export type EffectRoot = {
   readonly entrypoint: IsographEntrypoint<ResolverParam, unknown, EntityName>;
   readonly variables: Variables;
-  /** `effectSetDerivedNode(entrypoint.normalizationAst.root, resolverStoreKey(entrypoint field, variables))`. */
+  /** `effectSetDerivedNode(entrypoint.normalizationAst.root, resolverStoreKey(entrypoint.readerArtifact().selectableName, variables))`. */
   readonly effectSetNode: DerivedNodeId;
   /** The effect set the reconciler last acquired holds for. */
   held: EffectSet;
@@ -184,7 +203,22 @@ export type EffectRoot = {
 };
 ```
 
-The environment gains `loaderInstances: Map<LoaderInstanceKey, LoaderInstance>` and `effectRoots: Map<EffectRootKey, EffectRoot>`, where `EffectRootKey` is network-and-subscriptions.md's `NetworkRequestKey` (`entrypoint.queryText + JSON.stringify(stableCopy(variables))`).
+The environment gains `loaderInstances: Map<LoaderInstanceKey, LoaderInstance>` and `effectRoots: Map<EffectRootKey, EffectRoot>`:
+
+```ts
+// from libs/isograph-runtime/src/loaders.ts
+/** One mounted query: network-and-subscriptions.md's `NetworkRequestKey` of its entrypoint and variables. */
+export type EffectRootKey = NetworkRequestKey;
+
+/** `entrypoint.queryText + JSON.stringify(stableCopy(variables))`, the key `getOrCreateCacheForArtifact`
+ * builds (`libs/isograph-runtime/src/network.ts:54-55`). */
+export function effectRootKey(
+  entrypoint: IsographEntrypoint<ResolverParam, unknown, EntityName>,
+  variables: Variables,
+): EffectRootKey;
+```
+
+`mountQuery` calls `effectRootKey` to find or create its root.
 
 The walk, as a computation over pico-runtime.md's `ComputeContext` (a runtime-defined computation, Follow-ups 10):
 
