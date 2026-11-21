@@ -4,7 +4,7 @@ Status: exploration. Not approved for implementation. Nothing in this doc is dec
 
 Upstream references are the checkout at `/Users/rbalicki/code/isograph` (commit `9b81e0b6`). Paths without a directory are under `isograph/libs/isograph-react/src/core`; `react/` and `loadable-hooks/` paths are under `isograph/libs/isograph-react/src`; `disposable-state/` paths are under `isograph/libs/isograph-react-disposable-state/src`; `disposable-types/` paths are under `isograph/libs/isograph-disposable-types/src`; `crates/` paths are under `isograph/crates`. i2 paths are relative to the i2 root.
 
-This doc builds on `refactors/pending/runtime/pico-runtime.md` (held 3b, mark then pull; change 3's retention and `rootCount`; change 4's observers; Values with lifecycles; Other derived node kinds; Follow-ups 10, 11, and 12), `refactors/pending/runtime/network-and-subscriptions.md` (the request cache, `fetchEntrypoint`, the two-phase lifetime, Request entries in the store), and `refactors/pending/runtime/components-in-userland.md` (closure fields). It edits none of them; What this changes in other docs lists the amendments.
+This doc builds on `refactors/pending/runtime/pico-runtime.md` (The graph's mark then pull; Later: retention and the fetch decision, with `rootCount`; Later: keeping values up to date automatically, with observers and Values with lifecycles; Later: other derived node kinds; Later: a DAG of graphs; Follow-ups 10), `refactors/pending/runtime/network-and-subscriptions.md` (the request cache, `fetchEntrypoint`, the two-phase lifetime, Request entries in the store), and `refactors/pending/runtime/components-in-userland.md` (closure fields). It edits none of them; What this changes in other docs lists the amendments.
 
 ## The problem
 
@@ -20,13 +20,13 @@ Three consequences follow.
 - Which resources exist is decided at render, by whichever components React happened to render. A pending render that never commits starts resources that only a timeout releases (`CacheItem.ts:7`, `:195-253`).
 - A resource whose inputs did not change is not shared after commit. `CacheItem` leaves its `ParentCache` when its temporary retain count reaches 0, even while permanently retained (`CacheItem.ts:343-350`), so a later render of the same id creates a new item and a new fetch.
 
-pico-runtime.md's Goal moves resolver work out of render: a write marks, and settlement pulls what is observed. This doc moves resources out of render the same way: a write marks, and the runtime pulls each mounted query's effect set and reconciles the loaders it reaches.
+pico-runtime.md's Goal stores resolver results in one graph: a write marks, and whoever needs a value pulls. This doc moves resources out of render the same way: a write marks, and the runtime pulls each mounted query's effect set and reconciles the loaders it reaches.
 
 ## Two kinds of field
 
 Every client field is one of two kinds, and a directive on the field's declaration says which. The directive's name is open decision 1.
 
-- A pure function. Its value is a derived node of pico-runtime.md's graph: lazy, cached, cut off by `valuesEqual`. It reads through the reader walk and acquires nothing. Every client field upstream and i2 have today is this kind. Component fields are pure: a closure field's wrapper is a function of (link, field, variables) (components-in-userland.md, A field whose result is a closure), and the hooks a component calls when React renders it are React's effects, not the runtime's.
+- A pure function. Its value is a derived node of pico-runtime.md's graph: lazy, cached, cut off by its node's `equal`. It reads through the reader walk and acquires nothing. Every client field upstream and i2 have today is this kind. Component fields are pure: a closure field's wrapper is a function of (link, field, variables) (components-in-userland.md, A field whose result is a closure), and the hooks a component calls when React renders it are React's effects, not the runtime's.
 - A loader. Its inputs are a pure derived node over its fragment, and its `load(inputs)` returns an `ItemCleanupPair` (`disposable-types/index.ts:2`). The runtime calls `load` once per distinct inputs value per instance, outside every computation, and calls the cleanup when the instance is released or its inputs change.
 
 The split is the one pico-runtime.md's Values with lifecycles states for derived nodes (a computation is pure; a resource is an effect run apart from it), lifted from the runtime's internals to the field definition, so that user code names which fields have effects and the compiler knows it statically.
@@ -62,7 +62,7 @@ export type LoaderItem<TValue> = {
 };
 ```
 
-`LoaderItem` is Relay's `LiveState<T>` (`read(): T`, `subscribe(cb): () => void`; Relay docs, Live Fields), which pico-runtime.md's client roots already name as the shape an external value needs (Other derived node kinds, the `with` blocks sketch). An item that changes over time is not the derived node's value; it is a source (An item that changes over time).
+`LoaderItem` is Relay's `LiveState<T>` (`read(): T`, `subscribe(cb): () => void`; Relay docs, Live Fields), which pico-runtime.md's client roots already name as the shape an external value needs (Later: other derived node kinds, the `with` blocks sketch). An item that changes over time is not the derived node's value; it is a source (An item that changes over time).
 
 ### The reader AST
 
@@ -95,38 +95,38 @@ export type ReachesLoader = 'ReachesLoader' | 'NoLoader';
 // from libs/isograph-runtime/src/loaders.ts
 declare const loaderInstanceKeyBrand: unique symbol;
 
-/** (link, field, arguments): `resolverDerivedNode(link, resolverStoreKey(selectableName, variables))`'s string, under its own brand. */
+/** (link, field, arguments): `JSON.stringify([link.entityName, link.id, resolverStoreKey(selectableName, variables)])`, under its own brand. */
 export type LoaderInstanceKey = string & { readonly [loaderInstanceKeyBrand]: true };
 
 export function loaderInstanceKey(link: StoreLink, storeKey: StoreKey): LoaderInstanceKey;
 ```
 
-The instance's inputs node and a query's effect-set node are derived nodes with ids of their own, built beside `resolverDerivedNode` (pico-runtime.md, The store's side (2b)):
+The instance's inputs node and a query's effect-set node are derived nodes in a record container's `derived` map (pico-runtime.md, The store), under keys of their own:
 
 ```ts
 // from libs/isograph-runtime/src/sources.ts
-/** The inputs derived node of the loader instance at `storeKey` on `record`: `storeKey` is
- * `resolverStoreKey(loaderArtifact.selectableName, variables)` with the selection's variables. */
-export function loaderInputsDerivedNode(record: StoreLink, storeKey: StoreKey): DerivedNodeId {
-  return JSON.stringify(['LoaderInputs', record.entityName, record.id, storeKey]) as DerivedNodeId;
+/** The key, in `record`'s container, of the inputs derived node of the loader instance at `storeKey`:
+ * `storeKey` is `resolverStoreKey(loaderArtifact.selectableName, variables)` with the selection's variables. */
+export function loaderInputsKey(storeKey: StoreKey): StoreKey {
+  return JSON.stringify(['LoaderInputs', storeKey]);
 }
 
-/** The effect-set derived node of the query rooted at `record` whose entrypoint field has the
- * resolver store key `storeKey`: `resolverStoreKey(entrypoint.readerArtifact().selectableName, variables)`. */
-export function effectSetDerivedNode(record: StoreLink, storeKey: StoreKey): DerivedNodeId {
-  return JSON.stringify(['EffectSet', record.entityName, record.id, storeKey]) as DerivedNodeId;
+/** The key, in the root record's container, of the effect-set derived node of the query whose entrypoint
+ * field has the resolver store key `storeKey`: `resolverStoreKey(entrypoint.readerArtifact().selectableName, variables)`. */
+export function effectSetKey(storeKey: StoreKey): StoreKey {
+  return JSON.stringify(['EffectSet', storeKey]);
 }
 ```
 
-Each id is the JSON of a list of four strings whose first names its kind, and `resolverDerivedNode`'s is a list of three, so no inputs node or effect-set node shares an id with a resolver derived node, the root resolver derived node of the same entrypoint and variables included. `loaderInputsDerivedNode`'s callers are `effectEntries` and the React package's render-time read (Loading during render); `effectSetDerivedNode`'s are `mountQuery` and `reconcileEffectRoots`.
+Each key is the JSON of a list, which starts with `[`, and a resolver store key starts with a GraphQL name character, so no inputs node or effect-set node shares a key with a resolver derived node in one container, the root resolver node of the same entrypoint and variables included. The container's `derived` map then holds `DerivedNode<GraphValue>`. `loaderInputsKey`'s callers are `effectEntries` and the React package's render-time read (Loading during render); `effectSetKey`'s are `mountQuery` and `reconcileEffectRoots`.
 
-The key is upstream's stable id (`read.ts:332-339`) with the arguments limited to those the selection passes and the field's defaults (pico-runtime.md, The resolver store key). It does not include arguments supplied at a hook call, because the effect set computes keys from data alone (open decision 2).
+The key is upstream's stable id (`read.ts:332-339`) with the arguments limited to those the selection passes and the field's defaults (pico-runtime.md, Stored resolver results). It does not include arguments supplied at a hook call, because the effect set computes keys from data alone (open decision 2).
 
 ### Phases
 
-- Inputs. A pure derived node at `loaderInputsDerivedNode(link, storeKey)`, whose computation reads the loader's `inputs` reader artifact at the link with the field's variables. Lazy, cached, and pulled in any world, like any resolver derived node.
-- Construct. The runtime calls `load(inputs)` for an instance when it is first held, and again when its inputs node recomputes to a value `valuesEqual` rejects. An unrelated write that marks the inputs node and leaves its value equal is cut off at the inputs node, so it never reaches `load`. When the inputs change, the order of the old cleanup and the new `load` is open decision 6.
-- Retain. Instances are shared by key. Each holder adds one to the instance's count: an effect root whose effect set contains the key, or a temporary retain from an uncommitted render. When the count reaches 0, the runtime calls the cleanup. This is change 3's `rootCount` model (pico-runtime.md, Retention) applied to instances.
+- Inputs. A pure derived node at `loaderInputsKey(storeKey)` in the link's container, whose computation reads the loader's `inputs` reader artifact at the link with the field's variables. Lazy, cached, and pulled in any world, like any resolver derived node.
+- Construct. The runtime calls `load(inputs)` for an instance when it is first held, and again when its inputs node recomputes to a value its `equal` rejects. An unrelated write that marks the inputs node and leaves its value equal is cut off at the inputs node, so it never reaches `load`. When the inputs change, the order of the old cleanup and the new `load` is open decision 6.
+- Retain. Instances are shared by key. Each holder adds one to the instance's count: an effect root whose effect set contains the key, or a temporary retain from an uncommitted render. When the count reaches 0, the runtime calls the cleanup. This is `rootCount` (pico-runtime.md, Later: retention and the fetch decision) applied to instances.
 - Release. A holder releases when its effect set stops containing the key (a link retargeted, a refinement no longer holds, the inputs node's record was deleted), when its query is unmounted (a route change, a component unmounting), or when a temporary retain expires.
 
 ```ts
@@ -165,20 +165,18 @@ An item's value is a source, not the inputs node's value and not the effect-set 
 
 ```ts
 // from libs/isograph-runtime/src/sources.ts
-/** The current value of the item of the loader instance `key`. */
-export function loaderItemSource(key: LoaderInstanceKey): SourceId;
+/** The source node of the current value of the item of the loader instance `key`, inserted with no item when
+ * absent, because a reader that read `NotLoaded` must be marked when the instance loads. */
+export function loaderItemSource(environment: IsographEnvironment, key: LoaderInstanceKey): SourceNode<unknown, GraphValue>;
 ```
 
-- After `load` returns, the runtime calls `item.subscribe(onChange)` and stores the unsubscribe in `Loaded.unsubscribe`. `onChange` queues `markChanged(environment.graph, [loaderItemSource(key)])` as a write (open decision 7).
-- A reader walk at a `Loader` selection calls `readSource(loaderItemSource(key))` and returns `{ kind: 'Loaded', value: item.read() }` when the instance is `Loaded`, `{ kind: 'NotLoaded' }` when no instance is stored, and `{ kind: 'LoadThrew', error }` otherwise (open decision 2).
-- Releasing an instance calls `unsubscribe`, then `cleanup`, then `deleteSource(environment.graph, loaderItemSource(key))`, which marks every reader `Dirty`; they recompute to `NotLoaded` when pulled.
+- After `load` returns, the runtime calls `item.subscribe(onChange)` and stores the unsubscribe in `Loaded.unsubscribe`. `onChange` queues `markSourceChanged(loaderItemSource(environment, key))` as a write (open decision 7).
+- A reader walk at a `Loader` selection calls `readSource(loaderItemSource(environment, key))` and returns `{ kind: 'Loaded', value: item.read() }` when the instance is `Loaded`, `{ kind: 'NotLoaded' }` when no instance is stored, and `{ kind: 'LoadThrew', error }` otherwise (open decision 2).
+- Releasing an instance calls `unsubscribe`, then `cleanup`, then `markSourceChanged(loaderItemSource(environment, key))`, which marks every reader `Dirty`; they recompute to `NotLoaded` when pulled. The source node is dropped from its environment map when its `dependents` is empty and no instance is stored at its key.
 
-`loaderItemSource` and `urlSource` are `SourceId`s, and `markChanged` and `deleteSource` take the graph, as pico-runtime.md's body is written (open decision 29 (b)). Under its open decision 29 (a) both become cell objects and no `SourceId` is built:
+`loaderItemSource` and `urlSource` are source nodes (pico-runtime.md, The graph), each held by its owner: the environment's map by `LoaderInstanceKey`, and the router.
 
-- `loaderItemSource(key)` becomes a `Source<GraphValue>` per `LoaderInstanceKey`, kept in an environment map and inserted by the walk's first read of the key, as `recordCell` inserts an `ABSENT` record cell, because a reader that read `NotLoaded` must be marked when the instance loads. `onChange` and a load call `markChanged([cell])`; a release calls `markChanged([cell])` in place of `deleteSource`, because the item source owns no derived node. The cell is dropped when its `dependents` is empty and no instance is stored at its key, as `garbageCollect` drops a `MISSING` value cell.
-- `urlSource()` becomes one `Source<GraphValue>` the router holds, and the router reports a new URL with `markChanged([urlCell])`.
-
-A pure field downstream of a loader reads the item through the walk, so its dependency is recorded and `markChanged` reaches it. This is the client roots' rule (pico-runtime.md, Other derived node kinds): a source is current only if every write to it reports a change, and `subscribe` is the report.
+A pure field downstream of a loader reads the item through the walk, so its dependency is recorded and `markSourceChanged` reaches it. This is the client roots' rule (pico-runtime.md, Later: other derived node kinds): a source is current only if every write to it reports a change, and `subscribe` is the report.
 
 ## The effect set
 
@@ -199,8 +197,8 @@ export type EffectSetEntry = {
 export type EffectRoot = {
   readonly entrypoint: IsographEntrypoint<ResolverParam, unknown, EntityName>;
   readonly variables: Variables;
-  /** `effectSetDerivedNode(entrypoint.normalizationAst.root, resolverStoreKey(entrypoint.readerArtifact().selectableName, variables))`. */
-  readonly effectSetNode: DerivedNodeId;
+  /** The derived node at `effectSetKey(resolverStoreKey(entrypoint.readerArtifact().selectableName, variables))` in the container of `entrypoint.normalizationAst.root`. */
+  readonly effectSetNode: DerivedNode<GraphValue>;
   /** The effect set the reconciler last acquired holds for. */
   held: EffectSet;
   /** `mountQuery` calls not yet released. */
@@ -245,29 +243,26 @@ function effectEntries(
 ): Iterable<readonly [LoaderInstanceKey, EffectSetEntry]>;
 ```
 
-`effectEntries` yields nothing for a `Scalar` selection or a selection whose `reachesLoader` is `NoLoader`. A `Linked` selection reads the link through the walk's hooks, as `read` does, and recurses at each linked record. A `Refinement` reads the record's entity, as `read` does, and recurses when the condition holds. A `Resolver` selection that reaches a loader recurses into the selected field's reader AST at the same link with `childVariables(variables, selection.arguments)`; it does not call the resolver. A `Loader` selection reads the inputs node with `context.readDerivedNode(loaderInputsDerivedNode(link, storeKey), ..)` and yields one entry. Missing data on a path yields nothing for that path.
+`effectEntries` yields nothing for a `Scalar` selection or a selection whose `reachesLoader` is `NoLoader`. A `Linked` selection reads the link through the walk's hooks, as `read` does, and recurses at each linked record. A `Refinement` reads the record's entity, as `read` does, and recurses when the condition holds. A `Resolver` selection that reaches a loader recurses into the selected field's reader AST at the same link with `childVariables(variables, selection.arguments)`; it does not call the resolver. A `Loader` selection reads the inputs node with `context.readDerived(..)` of the node at `loaderInputsKey(storeKey)` in the link's container and yields one entry. Missing data on a path yields nothing for that path.
 
-`GraphValue` is the widened value type Follow-ups 10 names: `ResolverResult<unknown> | EffectSet | ...`, with `valuesEqual` answering unequal for two kinds. Two `EffectSet`s are equal when they have the same keys and each key's `inputs` are `valuesEqual` and its artifact is `===`.
+`GraphValue` is the widened value type Follow-ups 10 names: `ResolverResult<unknown> | EffectSet | ...`, and each node has its own `equal` (pico-runtime.md, Equality). An effect-set node's `equal` answers equal for two `EffectSet`s when they have the same keys and each key's `inputs` are equal by that inputs node's `equal` and its artifact is `===`.
 
 ### After a write
 
-Under held 3b (pico-runtime.md, Held: 3b, mark, then pull), a write marks and runs nothing. The full order of a write, with pico-runtime.md change 4's steps in place:
+Under pico-runtime.md's mark then pull (The graph), a write marks and runs nothing. The full order of a write, with pico-runtime.md's Later: keeping values up to date automatically in place:
 
-1. The write marks: `normalizeData`'s `normalize` and `markChanged` (change 2b), `garbageCollectEnvironment`'s `deleteSource` and `collect` (changes 2b and 3), or a queued write's `markChanged`.
-2. `settle` pulls the observed derived nodes (change 4).
-3. In `normalizeData` only, `retainEntrypoint` holds the new retention's root (change 3).
-4. `notify` calls the observers whose value changed, and empties `createdObserved` (change 4).
-5. `callSubscriptions` re-reads every subscription (change 2b).
-6. `reconcileEffectRoots` pulls every effect root's effect-set node. The pull brings up to date only the derived nodes on paths to loaders: the links the walk read and the inputs nodes. Every pure field the walk does not read stays marked (`Check` or `Dirty`) until a render or another pull reads it.
-7. For each effect root whose effect-set node's value changed, the reconciler diffs `held` against the new value: it acquires each new key and releases each dropped key, and sets `held`.
-8. For each instance whose current inputs are not `valuesEqual` to the inputs it was loaded with, the reconciler loads again with the new inputs and releases the old load, in the order open decision 6 decides.
-9. `notifyCreated` calls the observers of each derived node steps 6 to 8 created at an observed id (change 4). An inputs node's computation reads its `inputs` reader artifact through `contextHooks`, which creates the resolver derived nodes that artifact selects, and one of those can be at an observed id.
-10. `flushTeardowns` runs the releases, after every observer of the write was called in steps 4, 5, and 9.
-11. The writes queued during 6 to 9 (an item's `onChange`, a `load` that wrote a source) run as the next write, from step 1.
+1. The write marks: `normalize` marks as it writes (pico-runtime.md, `normalize` writes source nodes), `garbageCollectEnvironment`'s `deleteRecord` and `collect`, or a queued write's `markSourceChanged`.
+2. `notify` calls each observer whose node is not `Clean`; each reader pulls when it reads.
+3. `callSubscriptions` pulls every subscription's node.
+4. `reconcileEffectRoots` pulls every effect root's effect-set node. The pull brings up to date only the derived nodes on paths to loaders: the links the walk read and the inputs nodes. Every pure field the walk does not read stays marked (`Check` or `Dirty`) until a render or another pull reads it.
+5. For each effect root whose effect-set node's value changed, the reconciler diffs `held` against the new value: it acquires each new key and releases each dropped key, and sets `held`.
+6. For each instance whose current inputs are not equal, by its inputs node's `equal`, to the inputs it was loaded with, the reconciler loads again with the new inputs and releases the old load, in the order open decision 6 decides.
+7. `flushTeardowns` runs the releases, after every observer of the write was called in steps 2 and 3.
+8. The writes queued during 4 to 6 (an item's `onChange`, a `load` that wrote a source) run as the next write, from step 1.
 
-Steps 4 to 10 run in change 4's `finally`, so they run when step 2 or 3 throws (pico-runtime.md open decision 22). `writeOrMark`'s `PartialWriteError` branch runs steps 2 and 4 to 10, and skips 3, as change 4 skips the root hold there. Steps 6 to 8 change no value an observer was notified of in step 4: after `settle`, every observed derived node is `Clean` and reads no marked derived node (pico-runtime.md change 2's invariant), and the effect-set pull brings up to date only marked or new derived nodes.
+Steps 2 to 7 run in a `finally` after the write, so they run when `normalize` throws part-way (pico-runtime.md open decisions 3 and 4). Steps 4 to 6 pull only marked or new derived nodes, and an observer notified in step 2 reads the current value whenever it pulls.
 
-This differs from pico-runtime.md's Values with lifecycles (Reconciliation), whose order is `settle`, the root hold, `notify`, `callSubscriptions`, `reconcileEffects`, `flushTeardowns`, and whose `settle` pulls the mounted derived nodes with an effect together with the observed ones, before `notify`. Here `settle` pulls the observed derived nodes only, and the effect-set nodes are pulled in step 6, after `notify` and `callSubscriptions`. In both orders a resource is acquired and released only after the observers were called. This order replaces pico-runtime.md's only if the user takes this doc's direction for pico-runtime.md open decision 13 (What this changes in other docs); until then pico-runtime.md's Values with lifecycles stands.
+This differs from pico-runtime.md's Values with lifecycles, which pulls the mounted derived nodes with an effect in `reconcileEffects` after the write's notification. Here the effect-set nodes are pulled in step 4. In both orders a resource is acquired and released only after the observers were called. This order replaces pico-runtime.md's only if the user takes this doc's direction for pico-runtime.md open decision 13 (What this changes in other docs); until then pico-runtime.md's Values with lifecycles stands.
 
 ```ts
 // from libs/isograph-runtime/src/loaders.ts
@@ -282,7 +277,7 @@ export function mountQuery<TParam extends ResolverParam<TEntityName>, TOutput, T
 ): CleanupFn;
 ```
 
-Pulling the effect-set nodes after every write is open decision 3's (a) for these nodes alone: pico-runtime.md holds that a retained query nobody observes stays marked (open decision 3, held (b)), and this doc does not change that for pure fields. It is the case pico-runtime.md's Reconciliation already makes for mounted nodes with an effect: "an effect whose inputs changed must be replaced even when no reader reads the node."
+Pulling the effect-set nodes after every write is done for these nodes alone: pico-runtime.md holds that a retained query nobody observes stays marked (Later: keeping values up to date automatically), and this doc does not change that for pure fields. It is the case pico-runtime.md's Values with lifecycles already makes for mounted nodes with an effect: "an effect whose inputs changed must be replaced even when no reader reads the node."
 
 ### The link move
 
@@ -294,12 +289,12 @@ before  effect set of PetDetailRoute(id: 1): { Pet:2/Presence -> inputs "2" }
 
 write   Pet:1.bestFriend = Pet:3
 mark    effect-set node Dirty (it read Pet:1.bestFriend); Pet:2/Presence inputs node untouched
-settle  observed nodes; PetDetail's own resolver node is pulled only if observed
+notify  observers of marked nodes; PetDetail's own resolver node is pulled only when a reader pulls it
 pull    effect-set node: reads Pet:1.bestFriend -> Pet:3, creates and reads Pet:3/Presence inputs node -> "3"
         new value { Pet:3/Presence -> inputs "3" }, unequal
 diff    acquire Pet:3/Presence: not stored, load("3"), permanentRetainCount 1
         release Pet:2/Presence: permanentRetainCount 0, temporaryRetainCount 0 -> pushed to teardowns
-flush   Pet:2/Presence: unsubscribe, cleanup, deleteSource(graph, loaderItemSource(Pet:2/Presence))
+flush   Pet:2/Presence: unsubscribe, cleanup, markSourceChanged(loaderItemSource(environment, Pet:2/Presence))
 ```
 
 A write to `Pet:2.name` marks nothing the effect-set node read, so the pull finds it `Clean` and the reconciler does nothing. If `Presence` also selected `name`, a write to `Pet:3.name` would mark `Pet:3/Presence`'s inputs node `Dirty` and the effect-set node `Check`; the pull recomputes the inputs node, and only if its value changed does the effect-set node recompute and the instance reload.
@@ -316,8 +311,8 @@ The URL is a source: browser state the outside world owns, which arrives as an e
 
 ```ts
 // from libs/isograph-runtime/src/router.ts
-/** The current URL, as the router last reported it. */
-export function urlSource(): SourceId;
+/** The source node of the current URL, as the router last reported it. The router holds it. */
+export function urlSource(router: Router): SourceNode<URL, GraphValue>;
 
 /** A route table: which entrypoints, with which variables, a URL mounts. Pure. */
 export type Routes = (url: URL) => ReadonlyArray<MountedEntrypoint>;
@@ -328,7 +323,7 @@ export type MountedEntrypoint = {
 };
 ```
 
-A route change is a write: the router reports the new URL with `markChanged(environment.graph, [urlSource()])`, the mounted-entrypoints node recomputes, and the reconciler mounts the entrypoints that appeared and unmounts the ones that went. Then each new effect root's effect set is pulled and its instances acquired; each unmounted root releases what it held. A route change is mark, pull, diff, the same three steps as any write.
+A route change is a write: the router reports the new URL with `writeSource(urlSource(router), url)`, the mounted-entrypoints node recomputes, and the reconciler mounts the entrypoints that appeared and unmounts the ones that went. Then each new effect root's effect set is pulled and its instances acquired; each unmounted root releases what it held. A route change is mark, pull, diff, the same three steps as any write.
 
 Two caveats are open decisions:
 
@@ -365,7 +360,7 @@ A pending forked world can start loaders this way: a render in that world pulls 
 An entrypoint's fetch is a built-in loader at the entrypoint's root.
 
 - Identity: the root link, the entrypoint's field, the variables. This is `NetworkRequestKey` (network-and-subscriptions.md, The request cache) in another form.
-- Inputs: the root resolver derived node's kind on its variables, `MissingData` or not, which is pico-runtime.md's Follow-up 11 decision (`IfNecessary` fetches when the root is `MissingData`).
+- Inputs: the root resolver derived node's kind on its variables, `MissingData` or not, which is pico-runtime.md's fetch decision (Later: retention and the fetch decision; `IfNecessary` fetches when the root is `MissingData`).
 - Load: `fetchEntrypoint` (network-and-subscriptions.md), which returns `ItemCleanupPair<PromiseWrapper<void, unknown>>` and retains the query. The item is static: its value is the `PromiseWrapper`, which react.md's suspension decision reads.
 - Every effect set contains its own root's fetch instance first, so an effect root holds its query's retention through the fetch instance's cleanup. That is what makes the invariant's containment hold.
 
@@ -379,15 +374,15 @@ A built-in loader whose item is a hold on its own pure node: while the query is 
 
 ```ts
 // from libs/isograph-runtime/src/loaders.ts
-// the built-in eager loader's load, for the pure node `id`:
-load: () => [staticItem(undefined), observe(environment.graph, id, () => {})],
+// the built-in eager loader's load, for the pure node `node`:
+load: () => [staticItem(undefined), retainRoot(node)],
 ```
 
-`observe` with a callback that does nothing makes the node observed (pico-runtime.md, change 4), so `settle` pulls it after every write, and `collect` keeps it through `rootCount`. The cleanup removes the observer.
+`retainRoot` keeps the node through `collect` (pico-runtime.md, Later: retention and the fetch decision), and the effect walk reads the eager node, so `reconcileEffectRoots`'s pull of the effect-set node pulls it after every write. The cleanup removes the hold.
 
 Uses:
 
-- Precompute an expensive resolver before render, so the first render of a newly mounted component reads a `Clean` value instead of the result from before the last write (pico-runtime.md open decision 3's cost under held (b)).
+- Precompute an expensive resolver before render, so the first render's `getSnapshot` of a newly mounted component finds the node `Clean` instead of computing it (pico-runtime.md, Later: keeping values up to date automatically).
 - A value consumed outside React (a document title, an analytics context), current after every write while the query is mounted.
 
 Whether `eager` is syntax, and what it is called, is open decision 12. The name collides with two existing meanings: upstream's `EagerReaderArtifact` is a non-component client field (`reader.ts:25-36`), and i2's `Loadability::Eager` is a selection without `@loadable` (`crates/isograph_parser/src/selections.rs:36-43`).
@@ -396,7 +391,7 @@ Whether `eager` is syntax, and what it is called, is open decision 12. The name 
 
 A feature is syntax when the compiler must know it: it changes generated query text, the operation type, or static analysis such as `ReachesLoader`. It is a userland loader when its behavior is opaque to the compiler.
 
-- Syntax: the query fetch, refetch, `@loadable`, pagination (each generates query text or a refetch artifact); GraphQL subscriptions or `@live` (operation type); client roots (pico-runtime.md, Other derived node kinds; the compiler types their selectables); `eager`, if the effect set must see it to bound its lifetime by data.
+- Syntax: the query fetch, refetch, `@loadable`, pagination (each generates query text or a refetch artifact); GraphQL subscriptions or `@live` (operation type); client roots (pico-runtime.md, Later: other derived node kinds; the compiler types their selectables); `eager`, if the effect set must see it to bound its lifetime by data.
 - Userland loaders: localStorage write-through, impression logging, a third-party SDK's subscription that writes a source.
 - Between the two: polling (a timer; opaque, but its period may want to be part of the instance key), and prefetching a linked route's entrypoint (the route table is the router's, but the entrypoint and its variables are compiler artifacts).
 
@@ -408,7 +403,7 @@ The goal is a tree of worlds: the committed world and pending optimistic or tran
 
 Effects run only in the committed world. Effect roots, the reconciler, and permanent retains exist only there. A pending world may pull any pure node, including inputs nodes and effect-set nodes, for its own render, and may start loaders under temporary retains (Loading during render). It never acquires a permanent retain. When the pending world commits, its mounts become the committed world's effect roots, and the reconciler adopts its temporary retains by key.
 
-pico-runtime.md's Follow-ups 12 (Forks: a tree of optimistic worlds) states the constraint changes 2 to 4 keep for forks: a derived node's per-world state is one `DerivedNodeState` record, read and written only through `stateOf`, and effects run only in the committed world.
+pico-runtime.md's Later: a DAG of graphs states the constraint the core keeps for forks: a derived node's per-world state is one `StateSlot`, read and written only through `stateOf`, and effects run only in the committed world.
 
 ## End-user experience
 
@@ -469,11 +464,11 @@ What the user sees:
 
 None of these is edited by this doc.
 
-- pico-runtime.md, change 4: the derived nodes the runtime pulls after a write are the observed ones (`settle`) and the effect-set nodes of mounted queries (`reconcileEffectRoots`). "Mounted derived nodes with an effect" in Held: 3b's list and in the Goal become effect-set nodes of effect roots.
-- pico-runtime.md, Values with lifecycles, if the user takes this doc's direction for its open decision 13: effects move from derived nodes to loader instances, and After a write's order replaces Reconciliation's. `DerivedNodeDefinition.effect`, `NodeEffect`, `ObservedEffect`, and `reconcileEffects` are replaced by `LoaderArtifact.load`, `LoaderInstance`, and `reconcileEffectRoots`. An effect is set up when an effect root reaches its instance, not when `observe` mounts its node; a component observing a node no longer starts anything. Reconciliation sets up the new effect before tearing down the old; whether loaders keep that order for an instance whose inputs changed is open decision 6. The rule "a retained query nobody renders mounts nothing" holds with mount meaning `mountQuery`.
+- pico-runtime.md, Later: keeping values up to date automatically: besides the pulls of observers and subscriptions, the runtime pulls the effect-set nodes of mounted queries after a write (`reconcileEffectRoots`). "Mounted derived nodes with an effect" in Values with lifecycles become effect-set nodes of effect roots.
+- pico-runtime.md, Values with lifecycles, if the user takes this doc's direction for its open decision 13: effects move from derived nodes to loader instances, and After a write's order replaces Values with lifecycles'. The per-node effect and `reconcileEffects` are replaced by `LoaderArtifact.load`, `LoaderInstance`, and `reconcileEffectRoots`. An effect is set up when an effect root reaches its instance, not when `listen` mounts its node; a component observing a node no longer starts anything. Values with lifecycles sets up the new effect before tearing down the old; whether loaders keep that order for an instance whose inputs changed is open decision 6. The rule "a retained query nobody renders mounts nothing" holds with mount meaning `mountQuery`.
 - pico-runtime.md, open decision 13: (a) places lifecycles in the engine per derived node; this doc places them per loader instance in the runtime, with the engine unchanged except the widened value type of Follow-ups 10.
 - pico-runtime.md, Follow-ups 1, 2, 4, 5, 6: a client pointer's follow-up query is a built-in loader keyed by the pointer's target; deduplication (Follow-ups 5) is sharing by `LoaderInstanceKey`; cancellation (Follow-ups 6) is the loader's cleanup aborting the request.
-- pico-runtime.md, Follow-ups 11: the fetch decision becomes the fetch loader's inputs (The query fetch as a loader).
+- pico-runtime.md, Later: retention and the fetch decision: the fetch decision becomes the fetch loader's inputs (The query fetch as a loader).
 - network-and-subscriptions.md, Fetching: `fetchEntrypoint` is the fetch loader's `load`. `getOrCreateCacheForArtifact` and the request cache of `ParentCache`s are replaced by `loaderInstances`; change 7's `RequestEntry` counts are `LoaderInstance`'s. The two-phase lifetime for requests is Loading during render. `readAndSubscribe`'s own two-phase lifetime for subscriptions is unchanged.
 - components-in-userland.md: component fields are pure, unchanged. A component field whose selection set reaches a loader is a `Resolver` selection with `ReachesLoader`, and the effect walk descends into its reader AST although the parent does not read the component's data (A field whose result is a closure). Its open question 3 (a data derived node per closure) does not block this: the effect walk reads only the paths to loaders, not the closure's data node.
 - react.md: `useLazyReference`'s commit calls `mountQuery`; a loader field read at render that is `NotLoaded` calls `retainLoaderTemporarily`.
@@ -511,7 +506,7 @@ Held: (a). Deviation from upstream's (c), reason: the effect set computes instan
 
 - (a) Observed nodes and effect-set nodes of effect roots. Held (this doc).
 - (b) Observed nodes only; effect-set nodes are pulled when a component renders. Cost: an instance the data stopped reaching stays held until a render, which is upstream's behavior and loses the data-bounded lifetime.
-- (c) Every retained root (pico-runtime.md open decision 3 (a)). Cost: every retained query's pure fields run on every write.
+- (c) Every retained root. Cost: every retained query's pure fields run on every write.
 
 ### 4. Where `ReachesLoader` lives
 
@@ -522,20 +517,20 @@ Upstream has no counterpart. Held: (a), reason: it reuses the reader AST seam.
 
 ### 5. Where effect-set nodes and loader instances live
 
-- (a) Effect-set nodes in `environment.graph` as a runtime-defined derived node kind (Follow-ups 10), owned by the root record's `recordSource`; loader instances in `environment.loaderInstances`, outside the engine. Held: the engine stays store-agnostic (pico-runtime.md open decision 12) and knows nothing of instances.
+- (a) Effect-set nodes in the root record's container as a runtime-defined derived node kind (Follow-ups 10), owned by that container; loader instances in `environment.loaderInstances`, outside the engine. Held: `graph.ts` imports nothing from the store (pico-runtime.md, The graph) and knows nothing of instances.
 - (b) Instances in the engine, as pico-runtime.md open decision 13 (a) puts lifecycles. Cost: the engine gains reference counts, load, cleanup, and timers.
 
 ### 6. Order of cleanup and load when an instance's inputs change
 
-The instance's key does not change when its inputs change, so the question is only the order of the old load's release and the new `load` for one instance. pico-runtime.md's Reconciliation holds, for derived-node effects, "A new effect is set up before the old one is torn down", and tears the old one down after notification ("A replaced or disposed effect is torn down after every observer of that settlement was notified").
+The instance's key does not change when its inputs change, so the question is only the order of the old load's release and the new `load` for one instance. pico-runtime.md's Values with lifecycles holds, for derived-node effects, "A new effect is set up before the old one is torn down", and tears the old one down after notification ("A replaced or disposed effect is torn down after every observer of that write was notified").
 
-- (a) Cleanup, then load. In step 8 the reconciler calls the old `unsubscribe` and `cleanup`, then `load(newInputs)`, and stores the new `Loaded` state. Never two live resources for one instance, which an exclusive resource needs (one socket per user, one lock, an SDK that allows one watch per id). Costs:
+- (a) Cleanup, then load. In step 6 the reconciler calls the old `unsubscribe` and `cleanup`, then `load(newInputs)`, and stores the new `Loaded` state. Never two live resources for one instance, which an exclusive resource needs (one socket per user, one lock, an SDK that allows one watch per id). Costs:
   - A window with no resource. Between the old cleanup and the moment the new resource is live (for a socket, until it reconnects), events the outside world sends are delivered to neither; a loader that must not lose them needs its own replay.
   - What readers see. `cleanup` and `load` run in the same synchronous step, and no pull happens between them, so no reader observes `NotLoaded` from the order alone. Readers see the new item's first `read()`, which for a resource that connects asynchronously is its not-ready value; that is the same gap at the item's level. Readers do observe `NotLoaded` (or `LoadThrew`) when the new `load` throws, since the old item is already gone.
   - It is React's `useEffect` order (the previous effect's cleanup runs before the next effect).
-- (b) Load, then cleanup after notify, pico-runtime.md's Reconciliation order. In step 8 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markChanged(environment.graph, [loaderItemSource(key)])`, and holds the old `cleanup` for the next pass: step 11 runs the queued write, whose `settle` and `notify` move readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
+- (b) Load, then cleanup after notify, pico-runtime.md's Values with lifecycles order. In step 6 the reconciler calls `load(newInputs)`, calls the old `unsubscribe` at once (so the old item's `onChange` no longer marks `loaderItemSource(key)`), stores the new `Loaded` state, queues `markSourceChanged(loaderItemSource(environment, key))`, and holds the old `cleanup` for the next pass: step 8 runs the queued write, whose `notify` moves readers to the new item, and that pass's `flushTeardowns` runs the old cleanup. No gap: readers move from the old item's value to the new item's value, and a new `load` that throws leaves the old resource live until the flush. Costs:
   - Two live resources for one instance between `load` and the flush. An exclusive resource fails or evicts the old one, and a server that counts connections counts two.
-  - A cleanup held for the next pass is one more list on the environment, and After a write's step 10 flushes only the cleanups held from an earlier pass, so the old item is not released before readers moved off it.
+  - A cleanup held for the next pass is one more list on the environment, and After a write's step 7 flushes only the cleanups held from an earlier pass, so the old item is not released before readers moved off it.
 - (c) Per loader, a declaration option. `LoaderArtifact` gains `readonly reloadOrder: ReloadOrder`, with `export type ReloadOrder = 'CleanupThenLoad' | 'LoadThenCleanup'`, written by the compiler from an argument of the loader directive (open decision 1), with a default. It holds up: the right order is a property of the resource, which only the loader's author knows (exclusive resources need (a); a gapless display needs (b)), and both orders use the reconciler's existing steps. Costs: one more directive argument and a default to choose; the built-in loaders each pick one (the fetch loader and `eager` have no exclusive resource, so (b)).
 - (d) Hand-off: `load(inputs, previous)` receives the old item and cleanup and decides itself, returning the new pair; the runtime never calls the old cleanup when `load` took it over. Costs: every loader handles the case; the runtime cannot tell whether the old resource was released.
 
@@ -547,13 +542,13 @@ Held: none. Undecided.
 
 A `load` may write a source synchronously (a live item's initial value, a localStorage read), and an item's `onChange` may fire during another load.
 
-- (a) Queue them; after `flushTeardowns`, run the queue as the next write (step 11 of After a write). Held. Cost: a loop that ends only when loads stop writing; a loader that writes on every load of an instance whose inputs it changes does not terminate.
-- (b) Forbid synchronous writes: `markChanged` from inside `load` throws. Cost: an initial value shows one write late.
-- (c) Re-enter: mark and settle inside the reconciler. Cost: a pull during a diff; the reconciler's `held` maps change under it.
+- (a) Queue them; after `flushTeardowns`, run the queue as the next write (step 8 of After a write). Held. Cost: a loop that ends only when loads stop writing; a loader that writes on every load of an instance whose inputs it changes does not terminate.
+- (b) Forbid synchronous writes: `writeSource` or `markSourceChanged` from inside `load` throws. Cost: an initial value shows one write late.
+- (c) Re-enter: mark and pull inside the reconciler. Cost: a pull during a diff; the reconciler's `held` maps change under it.
 
 ### 8. Effect-set equality
 
-- (a) Same keys, `===` artifacts, `valuesEqual` inputs. Held.
+- (a) Same keys, `===` artifacts, inputs equal by each inputs node's `equal`. Held.
 - (b) Same keys only, with inputs changes found by comparing each instance's loaded inputs. Cost: the effect-set node recomputes and is equal while an inputs node changed, so the reconciler must visit every instance on every write to find inputs changes.
 
 ### 9. Sharing instances after commit
@@ -577,7 +572,7 @@ A `load` may write a source synchronously (a live item's initial value, a localS
 - (a) A selection directive: the selected field gets the built-in eager loader at (link, field, args), and the effect set reaches it. Held: the effect set must see it for its lifetime to be bounded by data, which a runtime call cannot give.
 - (b) A declaration directive: every selection of the field is eager.
 - (c) A runtime call, `retainEager(environment, location): CleanupFn`. Cost: lifetime is the caller's, not the data's.
-- (d) No `eager`; open decision 3 (d) (a `snapshot` that computes) covers the first use. Cost: render does resolver work (pico-runtime.md Goal).
+- (d) No `eager`; `getSnapshot`'s pull (pico-runtime.md, Later: keeping values up to date automatically) covers the first use. Cost: render does resolver work.
 
 The name is not chosen: `eager` collides with `EagerReaderArtifact` (`reader.ts:25-36`) and `Loadability::Eager` (`selections.rs:38-39`), and upstream's entrypoint diagnostic uses lazy and eager for `@lazyLoad` (`crates/isograph_schema/src/memoized/entrypoint_access.rs:131-134`).
 
