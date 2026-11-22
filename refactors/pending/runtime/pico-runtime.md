@@ -29,7 +29,7 @@ FC reads: root.2, root.3, other.2, other.3
 
 ## The engine
 
-The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/isograph-pico-js` (open decision 18).
+The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/pico-js` (open decision 18).
 
 pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (pico-js.md, Reverse edges, no epochs).
 
@@ -54,7 +54,7 @@ Every export has a caller in the Isograph runtime. The computation of a resolver
 
 ### Which layer owns each item
 
-Engine (`libs/isograph-pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
+Engine (`libs/pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
 
 - Types: `SourceNode`, `DerivedNode`, `PrecalculatedValue`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
@@ -97,7 +97,7 @@ The package's files, its two pre-commit hooks, and its CI step are pico-js.md, T
   },
 ```
 
-The runtime resolves the engine through `node_modules` to its `dist`, as it resolves `@isograph/disposable-types`: `tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps to a directory without the `isograph-` prefix, which does not exist. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked. In the same change the runtime's three pre-commit hooks match the engine's directory (pico-js.md, Pre-commit hooks).
+`tsconfig.build.json`'s `"@isograph/*": ["./libs/*"]` maps `@isograph/pico-js` to `libs/pico-js`, whose `package.json` `types` is `./dist/index.d.cts`, so the runtime type-checks against the engine's `dist`. turbo's `tsc` task depends on `^compile-libs` (`turbo.json`), so the engine is built before the runtime is type-checked. In the same change the runtime's three pre-commit hooks match the engine's directory (pico-js.md, Pre-commit hooks).
 
 ### Exhaustive switches
 
@@ -1437,7 +1437,7 @@ Each is one commit, in order; each is independently shippable.
 
    Tests and fixtures. Every `storeOf(..)` that holds a leaf lists it as a link under the parent's key plus the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), and `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated with `Leaf` targets. New tests: in `test/normalize.test.ts`, "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", and "a custom scalar's JSON array below its list depth is one __value"; in `test/check.test.ts`, "a missing __value is missing its scalar record"; in `test/garbageCollection.test.ts`, "a scalar record no retained query reaches is deleted".
 
-4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/isograph-pico-js` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
+4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/pico-js` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
 5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equals`, `storeValue` and `storeSnapshot` read `source.value`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceDirty` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceDirty` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 
    Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
@@ -1600,7 +1600,7 @@ Each is one commit, in order; each is independently shippable.
 Not part of the core. Retaining a query computes nothing: nothing runs at normalization time, and resolvers run when read.
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export type DerivedNode<TValue> = {
   // .. the core's fields, and:
   /** `rootCount` counts retentions and observers. */
@@ -1891,7 +1891,7 @@ It runs only when a caller calls it (`libs/isograph-runtime/src/environment.ts:6
 
 ### 18. The engine package's name (decided)
 
-Decided by the user: `@isograph/pico-js`, directory `libs/isograph-pico-js`. The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`). The directory follows the mapping of the other library directories, `@isograph/<name>` in `libs/isograph-<name>` (`libs/isograph-runtime`, `libs/isograph-disposable-types`, `libs/isograph-babel-plugin`; `@isograph/plugin-swc` in `libs/isograph-swc-plugin` is the one exception). No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (pico-js.md, The package), so nothing is published under it.
+Decided by the user: `@isograph/pico-js`, directory `libs/pico-js`. The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`). The directory matches the existing `tsconfig.build.json` mapping `"@isograph/*": ["./libs/*"]` (`tsconfig.build.json:22`). No workspace or upstream package uses the name (`libs/*/package.json`, `../isograph/libs/*/package.json`). Whether the name is free on the npm registry was not verifiable offline; the package is `private: true` (pico-js.md, The package), so nothing is published under it.
 
 ### 19. How the engine types the links between nodes of different value types (decided)
 

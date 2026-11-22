@@ -4,7 +4,7 @@ Status: under discussion. Not approved for implementation. This doc is the singl
 
 pico paths are under `crates/pico/src` and `crates/pico/tests` of this repo. Reactively is `packages/core/src/core.ts` of `milomg/reactively`, cited by line at commit `9081fa4bf302`. Preact signals is `packages/core/src/index.ts` of `preactjs/signals`, read at its `main` branch, with no line numbers, because no checkout is local. alien-signals is `src/system.ts` of `stackblitz/alien-signals`, cited by line at tag `v3.2.1`.
 
-The package is `@isograph/pico-js` in `libs/isograph-pico-js` (decision 1, decided; pico-runtime.md open decision 18).
+The package is `@isograph/pico-js` in `libs/pico-js` (decision 1, decided; pico-runtime.md open decision 18).
 
 ## Goal
 
@@ -145,7 +145,7 @@ Every edge is an object reference, held in both directions: a derived node's dep
 Every public function takes the node it acts on, and `readSource` and `readDerived` also take the derived node whose computation is running. There is no graph object: a graph is the set of nodes that its edges connect (decision 2).
 
 ```ts
-// from libs/isograph-pico-js/src/index.ts
+// from libs/pico-js/src/index.ts
 export {
   type Computation,
   createDerivedNode,
@@ -166,7 +166,7 @@ export {
 ### Types
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export type SourceNode<TValue> = {
   readonly kind: 'Source';
   value: TValue;
@@ -207,7 +207,7 @@ export type Computation<TValue> = (reader: DerivedNode<unknown>) => TValue;
 ### Functions
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export function createSourceNode<TValue>(
   value: TValue,
   equals: (previous: TValue, next: TValue) => boolean,
@@ -245,7 +245,7 @@ In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), 
 ### Construction
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export function createSourceNode<TValue>(
   value: TValue,
   equals: (previous: TValue, next: TValue) => boolean,
@@ -271,7 +271,7 @@ export function createDerivedNode<TValue>(
 ### Mark
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
   if (source.equals(source.value, value)) {
     return;
@@ -330,7 +330,7 @@ Marking does not recurse. `markCheck` is a loop over a work list, the worklist c
 ### Pull
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   const precalculated = node.precalculated;
   if (precalculated === MISSING) {
@@ -439,7 +439,7 @@ There are two read functions in place of one `read(reader, node)` that switches 
 ### Dependencies
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 function setDependencies(
   node: DerivedNode<unknown>,
   previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
@@ -478,7 +478,7 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 ### Disposal
 
 ```ts
-// from libs/isograph-pico-js/src/graph.ts
+// from libs/pico-js/src/graph.ts
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   const precalculated = node.precalculated;
   if (precalculated !== MISSING) {
@@ -510,7 +510,7 @@ The derived nodes and the reads between them must form a directed acyclic graph.
 
 ## The package README
 
-`libs/isograph-pico-js/README.md`, as `libs/isograph-disposable-types/README.md` is for its package. Its text:
+`libs/pico-js/README.md`, as `libs/isograph-disposable-types/README.md` is for its package. Its text:
 
 ````markdown
 # @isograph/pico-js
@@ -741,7 +741,7 @@ Top-level files:
 ### Test files
 
 ```text
-libs/isograph-pico-js/test/
+libs/pico-js/test/
   recompute.test.ts      ports of chains, reuse, cutoff; marking and short circuit; pull order; diamond
   dependencies.test.ts   recorded order, branch changes, repeated reads, absence as a value, untracked reads
   errors.test.ts         a throwing computation leaves the graph's state unchanged
@@ -755,7 +755,7 @@ Every test file imports from `../src`, which is `src/index.ts`.
 ### `recompute.test.ts`
 
 ```ts
-// from libs/isograph-pico-js/test/recompute.test.ts
+// from libs/pico-js/test/recompute.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1134,7 +1134,7 @@ A test whose comment says "setup as in" repeats that test's setup lines in the f
 ### `dependencies.test.ts`
 
 ```ts
-// from libs/isograph-pico-js/test/dependencies.test.ts
+// from libs/pico-js/test/dependencies.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1349,7 +1349,7 @@ describe('recorded dependencies', () => {
 A computation must not throw (Throws). The one test asserts the non-corruption guarantee, observed through values and call counts after the throw; it asserts nothing about the node that threw.
 
 ```ts
-// from libs/isograph-pico-js/test/errors.test.ts
+// from libs/pico-js/test/errors.test.ts
 import { expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1397,7 +1397,7 @@ The `3` write recomputes both nodes, which asserts that the throwing run left `s
 ### `disposal.test.ts`
 
 ```ts
-// from libs/isograph-pico-js/test/disposal.test.ts
+// from libs/pico-js/test/disposal.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1507,7 +1507,7 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 ### `degenerate.test.ts`
 
 ```ts
-// from libs/isograph-pico-js/test/degenerate.test.ts
+// from libs/pico-js/test/degenerate.test.ts
 import { describe, expect, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1695,7 +1695,7 @@ describe('degenerate cases', () => {
 ### `graph.test-d.ts`
 
 ```ts
-// from libs/isograph-pico-js/test/graph.test-d.ts
+// from libs/pico-js/test/graph.test-d.ts
 import { expectTypeOf, test } from 'vitest';
 import {
   createDerivedNode,
@@ -1751,10 +1751,10 @@ test('writes and equalities are typed by the node', () => {
 
 ### Location and files
 
-The engine is a workspace library at `libs/isograph-pico-js`, covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s without the Babel plugin, which only the runtime's fixtures need.
+The engine is a workspace library at `libs/pico-js`, covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s without the Babel plugin, which only the runtime's fixtures need.
 
 ```text
-libs/isograph-pico-js/
+libs/pico-js/
   package.json
   README.md                 The package README
   tsconfig.json             references tsconfig.package.json and tsconfig.test.json
@@ -1772,7 +1772,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
 ### `package.json`
 
 ```json
-// from libs/isograph-pico-js/package.json
+// from libs/pico-js/package.json
 {
   "name": "@isograph/pico-js",
   "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
@@ -1798,7 +1798,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
-    "directory": "libs/isograph-pico-js"
+    "directory": "libs/pico-js"
   },
   "sideEffects": false,
   "module": "./dist/index.mjs",
@@ -1819,7 +1819,7 @@ Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `re
 `tsconfig.json`, `tsconfig.package.json`, and `tsdown.config.ts` are the runtime's, byte for byte (`libs/isograph-runtime/tsconfig.json`, `tsconfig.package.json`, `tsdown.config.ts`). The engine compiles under the root `tsconfig.build.json`: `target: ES2022`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
 
 ```json
-// from libs/isograph-pico-js/tsconfig.test.json
+// from libs/pico-js/tsconfig.test.json
 {
   "extends": "../../tsconfig.build.json",
   "compilerOptions": {
@@ -1831,7 +1831,7 @@ Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `re
 ```
 
 ```ts
-// from libs/isograph-pico-js/vitest.config.ts
+// from libs/pico-js/vitest.config.ts
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -1853,13 +1853,13 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
         name: engine test
         entry: pnpm --filter @isograph/pico-js test
         language: system
-        files: '^libs/isograph-pico-js/'
+        files: '^libs/pico-js/'
         pass_filenames: false
       - id: pico-js-typecheck
         name: engine typecheck
         entry: pnpm --filter @isograph/pico-js tsc
         language: system
-        files: '^(libs/isograph-pico-js/|tsconfig\.build\.json$)'
+        files: '^(libs/pico-js/|tsconfig\.build\.json$)'
         pass_filenames: false
 ```
 
@@ -1868,9 +1868,9 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type fi
 ```yaml
 # from .pre-commit-config.yaml
       # runtime-dependencies-build and runtime-typecheck, files:
-        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/isograph-pico-js/|tsconfig\.build\.json$)'
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/pico-js/|tsconfig\.build\.json$)'
       # runtime-test, files:
-        files: '^libs/(isograph-runtime|isograph-disposable-types|isograph-pico-js)/'
+        files: '^libs/(isograph-runtime|isograph-disposable-types|pico-js)/'
 ```
 
 ### CI
@@ -1907,7 +1907,7 @@ pico-runtime.md's open decisions that restate this doc's state the same status: 
 
 ### 1. The package's name (decided)
 
-The package is `@isograph/pico-js` and its directory is `libs/isograph-pico-js` (pico-runtime.md open decision 18). The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`), which the engine ports. The directory follows the mapping of the other library directories, `@isograph/<name>` in `libs/isograph-<name>` (`@isograph/runtime` in `libs/isograph-runtime`, `@isograph/disposable-types` in `libs/isograph-disposable-types`, `@isograph/babel-plugin` in `libs/isograph-babel-plugin`; `@isograph/plugin-swc` in `libs/isograph-swc-plugin` is the one exception). Whether the name is free on the npm registry was not verified, because the registry was not reachable offline.
+The package is `@isograph/pico-js` and its directory is `libs/pico-js` (pico-runtime.md open decision 18). The `-js` suffix keeps the npm name distinct from the Rust crate `pico` (`crates/pico`), which the engine ports. The directory matches the existing `tsconfig.build.json` mapping `"@isograph/*": ["./libs/*"]` (`tsconfig.build.json:22`), which maps `@isograph/pico-js` to `libs/pico-js`. Whether the name is free on the npm registry was not verified, because the registry was not reachable offline.
 
 ### 2. A write during a computation (decided)
 
