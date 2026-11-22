@@ -28,7 +28,7 @@ A derived node holds a computation, an equality, its precalculated value, and th
 - `Check`: a derived node this one read, directly or transitively, is `Dirty`. The stored value may be current.
 - `Dirty`: a source node the last computation read was written, or a derived node it read recomputed to a value its equality rejected.
 
-Every mark holds the last computed value and the dependencies the last computation recorded, in read order. The first pull of a node with no precalculated value computes it and calls no equality.
+Every mark holds the last computed value and the dependencies the last computation recorded: its source dependencies and its derived dependencies, two lists, each in read order. The first pull of a node with no precalculated value computes it and calls no equality.
 
 ### Eager invalidation on write
 
@@ -84,12 +84,12 @@ gate = derived(read x % 2 === 0 ? 'even' : 'odd')
 other = derived(read y * 2)
 node = derived(read gate === 'even' ? read other : 0)
 
-pull node       -> reads gate ('even'), then other (20); node.dependencies = [gate, other]
+pull node       -> reads gate ('even'), then other (20); node.derivedDependencies = [gate, other]
 write x = 3     -> gate Dirty -> node Check
 write y = 11    -> other Dirty -> node already Check -> stop
 pull node: Check
   -> gate: Dirty -> run gate -> 'odd' !== 'even' -> node Dirty; gate was 'even', is 'odd' -> stop the walk
-  -> run node: reads gate ('odd') -> 0; node.dependencies = [gate]
+  -> run node: reads gate ('odd') -> 0; node.derivedDependencies = [gate]
 other is never pulled, and its computation does not run
 ```
 
@@ -139,7 +139,7 @@ A node recomputes at most once per write. After its pull it is `Clean`, and duri
 
 ### Reverse edges, no epochs
 
-Every edge is an object reference, held in both directions: a derived node's dependency list points down, and every node's `dependents` set points up. pico keeps forward edges only and finds nodes by id; it decides staleness with epochs (Comparison with the Rust pico crate). The engine needs no epoch: the mark on a node says whether its value is current, and the reverse edges let a write reach exactly the nodes above it. A write costs the nodes it reaches, and a pull of a `Clean` node is one step no matter how many unrelated writes happened. Both designs return the same values and run the same computations.
+Every edge is an object reference, held in both directions: a derived node's two dependency lists point down, and every node's `dependents` set points up. pico keeps forward edges only and finds nodes by id; it decides staleness with epochs (Comparison with the Rust pico crate). The engine needs no epoch: the mark on a node says whether its value is current, and the reverse edges let a write reach exactly the nodes above it. A write costs the nodes it reaches, and a pull of a `Clean` node is one step no matter how many unrelated writes happened. Both designs return the same values and run the same computations.
 
 ## The public API
 
@@ -183,25 +183,25 @@ export function objectIs<T>(a: T, b: T): boolean {
 ```ts
 // from libs/pico-js/src/graph.ts
 export type SourceNode<TValue> = {
-  readonly kind: 'Source';
   value: TValue;
   equals(previous: TValue, next: TValue): boolean;
   readonly dependents: Set<DerivedNode<unknown>>;
 };
 
 export type DerivedNode<TValue> = {
-  readonly kind: 'Derived';
   readonly computation: Computation<TValue>;
   equals(previous: TValue, next: TValue): boolean;
   precalculated: Option<PrecalculatedValue<TValue>>;
-  reads: (SourceNode<unknown> | DerivedNode<unknown>)[];
+  sourceReads: SourceNode<unknown>[];
+  derivedReads: DerivedNode<unknown>[];
   readonly dependents: Set<DerivedNode<unknown>>;
 };
 
 export type PrecalculatedValue<TValue> = {
   value: TValue;
   status: Status;
-  dependencies: (SourceNode<unknown> | DerivedNode<unknown>)[];
+  sourceDependencies: SourceNode<unknown>[];
+  derivedDependencies: DerivedNode<unknown>[];
 };
 
 export type Status = 'Clean' | 'Check' | 'Dirty';
@@ -255,7 +255,7 @@ In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), 
 
 ## The implementation
 
-`graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`, reads or writes its `dependents`, `precalculated`, or `reads`, or calls an unexported function.
+`graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`, reads or writes its `dependents`, `precalculated`, `sourceReads`, or `derivedReads`, or calls an unexported function.
 
 ### Construction
 
@@ -265,7 +265,7 @@ export function createSourceNode<TValue>(
   value: TValue,
   equals: (previous: TValue, next: TValue) => boolean,
 ): SourceNode<TValue> {
-  return { kind: 'Source', value, equals, dependents: new Set() };
+  return { value, equals, dependents: new Set() };
 }
 
 export function createDerivedNode<TValue>(
@@ -273,11 +273,11 @@ export function createDerivedNode<TValue>(
   equals: (previous: TValue, next: TValue) => boolean,
 ): DerivedNode<TValue> {
   return {
-    kind: 'Derived',
     computation,
     equals,
     precalculated: MISSING,
-    reads: [],
+    sourceReads: [],
+    derivedReads: [],
     dependents: new Set(),
   };
 }
@@ -362,16 +362,14 @@ function verify<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
 ): TValue {
-  for (const dependency of precalculated.dependencies) {
-    if (dependency.kind === 'Derived') {
-      const before = dependency.precalculated;
-      if (before === MISSING) {
-        return update(node, precalculated);
-      }
-      const previousValue = before.value;
-      if (!Object.is(pull(dependency), previousValue)) {
-        return update(node, precalculated);
-      }
+  for (const dependency of precalculated.derivedDependencies) {
+    const before = dependency.precalculated;
+    if (before === MISSING) {
+      return update(node, precalculated);
+    }
+    const previousValue = before.value;
+    if (!Object.is(pull(dependency), previousValue)) {
+      return update(node, precalculated);
     }
   }
   precalculated.status = 'Clean';
@@ -381,10 +379,13 @@ function verify<TValue>(
 function update<TValue>(node: DerivedNode<TValue>, precalculated: Option<PrecalculatedValue<TValue>>): TValue {
   const value = compute(node);
   if (precalculated === MISSING) {
-    const dependencies = node.reads;
-    setDependencies(node, NO_DEPENDENCIES, dependencies);
-    node.reads = [];
-    node.precalculated = { value, status: 'Clean', dependencies };
+    const sourceDependencies = node.sourceReads;
+    const derivedDependencies = node.derivedReads;
+    setDependencies(node, NO_DEPENDENCIES, sourceDependencies);
+    setDependencies(node, NO_DEPENDENCIES, derivedDependencies);
+    node.sourceReads = [];
+    node.derivedReads = [];
+    node.precalculated = { value, status: 'Clean', sourceDependencies, derivedDependencies };
     return value;
   }
   commitReads(node, precalculated);
@@ -399,27 +400,32 @@ function update<TValue>(node: DerivedNode<TValue>, precalculated: Option<Precalc
 }
 
 function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: PrecalculatedValue<TValue>): void {
-  const previous = precalculated.dependencies;
-  setDependencies(node, previous, node.reads);
-  precalculated.dependencies = node.reads;
-  node.reads = previous;
+  const previousSources = precalculated.sourceDependencies;
+  setDependencies(node, previousSources, node.sourceReads);
+  precalculated.sourceDependencies = node.sourceReads;
+  node.sourceReads = previousSources;
+  const previousDerived = precalculated.derivedDependencies;
+  setDependencies(node, previousDerived, node.derivedReads);
+  precalculated.derivedDependencies = node.derivedReads;
+  node.derivedReads = previousDerived;
 }
 
 const NO_DEPENDENCIES: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>> = [];
 
 function compute<TValue>(node: DerivedNode<TValue>): TValue {
-  node.reads.length = 0;
+  node.sourceReads.length = 0;
+  node.derivedReads.length = 0;
   return node.computation(node);
 }
 
 export function readSource<TValue>(consumer: DerivedNode<unknown>, source: SourceNode<TValue>): TValue {
-  consumer.reads.push(source);
+  consumer.sourceReads.push(source);
   return source.value;
 }
 
 export function readDerived<TValue>(consumer: DerivedNode<unknown>, node: DerivedNode<TValue>): TValue {
   const value = pull(node);
-  consumer.reads.push(node);
+  consumer.derivedReads.push(node);
   return value;
 }
 ```
@@ -428,19 +434,19 @@ export function readDerived<TValue>(consumer: DerivedNode<unknown>, node: Derive
 
 A computation receives the derived node being computed, its consumer, and `compute` passes it with no cast. Consumer is the established term for the node whose computation records a read: the TC39 signal-polyfill (`src/graph.ts`, from Angular signals) tracks it as `activeConsumer` and records a read in `producerAccessed`. The first argument of `readSource` and `readDerived` is the node whose computation is running, and a computation passes only the node it received, only while it runs. The engine does not check this contract (decision 2). A read through the node after the computation returned pushes into a buffer the next `compute` clears, so the read is lost. A read that passes another node records the dependency on that other node.
 
-There are two read functions in place of one `read(consumer, node)` that switches on `node.kind`: every caller knows statically whether it reads a source or a derived node, and a switch would test again what the caller's type already established, at a comparison per read.
+There are two read functions in place of one `read(consumer, node)`: every caller knows statically whether it reads a source or a derived node, so `readSource` pushes onto the consumer's `sourceReads` and `readDerived` onto its `derivedReads`, and no node carries a `kind` field for the engine to test. `verify` walks only `derivedDependencies`, in the order the computation read derived nodes; the order between a source read and a derived read is not recorded, because verification never checks a source.
 
 - `pull` is the only function that brings a derived node up to date. A node never computed goes to `update` with `MISSING`; otherwise `pull` switches on the mark, and a `Dirty` node goes to `update` with its `PrecalculatedValue`. `update` is the one function that runs a computation and stores its result; Reactively names its function for both runs `update`. With `MISSING` there is no previous value, so it calls no `equals` and allocates the `PrecalculatedValue`; otherwise it commits the reads and compares with `equals`. `verify` and `update` return the node's value, so a pull allocates no result object. `update` tests `MISSING` once more after `pull` has tested it, one comparison per computation; marking, verification, and reads pay nothing for the merge.
-- `verify` reads a dependency's value before it pulls the dependency and compares it with the value the pull returns, by `Object.is`. It reads `before.value` into `previousValue` before the pull because `update` writes the new value into the same `PrecalculatedValue`. It returns `update` at the first derived dependency whose value is not `Object.is` its previous value. This relies on `update` keeping the previous value object whenever `equals` accepts, so a dependency whose `equals` accepted returns the identical value. When `equals` rejects a value that is `Object.is` the previous one (`tripleEquals` on `NaN`), `verify` also treats the dependency as unchanged; the two values are indistinguishable, so the verified node's value is the value its computation would return. The comparison is `Object.is` in place of `!==` because `0 === -0` while a reader can tell them apart: under `objectIs`, a dependency that recomputes from `0` to `-0` is rejected by `equals`, and `!==` would leave its reader `Clean` over `0`. A dependency that holds `MISSING` makes the node recompute; marking never reaches a `Check` node over a disposed dependency, because disposal marks its dependents `Dirty`, but the type does not exclude it. A source dependency is not pulled and changes no mark. `update` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency returned its previous value and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
-- `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
-- `update` on a computed node calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
+- `verify` reads a dependency's value before it pulls the dependency and compares it with the value the pull returns, by `Object.is`. It reads `before.value` into `previousValue` before the pull because `update` writes the new value into the same `PrecalculatedValue`. It returns `update` at the first derived dependency whose value is not `Object.is` its previous value. This relies on `update` keeping the previous value object whenever `equals` accepts, so a dependency whose `equals` accepted returns the identical value. When `equals` rejects a value that is `Object.is` the previous one (`tripleEquals` on `NaN`), `verify` also treats the dependency as unchanged; the two values are indistinguishable, so the verified node's value is the value its computation would return. The comparison is `Object.is` in place of `!==` because `0 === -0` while a reader can tell them apart: under `objectIs`, a dependency that recomputes from `0` to `-0` is rejected by `equals`, and `!==` would leave its reader `Clean` over `0`. A dependency that holds `MISSING` makes the node recompute; marking never reaches a `Check` node over a disposed dependency, because disposal marks its dependents `Dirty`, but the type does not exclude it. Source dependencies are not walked. `update` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency returned its previous value and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
+- `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no `derivedDependencies` list holds a node whose pull threw.
+- `update` on a computed node calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency lists, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
 - `update` with `MISSING` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `update` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `update`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `update` computes for the first time is therefore `Dirty`, and `markDependentsDirty` on `Dirty` nodes changes nothing.
 - A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull calls `update` with `MISSING`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
-- A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The consumer). A throw out of the computation leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and the first `update` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `(SourceNode<unknown> | DerivedNode<unknown>)[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A node's source dependency list (`PrecalculatedValue.sourceDependencies`) and `node.sourceReads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. `derivedDependencies` and `derivedReads` are a second pair, swapped the same way. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The consumer). A throw out of the computation leaves the reads buffers partly filled and the state untouched; the next `compute` clears them. `createDerivedNode` allocates the first pair of reads buffers and the first `update` the next pair, two arrays per node creation and two per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `SourceNode<unknown>[]` and `DerivedNode<unknown>[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous; a read through its node after it returned breaks the contract (The consumer).
 - The consumer is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state. No state names the running computation, so `compute` saves and restores nothing and a throw out of a computation leaves nothing to reset.
 
-`pull`, `verify`, `update`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `update` path (`readDerived`, `pull`, `update`, `compute`, the computation) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the caller (open decision 12): the derived nodes below any node a caller pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
+`pull`, `verify`, `update`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `update` path (`readDerived`, `pull`, `update`, `compute`, the computation) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the caller (open decision 12): the derived nodes below any node a caller pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and one of its dependency lists then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
 ### Dependencies
 
@@ -469,7 +475,7 @@ function setDependencies(
 }
 ```
 
-A dependency list holds the nodes themselves, and each node carries its own `kind`, one field per node and nothing per edge, so `readSource` and `readDerived` allocate nothing per read: each pushes the node it read. A computation is a pure function of what it reads, so a recomputation over unchanged inputs reads the same nodes in the same order. `setDependencies` checks that case first: `n` pointer comparisons, no `Set` operation, and no allocation, and it is correct with duplicate entries, because equal lists name the same edges. A patch that keeps a common prefix and rewrites the tail would be wrong with duplicates unless each edge carried a count, and a hash-based diff of the two lists is not faster than removing and re-adding: it still costs at least two hash operations per kept dependency and allocates a set. Otherwise, removing every old edge and then adding every new one is `O(old + new)`. The loops are `for` loops in place of `forEach`, which allocated a closure per call over `node`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
+A dependency list holds the nodes themselves, so `readSource` and `readDerived` allocate nothing per read: each pushes the node it read onto its own list. A computation is a pure function of what it reads, so a recomputation over unchanged inputs reads the same sources in the same order and the same derived nodes in the same order. `setDependencies` receives one list pair at a time, and `commitReads` calls it once for the source lists and once for the derived lists. Its parameters are `ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>`, because it touches only `dependents`, which both node types have. It checks the unchanged case first: `n` pointer comparisons, no `Set` operation, and no allocation, and it is correct with duplicate entries, because equal lists name the same edges. A patch that keeps a common prefix and rewrites the tail would be wrong with duplicates unless each edge carried a count, and a hash-based diff of the two lists is not faster than removing and re-adding: it still costs at least two hash operations per kept dependency and allocates a set. Otherwise, removing every old edge and then adding every new one is `O(old + new)`. The loops are `for` loops in place of `forEach`, which allocated a closure per call over `node`. Removal runs first, so a dependency in both lists ends present, and a dependency read twice is one member of its set. A violation of "the `dependents` sets are the inverse of the dependency lists" is a silently stale result, which one writer guards.
 
 The dependency list keeps a node read twice as two entries. pico drops a read equal to the last one recorded (`TrackedDependencies::push`, `crates/pico/src/dependency.rs:33-41`). The engine does not: `Set.add` makes the edge idempotent, and the second verify step on that node finds it `Clean` and returns at once, so dropping repeats would cost a comparison per read to save a step that costs one.
 
@@ -482,16 +488,17 @@ Reactively reuses the unchanged prefix of the previous source list (`CurrentGets
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   const precalculated = node.precalculated;
   if (precalculated !== MISSING) {
-    setDependencies(node, precalculated.dependencies, NO_DEPENDENCIES);
+    setDependencies(node, precalculated.sourceDependencies, NO_DEPENDENCIES);
+    setDependencies(node, precalculated.derivedDependencies, NO_DEPENDENCIES);
     node.precalculated = MISSING;
   }
   markDependentsDirty(node.dependents);
 }
 ```
 
-- The node leaves the `dependents` set of everything it read, so no later write reaches it, and its `PrecalculatedValue`, which held its dependency list, is dropped, so it lists no dependency that does not list it back.
+- The node leaves the `dependents` set of everything it read, so no later write reaches it, and its `PrecalculatedValue`, which held its dependency lists, is dropped, so it lists no dependency that does not list it back.
 - Its precalculated value becomes `MISSING`, so the engine holds no reference to the value, and its next pull calls `update` with `MISSING`.
-- Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their dependency lists still name the disposed node, and `node.dependents` still names them, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes them from `node.dependents`.
+- Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their `derivedDependencies` lists still name the disposed node, and `node.dependents` still names them, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes them from `node.dependents`.
 - Disposing a node that was never computed or was already disposed changes nothing but marking its dependents, of which a never-computed node has none.
 
 Without `MISSING`, a `Clean` node disposed by `setDependencies` and marking alone would keep its value while no source lists it, so a later pull would return its old value forever.
@@ -596,9 +603,9 @@ Two pulls with no write between them run nothing the second time. A pull of a `C
 
 ### How dependencies are recorded
 
-`compute` clears the node's `reads` buffer and passes the node itself to the computation. `readSource(consumer, source)` appends the source node to the reading node's `reads` and returns its value. `readDerived(consumer, node)` pulls `node`, appends it, and returns its value. The list is in read order and keeps repeats.
+`compute` clears the node's `sourceReads` and `derivedReads` buffers and passes the node itself to the computation. `readSource(consumer, source)` appends the source node to the reading node's `sourceReads` and returns its value. `readDerived(consumer, node)` pulls `node`, appends it to `derivedReads`, and returns its value. Each list is in read order and keeps repeats.
 
-When the computation returns, `update` replaces the node's dependency list with the new one and moves the reverse edges with `setDependencies`. The new list replaces the old one even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
+When the computation returns, `update` replaces the node's two dependency lists with the new ones and moves the reverse edges with `setDependencies`. The new lists replace the old ones even when the value came back equal. A read that a branch skips is not a dependency: a node that stopped reading `a` is not marked by a write of `a`.
 
 Only `readSource` and `readDerived` record. A computation that reads a source as `source.value`, or a derived node through `pull`, records nothing: both are untracked reads, allowed inside a computation (decision 10). pico has the same hole and the same rule: `MemoRef::lookup` reads without recording and `lookup_tracked` records (`crates/pico/src/memo_ref.rs:57`, `:80`; pico.md, Memo).
 
@@ -1839,7 +1846,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.precalculated`, `DerivedNode.reads`, and the fields of `PrecalculatedValue`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and `reads`, which the engine reuses as buffers (Pull). The engine has no class (decision 7), so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.precalculated`, `DerivedNode.sourceReads`, `DerivedNode.derivedReads`, and the fields of `PrecalculatedValue`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and the reads buffers, which the engine reuses as buffers (Pull). The engine has no class (decision 7), so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 
@@ -1935,7 +1942,7 @@ The engine has no default equality. `createDerivedNode` and `createSourceNode` r
 
 ### 7. Whether a caller can write a node's fields (decided)
 
-pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. A caller that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node.
+pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. A caller that writes `dependents`, `precalculated`, `sourceReads`, or `derivedReads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node.
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
