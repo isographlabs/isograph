@@ -10,11 +10,11 @@ The package is `@isograph/pico-js` in `libs/pico-js` (decision 1, decided; pico-
 
 The engine is a graph of values. A source node holds a value that code outside the graph sets. A derived node holds the value of a computation over source nodes and other derived nodes. The engine records which nodes each computation read, marks the derived nodes above a written source, and recomputes a derived node only when it is read and one of these holds: it was never computed, it was disposed, a source it read was written to a value that source's equality rejected, or a derived node it read recomputed to a value that node's equality rejected. A source written to a new value and then written back to the old one before a pull still makes its direct readers recompute once; each of them computes the old value, its equality accepts it, and nothing above it recomputes.
 
-The engine imports nothing. It names no store, record, link, key, reader AST, entity, resolver, or other Isograph type. A project with values of its own types uses it with no Isograph code. The Isograph runtime is one consumer: its server values are source nodes and its resolver results are derived nodes (pico-runtime.md, The engine and the Isograph runtime). This doc describes the engine alone.
+The engine imports nothing. It names no store, record, link, key, reader AST, entity, resolver, or other Isograph type. A project with values of its own types uses it with no Isograph code. The Isograph runtime is one caller: its server values are source nodes and its resolver results are derived nodes (pico-runtime.md, The engine and the Isograph runtime). This doc describes the engine alone.
 
 The engine's public behavior is pico's: which values a read returns, which computations run again after a write, cutoff by equality, and dependencies recorded per computation and replaced after every computation. Its invalidation differs from pico's. pico stamps sources with epochs and verifies a demanded memo by walking its dependencies. The engine keeps reverse edges and marks the nodes above a write eagerly, then recomputes lazily on a read (Comparison with the Rust pico crate).
 
-The engine gives up no performance to prevent misuse. Misuse is a documented contract: the engine runs no check to catch a consumer that breaks one, and a broken contract leaves values silently stale or the engine's state unguaranteed. pico rejects a write during a computation and takes the database as a parameter of every call; the engine has neither the check nor a database object (decision 2).
+The engine gives up no performance to prevent misuse. Misuse is a documented contract: the engine runs no check to catch a caller that breaks one, and a broken contract leaves values silently stale or the engine's state unguaranteed. pico rejects a write during a computation and takes the database as a parameter of every call; the engine has neither the check nor a database object (decision 2).
 
 ## The model
 
@@ -175,7 +175,7 @@ export function objectIs<T>(a: T, b: T): boolean {
 }
 ```
 
-`PrecalculatedValue` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
+`PrecalculatedValue` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no caller names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a caller can read and write (decision 7, decided).
 
 ### Types
 
@@ -250,7 +250,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(node: DerivedNode<unknown>): void;
 ```
 
-In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, tripleEquals)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, tripleEquals)` as each node's equality, with `===` as its default output equality. Outside Isograph: the caller's own code, as in The package README.
 
 ## The implementation
 
@@ -448,7 +448,7 @@ There are two read functions in place of one `read(reader, node)` that switches 
 - A computation is synchronous; a read through its node after it returned breaks the contract (The reader).
 - The reader is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state.
 
-`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the consumer (open decision 12): the derived nodes below any node a consumer pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
+`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the caller (open decision 12): the derived nodes below any node a caller pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
 ### Dependencies
 
@@ -587,21 +587,21 @@ The README's rules restate the engine's behavior under the option the body is wr
 
 ## The design
 
-This section is the engine's counterpart of `docs-website/docs/design-docs/pico.md`. It describes what each part is and why, for an agent working inside the engine or on a consumer of it.
+This section is the engine's counterpart of `docs-website/docs/design-docs/pico.md`. It describes what each part is and why, for an agent working inside the engine or on code that calls it.
 
 ### Sources
 
-A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
+A source node is an input fact: a value the graph does not compute. The caller creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A caller that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
-A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine has no default equality, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
+A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine has no default equality, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a caller that changed the value object in place or whose source went away.
 
 Code outside a computation reads a source as `source.value`, which records nothing. A computation reads it with `readSource(reader, source)`, passing the node it received.
 
-A source is not collected by the engine. It lives as long as the consumer and the dependency lists of its readers hold it.
+A source is not collected by the engine. It lives as long as the caller and the dependency lists of its readers hold it.
 
 ### Derived nodes
 
-A derived node is a computation, an equality, a state, and a set of dependents. The consumer creates it with `createDerivedNode(computation, equals)` and holds the returned object. The object is the node's identity. A consumer that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
+A derived node is a computation, an equality, a state, and a set of dependents. The caller creates it with `createDerivedNode(computation, equals)` and holds the returned object. The object is the node's identity. A caller that wants one node per key (pico's memo arguments) keeps its own map from key to node; the engine has no memo table. The Isograph runtime's record containers are such a map.
 
 The computation receives its own node (The reader) and returns the value. It must be a pure function of what it reads with `readSource` and `readDerived`: no clock, no network, no read through a closure. It must be synchronous, because the dependency list is final when the computation returns; the engine does not check it (decision 2). A computation runs only during a pull: first on the first pull that reaches the node, and again on a pull that finds it `Dirty`. It never runs during a write.
 
@@ -625,13 +625,13 @@ The walk stops at the first changed dependency because the recomputation that fo
 
 `equals(previous, next)` decides whether the nodes above a recomputed node recompute. When it accepts, the node keeps the previous value object, so a reader comparing by identity sees no change, and its dependents stay as marked: a `Check` dependent then verifies to `Clean` without running. When it rejects, the node stores the new value and marks its dependents `Dirty`.
 
-An equality may answer equal only when no reader can tell the two values apart. An equality that answers equal for distinguishable values makes readers keep a stale value. An equality that answers unequal for indistinguishable values costs recomputation, never a wrong value. The engine has no comparison of its own; the caller supplies every equality (decision 6). A consumer whose computation builds a new object on each run supplies a structural comparator, or the nodes above it recompute on every change below.
+An equality may answer equal only when no reader can tell the two values apart. An equality that answers equal for distinguishable values makes readers keep a stale value. An equality that answers unequal for indistinguishable values costs recomputation, never a wrong value. The engine has no comparison of its own; the caller supplies every equality (decision 6). A caller whose computation builds a new object on each run supplies a structural comparator, or the nodes above it recompute on every change below.
 
 pico's equivalent is backdating: an equal recomputation keeps the old `time_updated` (pico.md, Equality and backdating).
 
 ### Disposal
 
-`disposeDerivedNode(node)` is the only way a derived node leaves the graph. It detaches the node from what it read, resets it to never computed, and marks its dependents `Dirty` (Disposal). The engine does not decide when to dispose: there is no reachability walk, no LRU, and no reference count in the engine's first implementation. The consumer disposes a node when it drops the key that held it. The Isograph runtime needs this: without disposal, after `deleteRecord` the old derived node recomputes, attaches to the source nodes of the new `Absent` container, and stays referenced and marked, and when it recomputes to an equal value a reader keeps it while `resolverNodeAt` creates a second node for the same key. Disposal removes its edges, resets it to `MISSING`, and marks its readers `Dirty`, so their recomputation reads the new node. pico collects instead (`run_garbage_collection`, `crates/pico/src/database.rs:169`), keeping the last 10,000 top-level calls and what they reach (pico.md, Garbage collection); a collection policy for the engine is pico-runtime.md's Later: collecting derived nodes.
+`disposeDerivedNode(node)` is the only way a derived node leaves the graph. It detaches the node from what it read, resets it to never computed, and marks its dependents `Dirty` (Disposal). The engine does not decide when to dispose: there is no reachability walk, no LRU, and no reference count in the engine's first implementation. The caller disposes a node when it drops the key that held it. The Isograph runtime needs this: without disposal, after `deleteRecord` the old derived node recomputes, attaches to the source nodes of the new `Absent` container, and stays referenced and marked, and when it recomputes to an equal value a reader keeps it while `resolverNodeAt` creates a second node for the same key. Disposal removes its edges, resets it to `MISSING`, and marks its readers `Dirty`, so their recomputation reads the new node. pico collects instead (`run_garbage_collection`, `crates/pico/src/database.rs:169`), keeping the last 10,000 top-level calls and what they reach (pico.md, Garbage collection); a collection policy for the engine is pico-runtime.md's Later: collecting derived nodes.
 
 A derived node with no dependencies is computed once and stays `Clean` under every write, because no source lists it. A `Check` dependent's verify pulls it in one step. Only disposal changes it, which marks its dependents `Dirty`; its next pull computes it again. In the Isograph runtime, a refinement such as `asPet` is a derived node of this kind.
 
@@ -664,7 +664,7 @@ Invalidation differs:
 - pico keeps forward edges only, as ids into storage; the engine keeps object references in both directions.
 - pico checks source dependencies during verification; the engine does not, because a changed source already marked its readers `Dirty`.
 - pico's `set` compares the new source value with the old one and does not advance the epoch when they are equal (`database.rs:321`). The engine's `writeSource` compares by the source's `equals` and marks nothing when they are equal (decision 8).
-- pico finds a memo by its function and arguments, interned as `DerivedNodeId`; the engine has no keys, and the consumer holds node objects.
+- pico finds a memo by its function and arguments, interned as `DerivedNodeId`; the engine has no keys, and the caller holds node objects.
 - pico has one equality per type (`PartialEq` through `DynEq`); the engine has one per node.
 - pico removes a source by key, and a later `get` of its id panics (`removing_params.rs`); the engine has no removal, and a source object cannot dangle.
 - pico collects derived nodes by LRU and reachability; the engine disposes on request.
@@ -726,7 +726,7 @@ Top-level files:
 
 `absent_source`:
 
-- `missing_key.rs:57` `missing_then_set_reruns`: ports as `dependencies.test.ts` "a source that holds the consumer's absence value". Delta: pico reads an absent key; the engine's source holds a sentinel the test defines, because an engine source always holds a value.
+- `missing_key.rs:57` `missing_then_set_reruns`: ports as `dependencies.test.ts` "a source that holds the caller's absence value". Delta: pico reads an absent key; the engine's source holds a sentinel the test defines, because an engine source always holds a value.
 - `missing_key.rs:78` `missing_and_still_missing_across_epochs_does_not_rerun`: does not port. It pins that an absent key's dependency stays at the initial epoch across unrelated epochs; there is no epoch and no absent key.
 - `missing_key.rs:100` `unrelated_set_does_not_rerun_reader_of_missing_key`: does not port. It pins keyed absence (`OtherConfig` versus `Config`); what is left is "a write to another source runs nothing", the port of `unrelated_source_changes`.
 - `missing_key.rs:133` `set_reruns_only_readers_of_that_key`: does not port, for the same reason; the remainder is the ports of `basic` and `unrelated_source_changes`.
@@ -734,7 +734,7 @@ Top-level files:
 - `missing_key.rs:192` `parent_of_missing_reader_reruns`: does not port. It pins that an absent key's dependency propagates to a parent memo; with absence as a value, the remainder is the port of `multi_function_chain`.
 - `missing_key.rs:212` `read_outside_a_memo_then_set`: ports as "source.value outside a computation, then a reader created after the write".
 - `missing_key.rs:233` `read_outside_a_memo_after_absent_node_exists`: ports as "source.value outside a computation leaves the readers' dependency".
-- `remove.rs:52` `present_then_removed_reruns_and_returns_none`, `:77` `removed_then_set_reruns`, `:102` `removed_and_still_removed_does_not_rerun`, `:128` `remove_of_missing_key_does_not_rerun`, `:145` `remove_of_never_read_key_then_read`: do not port. They pin `remove_singleton`'s epoch rules (a remove of a present key advances the epoch, a remove of an absent key does not). The engine has no removal; a consumer writes its absence value, which is a write like any other (the ports of `basic` and `overriding_same_source`).
+- `remove.rs:52` `present_then_removed_reruns_and_returns_none`, `:77` `removed_then_set_reruns`, `:102` `removed_and_still_removed_does_not_rerun`, `:128` `remove_of_missing_key_does_not_rerun`, `:145` `remove_of_never_read_key_then_read`: do not port. They pin `remove_singleton`'s epoch rules (a remove of a present key advances the epoch, a remove of an absent key does not). The engine has no removal; a caller writes its absence value, which is a write like any other (the ports of `basic` and `overriding_same_source`).
 - `try_get.rs:43` `set_of_never_set_key_reruns_reader`, `:64` `unrelated_set_does_not_rerun_reader_of_never_set_key`, `:83` `id_for_key_matches_the_id_set_returns`: do not port. They pin `try_get` of a never-set key and `id_for_key`; the engine has no keys.
 - `garbage_collection.rs:46` `collected_reader_of_missing_key_sees_set`: ports as `disposal.test.ts` "a disposed node recomputes on its next pull and sees writes made after disposal". Delta: pico's LRU collects the reader; the test disposes it.
 - `garbage_collection.rs:72` `retained_reader_of_missing_key_sees_set`, `:97` `remove_after_collection`: do not port. They pin that an LRU-retained reader keeps its dependency through `run_garbage_collection`; the engine has no collection, and a node not disposed keeps its edges (every other test).
@@ -750,7 +750,7 @@ Top-level files:
 `tracking_field`:
 
 - `correctness.rs:17` `tracking_field_correctness`: ports as `dependencies.test.ts` "source.value inside a computation records nothing". Delta: pico's untracked iteration of a `#[tracked]` map becomes a read of `source.value` inside a computation, which is the engine's untracked read (decision 10), and pico's tracked iteration becomes `readSource`.
-- `efficiency.rs:23` `untracked_efficiency`, `:57` `tracked_inefficiency`: do not port. They pin the `#[tracked]` counter's granularity (a tracked read depends on the whole map); the engine has no tracked map, and a consumer that wants per-key granularity holds one source per key, which the port of `unrelated_source_changes` covers.
+- `efficiency.rs:23` `untracked_efficiency`, `:57` `tracked_inefficiency`: do not port. They pin the `#[tracked]` counter's granularity (a tracked read depends on the whole map); the engine has no tracked map, and a caller that wants per-key granularity holds one source per key, which the port of `unrelated_source_changes` covers.
 - `never_written.rs:54` `iteration_before_first_write_then_insert_reruns`, `:79` `untracked_miss_then_tracked_then_insert_reruns`, `:91` `first_tracked_write_writes_counter_zero`: do not port. They pin the tracked counter's never-written singleton; the engine has neither.
 
 ### Test files
@@ -1250,7 +1250,7 @@ describe('recorded dependencies', () => {
   });
 
   // crates/pico/tests/absent_source/missing_key.rs:57
-  test('a source that holds the consumer’s absence value', () => {
+  test('a source that holds the caller’s absence value', () => {
     const calls = { name: 0 };
     const config = createSourceNode<string | typeof MISSING>(MISSING, tripleEquals);
     const name = createDerivedNode((reader) => {
@@ -1908,7 +1908,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - Disposal resets the node to never computed (Disposal, open decision 9).
 - A computation and an equality must not throw, and for a computation's throw the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
-- Pull depth is a contract on the consumer; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
+- Pull depth is a contract on the caller; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
 - The engine has no default equality; `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, tripleEquals)` to each resolver node.
 - A read of `source.value` or a `pull` inside a computation is an untracked read (decision 10).
 
@@ -1939,16 +1939,16 @@ pico-runtime.md open decision 19, restated.
 Decided by the user: (a).
 
 - (a) No alias: a link is written `DerivedNode<unknown>`, `SourceNode<unknown>`, or `SourceNode<unknown> | DerivedNode<unknown>` at each use, and `equals` is a method signature so that `DerivedNode<T>` is assignable to `DerivedNode<unknown>`. tsc 5.6 under `strict` accepts pushing a `DerivedNode<number>` into a dependency array, adding one to a `Set<DerivedNode<unknown>>`, and passing one as `reader`, and rejects all three when `equals` is a function-typed property. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as DerivedNode<unknown>).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
-- (b) One value type per graph. Cost: a consumer whose nodes have different value types declares a union and narrows every `readDerived` result.
+- (b) One value type per graph. Cost: a caller whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 
 ### 6. The engine's identity equality (decided)
 
 The engine has no default equality. `createDerivedNode` and `createSourceNode` require `equals`, with no optional parameter and no default. The package exports two comparisons, `tripleEquals` (`===`) and `objectIs` (`Object.is`), which a caller passes explicitly; a shared function avoids allocating a closure per node creation. `tripleEquals` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equals` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equals` decides cutoff.
 
-### 7. Whether a consumer can write a node's fields (decided)
+### 7. Whether a caller can write a node's fields (decided)
 
-pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. A consumer that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node.
+pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain objects of plain object types, and the engine has no class. A caller that writes `dependents`, `precalculated`, or `reads` breaks the contract silently, and the engine does not check it (decision 2). This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals`, which needs decision 5 (c) or a cast per link, and opaque node types cost a cast in every engine function that receives a node.
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
@@ -1958,7 +1958,7 @@ Writing an equal value does not propagate. A source takes a required equality, a
 
 A disposal that leaves the node's state as it was is not an option: a `Clean` node pulled after it returns its old value although no source lists it (Disposal). pico removes a collected memo's revision, and the next call of the memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`).
 
-- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. This doc's body describes it. This option is held. Reason: pico's behavior. Cost: a consumer that pulls a node it disposed gets a working node again instead of an error.
+- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges. This doc's body describes it. This option is held. Reason: pico's behavior. Cost: a caller that pulls a node it disposed gets a working node again instead of an error.
 - (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
 
 ### 10. An untracked read inside a computation (decided)
@@ -1971,4 +1971,4 @@ The package ships alone, as its own change (pico-runtime.md core change 4), with
 
 ### 12. Pull depth (decided)
 
-Pull depth is a contract on the consumer. `pull`, `verify`, `recompute`, and `compute` recurse once per level of derived nodes below the pulled node, so a graph's pull depth must stay well below the host's call stack limit, an estimated 2,000 derived levels (about five frames per level; an estimate, not a measurement) in Node 24 with its default stack (Pull). Marking is iterative and never overflows (Mark). A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its state: at the limit, a node's edges may be partly moved by `setDependencies` (Throws). The engine has no iterative pull. In the Isograph runtime, pull depth is bounded by client field nesting.
+Pull depth is a contract on the caller. `pull`, `verify`, `recompute`, and `compute` recurse once per level of derived nodes below the pulled node, so a graph's pull depth must stay well below the host's call stack limit, an estimated 2,000 derived levels (about five frames per level; an estimate, not a measurement) in Node 24 with its default stack (Pull). Marking is iterative and never overflows (Mark). A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its state: at the limit, a node's edges may be partly moved by `setDependencies` (Throws). The engine has no iterative pull. In the Isograph runtime, pull depth is bounded by client field nesting.

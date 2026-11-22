@@ -84,7 +84,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - Equality defaults. The engine has none: every node's `equals` is a constructor argument (pico-js.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
 - One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (pico-js.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
 - Throws. A computation must not throw (pico-js.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching every throw of the resolver into `ResolverThrew` (Stored resolver results, open decision 30).
-- Field visibility. Nodes are plain objects, and a consumer outside this repo can write a node's fields (open decision 21, decided).
+- Field visibility. Nodes are plain objects, and a caller outside this repo can write a node's fields (open decision 21, decided).
 - Construction. `sourceNodeAt` calls `createSourceNode` and `resolverNodeAt` calls `createDerivedNode`, so the Isograph runtime builds no engine object by hand.
 
 ### The engine package and the runtime
@@ -1906,9 +1906,9 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 
 Decided by the user: the engine has no default equality and exports two comparisons, `tripleEquals` (`===`) and `objectIs` (`Object.is`), which a caller passes explicitly; `equals` is a required argument of `createDerivedNode` and of `createSourceNode` (`refactors/pending/runtime/pico-js.md` open decision 6). The Isograph layer does not depend on an engine default: every resolver node passes `resolverResultsEqual(artifact, outputEqual)`, whose `outputEqual` is `===` (`tripleEquals`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source node passes `isUnchanged(key)` (The store).
 
-### 21. Whether a consumer can write a node's fields (decided)
+### 21. Whether a caller can write a node's fields (decided)
 
-`refactors/pending/runtime/pico-js.md` open decision 7. Decided by the user: (a), nodes are plain objects and the engine has no class. `SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every consumer of the package. A consumer that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (pico-js.md, Dependencies), and the result is a silently stale value; the engine does not check it (open decision 2). The computation's `Context` is opaque (pico-js.md, The context).
+`refactors/pending/runtime/pico-js.md` open decision 7. Decided by the user: (a), nodes are plain objects and the engine has no class. `SourceNode` and `DerivedNode` are plain object types, and their fields are visible to every caller of the package. A caller that writes `dependents` breaks the rule that the `dependents` sets are the inverse of the dependency lists (pico-js.md, Dependencies), and the result is a silently stale value; the engine does not check it (open decision 2). The computation's `Context` is opaque (pico-js.md, The context).
 
 This deviates from AGENTS.md's "Never rely on discipline what we can enforce with newtypes" for the node types. Reason: classes with ES private fields make `DerivedNode<number>` not assignable to `DerivedNode<unknown>` through a private `#equals` (checked with this repo's `tsc` 5.6.3), which needs open decision 19 (c) or a cast at each link, and opaque node types cost a cast in every engine function that receives a node.
 
@@ -1925,7 +1925,7 @@ This deviates from AGENTS.md's "Never rely on discipline what we can enforce wit
 
 `refactors/pending/runtime/pico-js.md` open decision 9.
 
-- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges (pico-js.md, Disposal). This option is held. Reason: pico's behavior; the next call of a collected memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`). Cost: a consumer that pulls a node it disposed gets a working node again instead of an error. In the Isograph runtime no code pulls a node after `deleteRecord` disposed it: the node is removed from its container's `derived`, and the next read creates a new node.
+- (a) Disposal resets the node to never computed; a later pull computes it from scratch and reattaches its edges (pico-js.md, Disposal). This option is held. Reason: pico's behavior; the next call of a collected memo computes it again (`crates/pico/tests/absent_source/garbage_collection.rs:46`). Cost: a caller that pulls a node it disposed gets a working node again instead of an error. In the Isograph runtime no code pulls a node after `deleteRecord` disposed it: the node is removed from its container's `derived`, and the next read creates a new node.
 - (b) A fourth state, `Disposed`; `pull` throws on it, and so does a dependent's recomputation that reads it. Cost: every `switch` on the mark gains a case, and a dependent marked `Dirty` by the disposal throws on its next pull when its computation still reads the node.
 
 ### 25. An untracked read inside a computation (decided)
