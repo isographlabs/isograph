@@ -292,55 +292,46 @@ export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): 
     return;
   }
   source.value = value;
-  markDirty(source.dependents);
+  markDependentsDirty(source.dependents);
 }
 
 export function markSourceDirty(source: SourceNode<unknown>): void {
-  markDirty(source.dependents);
+  markDependentsDirty(source.dependents);
 }
 
-function markDirty(nodes: ReadonlySet<DerivedNode<unknown>>): void {
-  const work: DerivedNode<unknown>[] = [];
-  const push = (dependent: DerivedNode<unknown>): void => {
-    work.push(dependent);
-  };
-  nodes.forEach((node) => {
-    if (markOneDirty(node) === 'Clean') {
-      node.dependents.forEach(push);
-    }
-  });
-  markCheck(work);
-}
-
-function markOneDirty(node: DerivedNode<unknown>): Option<Status> {
-  const precalculated = node.precalculated;
-  if (precalculated === MISSING) {
-    return MISSING;
-  }
-  const status = precalculated.status;
-  precalculated.status = 'Dirty';
-  return status;
-}
-
-function markCheck(work: DerivedNode<unknown>[]): void {
-  const push = (dependent: DerivedNode<unknown>): void => {
-    work.push(dependent);
-  };
-  let node = work.pop();
-  while (node !== undefined) {
+function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
+  const stack: Array<DerivedNode<unknown>> = [];
+  for (const node of dependents) {
     const precalculated = node.precalculated;
-    if (precalculated !== MISSING && precalculated.status === 'Clean') {
-      precalculated.status = 'Check';
-      node.dependents.forEach(push);
+    if (precalculated === MISSING) {
+      continue;
     }
-    node = work.pop();
+    if (precalculated.status === 'Clean') {
+      for (const dependent of node.dependents) {
+        stack.push(dependent);
+      }
+    }
+    precalculated.status = 'Dirty';
+  }
+  let node: DerivedNode<unknown> | undefined;
+  while ((node = stack.pop()) !== undefined) {
+    const precalculated = node.precalculated;
+    if (precalculated === MISSING || precalculated.status !== 'Clean') {
+      continue;
+    }
+    precalculated.status = 'Check';
+    for (const dependent of node.dependents) {
+      stack.push(dependent);
+    }
   }
 }
 ```
 
-`markDirty` and `markCheck` never add or remove an element of a `dependents` set, so each iterates the sets directly while it marks. A write allocates one work array and three closures per `markDirty` call, and nothing per marked node: no copy of a `dependents` set, no array per node from `markOneDirty`, and no closure per node in `markCheck`.
+`markDependentsDirty` receives the `dependents` set of the written source, the recomputed node, or the disposed node. Its first loop marks each of those direct dependents `Dirty` whatever its mark, because its own input changed, and pushes the dependents of each one that was `Clean`. Its second loop pops the stack and marks each `Clean` node `Check` and pushes its dependents; a node that is not `Clean` is skipped, because by the invariant its dependents are already marked. `writeSource` and `markSourceDirty` call it with `source.dependents`, and `update` and `disposeDerivedNode` with `node.dependents`.
 
-Marking does not recurse. `markCheck` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive `markCheck` would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `work` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
+`markDependentsDirty` never adds or removes an element of a `dependents` set, so it iterates the sets directly while it marks. Both loops are `for...of` and `while` with no callback, so a write allocates one stack array and no closure. Each `for...of` over a `Set` creates a `Set` iterator object unless the compiler elides it; nothing else is allocated per marked node, and no `dependents` set is copied.
+
+Marking does not recurse. The second loop of `markDependentsDirty` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive marking would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `stack` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
 
 ### Pull
 
@@ -403,7 +394,7 @@ function update<TValue>(node: DerivedNode<TValue>, precalculated: Option<Precalc
   }
   precalculated.value = value;
   precalculated.status = 'Clean';
-  markDirty(node.dependents);
+  markDependentsDirty(node.dependents);
   return value;
 }
 
@@ -443,7 +434,7 @@ There are two read functions in place of one `read(consumer, node)` that switche
 - `verify` reads a dependency's value before it pulls the dependency and compares it with the value the pull returns, by `Object.is`. It reads `before.value` into `previousValue` before the pull because `update` writes the new value into the same `PrecalculatedValue`. It returns `update` at the first derived dependency whose value is not `Object.is` its previous value. This relies on `update` keeping the previous value object whenever `equals` accepts, so a dependency whose `equals` accepted returns the identical value. When `equals` rejects a value that is `Object.is` the previous one (`tripleEquals` on `NaN`), `verify` also treats the dependency as unchanged; the two values are indistinguishable, so the verified node's value is the value its computation would return. The comparison is `Object.is` in place of `!==` because `0 === -0` while a reader can tell them apart: under `objectIs`, a dependency that recomputes from `0` to `-0` is rejected by `equals`, and `!==` would leave its reader `Clean` over `0`. A dependency that holds `MISSING` makes the node recompute; marking never reaches a `Check` node over a disposed dependency, because disposal marks its dependents `Dirty`, but the type does not exclude it. A source dependency is not pulled and changes no mark. `update` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency returned its previous value and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `update` on a computed node calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
-- `update` with `MISSING` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `update` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `update`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `update` computes for the first time is therefore `Dirty`, and `markDirty` on `Dirty` nodes changes nothing.
+- `update` with `MISSING` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `update` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `update`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `update` computes for the first time is therefore `Dirty`, and `markDependentsDirty` on `Dirty` nodes changes nothing.
 - A node that was never computed or was disposed holds `MISSING` in place of a `PrecalculatedValue`, so its value cannot be read without first ruling `MISSING` out. Its first pull calls `update` with `MISSING`, which calls no `equals`. Marking never reaches such a node, because a node in a `dependents` set was computed. The `PrecalculatedValue` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
 - A node's dependency list (`PrecalculatedValue.dependencies`) and `node.reads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The consumer). A throw out of the computation leaves `node.reads` partly filled and the state untouched; the next `compute` clears it. `createDerivedNode` allocates the first `reads` buffer and the first `update` the next, one array per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `(SourceNode<unknown> | DerivedNode<unknown>)[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous; a read through its node after it returned breaks the contract (The consumer).
@@ -500,7 +491,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
     setDependencies(node, precalculated.dependencies, NO_DEPENDENCIES);
     node.precalculated = MISSING;
   }
-  markDirty(node.dependents);
+  markDependentsDirty(node.dependents);
 }
 ```
 
@@ -1905,7 +1896,7 @@ AGENTS.md says we do not have anything we do not use, and tests-only is not a re
 pico-runtime.md holds no copy of the engine. It references this doc by section for every engine type, function body, test, and package file, and it specifies only the Isograph layer and the calls that layer makes into the engine (pico-runtime.md, The engine). Its core change 4 implements this doc. The engine behaviors pico-runtime.md relies on are this doc's body:
 
 - The engine has no write-during-computation check and no graph object; a computation or an equality that writes breaks the contract and leaves values silently stale (Writes during a computation, decision 2). pico-runtime.md's `callResolver` catches every throw of a resolver into `ResolverThrew` (pico-runtime.md open decision 30).
-- Marking walks a work list: `markDirty` over a set, `markOneDirty`, and `markCheck` (Mark).
+- Marking marks the direct dependents `Dirty` in one loop and walks a work list for the transitive ones, in `markDependentsDirty` (Mark).
 - A computation is synchronous, and the node it receives is used only as the first argument of `readSource` and `readDerived` while it runs; any other use breaks the contract, and the engine does not check it (The consumer, decision 2).
 - Disposal resets the node to never computed (Disposal, open decision 9).
 - A computation and an equality must not throw, and for a computation's throw the engine guarantees only that its own state is not corrupted (Throws, decision 3).
