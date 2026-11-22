@@ -255,7 +255,7 @@ In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), 
 
 ## The implementation
 
-`graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`, reads or writes its `dependents`, `precalculated`, `sourceReads`, or `derivedReads`, or calls an unexported function.
+`graph.ts` is the whole engine. Every function below is in it. Code outside `graph.ts` reads a source's `value` for an untracked read (decision 10). No code outside `graph.ts` writes a node's `value`; no code outside `graph.ts` other than `recompute.test.ts`, which reads `precalculated.status` to assert marks, reads or writes its `dependents`, `precalculated`, `sourceReads`, or `derivedReads`, or calls an unexported function.
 
 ### Construction
 
@@ -307,31 +307,29 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
       continue;
     }
     if (precalculated.status === 'Clean') {
-      for (const dependent of node.dependents) {
-        stack.push(dependent);
-      }
+      stack.push(node);
     }
     precalculated.status = 'Dirty';
   }
   let node: DerivedNode<unknown> | undefined;
   while ((node = stack.pop()) !== undefined) {
-    const precalculated = node.precalculated;
-    if (precalculated === MISSING || precalculated.status !== 'Clean') {
-      continue;
-    }
-    precalculated.status = 'Check';
     for (const dependent of node.dependents) {
+      const precalculated = dependent.precalculated;
+      if (precalculated === MISSING || precalculated.status !== 'Clean') {
+        continue;
+      }
+      precalculated.status = 'Check';
       stack.push(dependent);
     }
   }
 }
 ```
 
-`markDependentsDirty` receives the `dependents` set of the written source, the recomputed node, or the disposed node. Its first loop marks each of those direct dependents `Dirty` whatever its mark, because its own input changed, and pushes the dependents of each one that was `Clean`. Its second loop pops the stack and marks each `Clean` node `Check` and pushes its dependents; a node that is not `Clean` is skipped, because by the invariant its dependents are already marked. `writeSource` and `markSourceDirty` call it with `source.dependents`, and `update` and `disposeDerivedNode` with `node.dependents`.
+`markDependentsDirty` receives the `dependents` set of the written source, the recomputed node, or the disposed node. Its first loop marks each of those direct dependents `Dirty` whatever its mark, because its own input changed, and pushes each one that was `Clean`. Its second loop pops a node and walks its `dependents`: each `Clean` dependent becomes `Check` and is pushed, and a dependent that is not `Clean` is skipped, because by the invariant its own dependents are already marked. The marks are the visited set: a node is pushed only when it leaves `Clean`, so each node is pushed at most once and each `dependents` set is walked at most once per write. `writeSource` and `markSourceDirty` call it with `source.dependents`, and `update` and `disposeDerivedNode` with `node.dependents`.
 
 `markDependentsDirty` never adds or removes an element of a `dependents` set, so it iterates the sets directly while it marks. Both loops are `for...of` and `while` with no callback, so a write allocates one stack array and no closure. Each `for...of` over a `Set` creates a `Set` iterator object unless the compiler elides it; nothing else is allocated per marked node, and no `dependents` set is copied.
 
-Marking does not recurse. The second loop of `markDependentsDirty` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive marking would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `stack` holds at most one entry per `dependents` edge the walk reaches. Each dependent is pushed singly, so no call receives a set's size in arguments.
+Marking does not recurse. The second loop of `markDependentsDirty` is a loop over a work list, the worklist case of AGENTS.md (Iterators), so its stack depth is the same for a chain of ten nodes and a chain of 100,000, and marking runs to completion on a graph of any height. A recursive marking would overflow the call stack on a tall enough chain; the `RangeError` would leave the nodes below the overflow `Check` and the nodes above it `Clean`, a `Clean` dependent of a node that is not `Clean`, and a later write could not repair it, because marking stops at the direct reader, which is already `Dirty`. `stack` holds at most one entry per node that leaves `Clean`. Each dependent is pushed singly, so no call receives a set's size in arguments.
 
 ### Pull
 
@@ -776,6 +774,12 @@ import {
   tripleEquals,
   writeSource,
 } from '../src';
+import type { Status } from '../src/graph';
+
+function statusOf(node: DerivedNode<unknown>): Status | 'Missing' {
+  const precalculated = node.precalculated;
+  return typeof precalculated === 'symbol' ? 'Missing' : precalculated.status;
+}
 
 describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/basic.rs:14
@@ -1064,7 +1068,7 @@ describe('marking and the short circuit', () => {
     expect(calls).toEqual({ clamped: 2, doubled: 1, label: 1 });
   });
 
-  test('a diamond computes each node once per write', () => {
+  test('a diamond marks both readers Dirty and the bottom Check, and computes each node once per write', () => {
     const calls = { left: 0, right: 0, bottom: 0 };
     const count = createSourceNode(1, tripleEquals);
     const left = createDerivedNode((consumer) => {
@@ -1082,13 +1086,14 @@ describe('marking and the short circuit', () => {
     expect(pull(bottom)).toBe(4);
 
     writeSource(count, 2);
+    expect([statusOf(left), statusOf(right), statusOf(bottom)]).toEqual(['Dirty', 'Dirty', 'Check']);
     expect(pull(bottom)).toBe(7);
     expect(pull(left)).toBe(3);
     expect(pull(right)).toBe(4);
     expect(calls).toEqual({ left: 2, right: 2, bottom: 2 });
   });
 
-  test('marking a chain of 100,000 nodes completes', () => {
+  test('marking a chain of 100,000 nodes marks the reader Dirty and every node above it Check', () => {
     const count = createSourceNode(0, tripleEquals);
     const chain: ReadonlyArray<DerivedNode<number>> = Array.from({ length: 100_000 }, (_, index) =>
       createDerivedNode((consumer) => {
@@ -1099,6 +1104,7 @@ describe('marking and the short circuit', () => {
     expect(chain.map((node) => pull(node)).at(-1)).toBe(99_999);
 
     expect(() => writeSource(count, 1)).not.toThrow();
+    expect(chain.map(statusOf)).toEqual(chain.map((_, index) => (index === 0 ? 'Dirty' : 'Check')));
     expect(chain.map((node) => pull(node)).at(-1)).toBe(100_000);
   });
 
