@@ -61,7 +61,7 @@ Engine (`libs/pico-js/src/graph.ts` and `libs/pico-js/src/equality.ts`), as pico
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction: `createSourceNode`, `createDerivedNode`.
 - Mark: `writeSource`, `markSourceDirty`, `markDirty`, `markOneDirty`, `markCheck`.
-- Pull: `pull`, `refresh`, `refreshPrecalculated`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The consumer).
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The consumer).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
 - Equality (`equality.ts`): `tripleEquals`, `objectIs`.
