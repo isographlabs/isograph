@@ -159,6 +159,20 @@ export {
   type SourceNode,
   writeSource,
 } from './graph';
+export { objectIs, tripleEquals } from './equality';
+```
+
+The engine has no default equality: `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). The package exports two comparisons that a caller passes explicitly (decision 6).
+
+```ts
+// from libs/pico-js/src/equality.ts
+export function tripleEquals<T>(a: T, b: T): boolean {
+  return a === b;
+}
+
+export function objectIs<T>(a: T, b: T): boolean {
+  return Object.is(a, b);
+}
 ```
 
 `PrecalculatedValue` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no consumer names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a consumer can read and write (decision 7, decided).
@@ -236,7 +250,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue;
 export function disposeDerivedNode(node: DerivedNode<unknown>): void;
 ```
 
-In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, identical)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
+In the Isograph runtime (pico-runtime.md, The engine and the Isograph runtime), the callers are `createSourceNode` in `store.ts`, which reads `source.value` for an untracked read; `writeSource` in `normalize.ts` and `test/fixtures.ts`; `markSourceDirty` and `disposeDerivedNode` in `deleteRecord`; `createDerivedNode`, `pull`, `readSource`, and `readDerived` in `storedResults.ts`, which passes `resolverResultsEqual(artifact, tripleEquals)` as each node's equality, with `===` as its default output equality. Outside Isograph: the consumer's own code, as in The package README.
 
 ## The implementation
 
@@ -528,23 +542,24 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '@isograph/pico-js';
 
-const price = createSourceNode(100, (a, b) => a === b);
-const quantity = createSourceNode(3, (a, b) => a === b);
+const price = createSourceNode(100, tripleEquals);
+const quantity = createSourceNode(3, tripleEquals);
 
 const total = createDerivedNode(
   (reader) => readSource(reader, price) * readSource(reader, quantity),
-  (a, b) => a === b,
+  tripleEquals,
 );
 const isLargeOrder = createDerivedNode(
   (reader) => readDerived(reader, total) >= 1000,
-  (a, b) => a === b,
+  tripleEquals,
 );
 const banner = createDerivedNode(
   (reader) => (readDerived(reader, isLargeOrder) ? 'Free shipping' : ''),
-  (a, b) => a === b,
+  tripleEquals,
 );
 
 pull(banner); // '' (runs total, isLargeOrder, banner)
@@ -560,7 +575,7 @@ pull(banner); // 'Free shipping' (runs all three)
 - The `reader` is the node being computed. A computation reads no field of it and passes it only to `readSource` and `readDerived`, and only while it runs. The engine does not check this: a read through a reader after its computation returned, such as a read after an `await`, is lost, and the node does not recompute when that value changes.
 - A computation is a pure function of what it reads. It does not write a source or dispose a node. The engine does not check this: a write inside a computation can leave the computing node holding a value computed from an input that changed during its run, and every later pull returns that stale value with no error. A read of `source.value` or a `pull` inside a computation is an untracked read: it returns the value and records no dependency.
 - An equality, of a source or of a derived node, does not write a source or dispose a node either. The engine does not check this, and a violation leaves values stale in the same way.
-- Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `(a, b) => a === b` for identity, or your own comparator for values you build fresh on each run.
+- Each derived node has an equality. When a recomputed value is equal to the previous one, the node keeps the previous value object and the nodes above it do not recompute. The engine has no default: pass `tripleEquals` for `===`, `objectIs` for `Object.is`, or your own comparator for values you build fresh on each run.
 - Each source node has an equality too. A `writeSource` of a value equal to the stored one stores nothing and marks nothing. `markSourceDirty` marks a source whose value object you changed in place.
 - A computation and an equality must not throw. A throw is a programmer error. A computation's throw propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
@@ -578,7 +593,7 @@ This section is the engine's counterpart of `docs-website/docs/design-docs/pico.
 
 A source node is an input fact: a value the graph does not compute. The consumer creates it with `createSourceNode(value, equals)` and holds the returned object. The object is the source's identity. There is no key, no lookup by key, and no absent source: a source exists from creation and always holds a value. A consumer that needs "not set yet" stores a value of its own that says so (`undefined`, a sentinel symbol, or a tagged union), and readers depend on that value like any other. The Isograph runtime's `MISSING` is such a value.
 
-A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine defines no equality of its own, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
+A source is written with `writeSource(source, value)`. The write compares the stored value with the new one by the source's `equals`. When `equals` accepts, the write stores nothing and marks nothing; when it rejects, the write sets the value and marks (decision 8). The engine has no default equality, for sources as for derived nodes (decision 6). `markSourceDirty(source)` marks without setting, for a consumer that changed the value object in place or whose source went away.
 
 Code outside a computation reads a source as `source.value`, which records nothing. A computation reads it with `readSource(reader, source)`, passing the node it received.
 
@@ -764,20 +779,19 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
-
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/basic.rs:14
   test('a derived node recomputes after its source is written', () => {
     const calls = { firstLetter: 0 };
-    const input = createSourceNode('asdf', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
     const firstLetter = createDerivedNode((reader) => {
       calls.firstLetter += 1;
       return readSource(reader, input).charAt(0);
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(firstLetter)).toBe('a');
     expect(calls.firstLetter).toBe(1);
@@ -790,15 +804,15 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/basic_multi_function_chain.rs:21
   test('a chain recomputes every node whose input changed', () => {
     const calls = { firstLetter: 0, capitalized: 0 };
-    const input = createSourceNode('asdf', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
     const firstLetter = createDerivedNode((reader) => {
       calls.firstLetter += 1;
       return readSource(reader, input).charAt(0);
-    }, strictEqual);
+    }, tripleEquals);
     const capitalized = createDerivedNode((reader) => {
       calls.capitalized += 1;
       return readDerived(reader, firstLetter).toUpperCase();
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(capitalized)).toBe('A');
     expect(calls).toEqual({ firstLetter: 1, capitalized: 1 });
@@ -837,15 +851,15 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/partial_reuse_single_chain.rs:15
   test('a node pulled before its reader is not computed again for the reader', () => {
     const calls = { firstLetter: 0, exclaimed: 0 };
-    const input = createSourceNode('asdf', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
     const firstLetter = createDerivedNode((reader) => {
       calls.firstLetter += 1;
       return readSource(reader, input).charAt(0);
-    }, strictEqual);
+    }, tripleEquals);
     const exclaimed = createDerivedNode((reader) => {
       calls.exclaimed += 1;
       return `${readDerived(reader, firstLetter)}!`;
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(firstLetter)).toBe('a');
     expect(calls).toEqual({ firstLetter: 1, exclaimed: 0 });
@@ -859,7 +873,7 @@ describe('ported from crates/pico/tests', () => {
     const questioned = createDerivedNode((reader) => {
       calls.questioned += 1;
       return `${readDerived(reader, firstLetter)}?`;
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(exclaimed)).toBe('a!');
     expect(pull(questioned)).toBe('a?');
@@ -869,20 +883,20 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/side_chain.rs:16
   test('a dependency with no inputs is not computed again when its reader recomputes', () => {
     const calls = { firstLetter: 0, capitalized: 0, unchanged: 0 };
-    const input = createSourceNode('asdf', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
     const firstLetter = createDerivedNode((reader) => {
       calls.firstLetter += 1;
       return readSource(reader, input).charAt(0);
-    }, strictEqual);
+    }, tripleEquals);
     const unchanged = createDerivedNode(() => {
       calls.unchanged += 1;
       return 'this node is computed once';
-    }, strictEqual);
+    }, tripleEquals);
     const capitalized = createDerivedNode((reader) => {
       calls.capitalized += 1;
       readDerived(reader, unchanged);
       return readDerived(reader, firstLetter).toUpperCase();
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(capitalized)).toBe('A');
     expect(calls).toEqual({ firstLetter: 1, capitalized: 1, unchanged: 1 });
@@ -897,12 +911,12 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/unrelated_source_change.rs:14
   test('a write to another source runs nothing', () => {
     const calls = { firstLetter: 0 };
-    const input = createSourceNode('asdf', strictEqual);
-    const other = createSourceNode('isograph', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
+    const other = createSourceNode('isograph', tripleEquals);
     const firstLetter = createDerivedNode((reader) => {
       calls.firstLetter += 1;
       return readSource(reader, input).charAt(0);
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(firstLetter)).toBe('a');
     writeSource(other, 'pico');
@@ -913,7 +927,7 @@ describe('ported from crates/pico/tests', () => {
   // crates/pico/tests/return_value_not_cloned.rs:14
   test('a pull returns the stored value object', () => {
     const calls = { letter: 0 };
-    const input = createSourceNode('asdf', strictEqual);
+    const input = createSourceNode('asdf', tripleEquals);
     const letter = createDerivedNode(
       (reader) => {
         calls.letter += 1;
@@ -954,7 +968,7 @@ describe('ported from crates/pico/tests', () => {
           bestBook: 'A monetary history of the United States',
         },
       ],
-      strictEqual,
+      tripleEquals,
     );
     const keynes = createDerivedNode(
       (reader) =>
@@ -966,7 +980,7 @@ describe('ported from crates/pico/tests', () => {
     const bestBook = createDerivedNode((reader) => {
       calls.bestBook += 1;
       return readDerived(reader, keynes)?.bestBook;
-    }, strictEqual);
+    }, tripleEquals);
 
     expect(pull(bestBook)).toBe('General theory');
 
@@ -993,15 +1007,15 @@ describe('ported from crates/pico/tests', () => {
 describe('marking and the short circuit', () => {
   test('a write runs no computation', () => {
     const calls = { doubled: 0, label: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const doubled = createDerivedNode((reader) => {
       calls.doubled += 1;
       return readSource(reader, count) * 2;
-    }, strictEqual);
+    }, tripleEquals);
     const label = createDerivedNode((reader) => {
       calls.label += 1;
       return `${readDerived(reader, doubled)}`;
-    }, strictEqual);
+    }, tripleEquals);
     pull(label);
 
     writeSource(count, 2);
@@ -1014,15 +1028,15 @@ describe('marking and the short circuit', () => {
 
   test('a direct reader of a written source recomputes; a reader above it recomputes only when that value changed', () => {
     const calls = { parity: 0, label: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const parity = createDerivedNode((reader) => {
       calls.parity += 1;
       return readSource(reader, count) % 2 === 0 ? 'even' : 'odd';
-    }, strictEqual);
+    }, tripleEquals);
     const label = createDerivedNode((reader) => {
       calls.label += 1;
       return `the count is ${readDerived(reader, parity)}`;
-    }, strictEqual);
+    }, tripleEquals);
     const first = pull(label);
 
     writeSource(count, 3);
@@ -1036,19 +1050,19 @@ describe('marking and the short circuit', () => {
 
   test('the short circuit holds through every level above the node that came back equal', () => {
     const calls = { clamped: 0, doubled: 0, label: 0 };
-    const count = createSourceNode(20, strictEqual);
+    const count = createSourceNode(20, tripleEquals);
     const clamped = createDerivedNode((reader) => {
       calls.clamped += 1;
       return Math.min(readSource(reader, count), 10);
-    }, strictEqual);
+    }, tripleEquals);
     const doubled = createDerivedNode((reader) => {
       calls.doubled += 1;
       return readDerived(reader, clamped) * 2;
-    }, strictEqual);
+    }, tripleEquals);
     const label = createDerivedNode((reader) => {
       calls.label += 1;
       return `${readDerived(reader, doubled)}`;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(label)).toBe('20');
 
     writeSource(count, 30);
@@ -1058,19 +1072,19 @@ describe('marking and the short circuit', () => {
 
   test('a diamond computes each node once per write', () => {
     const calls = { left: 0, right: 0, bottom: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const left = createDerivedNode((reader) => {
       calls.left += 1;
       return readSource(reader, count) + 1;
-    }, strictEqual);
+    }, tripleEquals);
     const right = createDerivedNode((reader) => {
       calls.right += 1;
       return readSource(reader, count) * 2;
-    }, strictEqual);
+    }, tripleEquals);
     const bottom = createDerivedNode((reader) => {
       calls.bottom += 1;
       return readDerived(reader, left) + readDerived(reader, right);
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(bottom)).toBe(4);
 
     writeSource(count, 2);
@@ -1081,12 +1095,12 @@ describe('marking and the short circuit', () => {
   });
 
   test('marking a chain of 100,000 nodes completes', () => {
-    const count = createSourceNode(0, strictEqual);
+    const count = createSourceNode(0, tripleEquals);
     const chain: ReadonlyArray<DerivedNode<number>> = Array.from({ length: 100_000 }, (_, index) =>
       createDerivedNode((reader) => {
         const below = chain[index - 1];
         return below === undefined ? readSource(reader, count) : readDerived(reader, below) + 1;
-      }, strictEqual),
+      }, tripleEquals),
     );
     expect(chain.map((node) => pull(node)).at(-1)).toBe(99_999);
 
@@ -1097,20 +1111,20 @@ describe('marking and the short circuit', () => {
   test('top-level pull order changes neither values nor what runs', () => {
     const build = () => {
       const calls = { sum: 0, parity: 0, label: 0 };
-      const a = createSourceNode(1, strictEqual);
-      const b = createSourceNode(2, strictEqual);
+      const a = createSourceNode(1, tripleEquals);
+      const b = createSourceNode(2, tripleEquals);
       const sum = createDerivedNode((reader) => {
         calls.sum += 1;
         return readSource(reader, a) + readSource(reader, b);
-      }, strictEqual);
+      }, tripleEquals);
       const parity = createDerivedNode((reader) => {
         calls.parity += 1;
         return readDerived(reader, sum) % 2 === 0 ? 'even' : 'odd';
-      }, strictEqual);
+      }, tripleEquals);
       const label = createDerivedNode((reader) => {
         calls.label += 1;
         return `the sum is ${readDerived(reader, parity)}`;
-      }, strictEqual);
+      }, tripleEquals);
       pull(label);
       writeSource(a, 3);
       return { calls, sum, label };
@@ -1142,30 +1156,29 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
-
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 const MISSING: unique symbol = Symbol('missing');
 
 describe('recorded dependencies', () => {
   test('verification stops at the first dependency that changed, in recorded order', () => {
     const calls = { gate: 0, other: 0, node: 0 };
-    const x = createSourceNode(2, strictEqual);
-    const y = createSourceNode(10, strictEqual);
+    const x = createSourceNode(2, tripleEquals);
+    const y = createSourceNode(10, tripleEquals);
     const gate = createDerivedNode((reader) => {
       calls.gate += 1;
       return readSource(reader, x) % 2 === 0 ? 'even' : 'odd';
-    }, strictEqual);
+    }, tripleEquals);
     const other = createDerivedNode((reader) => {
       calls.other += 1;
       return readSource(reader, y) * 2;
-    }, strictEqual);
+    }, tripleEquals);
     const node = createDerivedNode((reader) => {
       calls.node += 1;
       return readDerived(reader, gate) === 'even' ? readDerived(reader, other) : 0;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(node)).toBe(20);
 
     writeSource(x, 3);
@@ -1179,13 +1192,13 @@ describe('recorded dependencies', () => {
 
   test('a branch change replaces the dependencies', () => {
     const calls = { pick: 0 };
-    const useA = createSourceNode(true, strictEqual);
-    const a = createSourceNode(1, strictEqual);
-    const b = createSourceNode(2, strictEqual);
+    const useA = createSourceNode(true, tripleEquals);
+    const a = createSourceNode(1, tripleEquals);
+    const b = createSourceNode(2, tripleEquals);
     const pick = createDerivedNode((reader) => {
       calls.pick += 1;
       return readSource(reader, useA) ? readSource(reader, a) : readSource(reader, b);
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(pick)).toBe(1);
 
     writeSource(useA, false);
@@ -1203,15 +1216,15 @@ describe('recorded dependencies', () => {
 
   test('a derived node read twice is computed once per write', () => {
     const calls = { inner: 0, outer: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const inner = createDerivedNode((reader) => {
       calls.inner += 1;
       return readSource(reader, count) * 2;
-    }, strictEqual);
+    }, tripleEquals);
     const outer = createDerivedNode((reader) => {
       calls.outer += 1;
       return readDerived(reader, inner) + readDerived(reader, inner);
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(outer)).toBe(4);
 
     writeSource(count, 2);
@@ -1222,11 +1235,11 @@ describe('recorded dependencies', () => {
   // crates/pico/tests/absent_source/missing_key.rs:164
   test('a computation that reads one source twice', () => {
     const calls = { twice: 0 };
-    const config = createSourceNode('a', strictEqual);
+    const config = createSourceNode('a', tripleEquals);
     const twice = createDerivedNode((reader) => {
       calls.twice += 1;
       return `${readSource(reader, config)}${readSource(reader, config)}`;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(twice)).toBe('aa');
 
     writeSource(config, 'b');
@@ -1239,12 +1252,12 @@ describe('recorded dependencies', () => {
   // crates/pico/tests/absent_source/missing_key.rs:57
   test('a source that holds the consumer’s absence value', () => {
     const calls = { name: 0 };
-    const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
+    const config = createSourceNode<string | typeof MISSING>(MISSING, tripleEquals);
     const name = createDerivedNode((reader) => {
       calls.name += 1;
       const value = readSource(reader, config);
       return value === MISSING ? null : value;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(name)).toBe(null);
 
     writeSource(config, 'a');
@@ -1255,7 +1268,7 @@ describe('recorded dependencies', () => {
   // crates/pico/tests/absent_source/missing_key.rs:212
   test('source.value outside a computation, then a reader created after the write', () => {
     const calls = { name: 0 };
-    const config = createSourceNode<string | typeof MISSING>(MISSING, strictEqual);
+    const config = createSourceNode<string | typeof MISSING>(MISSING, tripleEquals);
     expect(config.value).toBe(MISSING);
 
     writeSource(config, 'a');
@@ -1263,7 +1276,7 @@ describe('recorded dependencies', () => {
       calls.name += 1;
       const value = readSource(reader, config);
       return value === MISSING ? null : value;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(name)).toBe('a');
     expect(calls.name).toBe(1);
     expect(config.value).toBe('a');
@@ -1282,11 +1295,11 @@ describe('recorded dependencies', () => {
 
   // crates/pico/tests/tracking_field/correctness.rs:17
   test('source.value inside a computation records nothing', () => {
-    const items = createSourceNode<ReadonlyArray<string>>(['asdf'], strictEqual);
-    const untrackedCount = createDerivedNode(() => items.value.length, strictEqual);
+    const items = createSourceNode<ReadonlyArray<string>>(['asdf'], tripleEquals);
+    const untrackedCount = createDerivedNode(() => items.value.length, tripleEquals);
     const trackedCount = createDerivedNode(
       (reader) => readSource(reader, items).length,
-      strictEqual,
+      tripleEquals,
     );
     expect(pull(untrackedCount)).toBe(1);
 
@@ -1300,15 +1313,15 @@ describe('recorded dependencies', () => {
 
   test('a recompute that reads the same nodes keeps its edges', () => {
     const calls = { node: 0 };
-    const trigger = createSourceNode(0, strictEqual);
-    const useA = createSourceNode(true, strictEqual);
-    const a = createSourceNode(1, strictEqual);
-    const b = createSourceNode(10, strictEqual);
+    const trigger = createSourceNode(0, tripleEquals);
+    const useA = createSourceNode(true, tripleEquals);
+    const a = createSourceNode(1, tripleEquals);
+    const b = createSourceNode(10, tripleEquals);
     const node = createDerivedNode((reader) => {
       calls.node += 1;
       readSource(reader, trigger);
       return readSource(reader, useA) ? readSource(reader, a) : readSource(reader, b);
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(node)).toBe(1);
 
     writeSource(trigger, 1);
@@ -1328,12 +1341,12 @@ describe('recorded dependencies', () => {
 
   test('pull inside a computation records nothing', () => {
     const calls = { outer: 0 };
-    const count = createSourceNode(1, strictEqual);
-    const doubled = createDerivedNode((reader) => readSource(reader, count) * 2, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
+    const doubled = createDerivedNode((reader) => readSource(reader, count) * 2, tripleEquals);
     const outer = createDerivedNode(() => {
       calls.outer += 1;
       return pull(doubled);
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(outer)).toBe(2);
 
     writeSource(count, 2);
@@ -1357,14 +1370,13 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
 
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
-
 test('a throwing computation leaves the graph state unchanged', () => {
   const calls = { scaled: 0, parent: 0 };
-  const count = createSourceNode(1, strictEqual);
+  const count = createSourceNode(1, tripleEquals);
   const scaled = createDerivedNode((reader) => {
     calls.scaled += 1;
     const value = readSource(reader, count);
@@ -1372,11 +1384,11 @@ test('a throwing computation leaves the graph state unchanged', () => {
       throw new Error('negative');
     }
     return value * 10;
-  }, strictEqual);
+  }, tripleEquals);
   const parent = createDerivedNode((reader) => {
     calls.parent += 1;
     return `${readDerived(reader, scaled)}`;
-  }, strictEqual);
+  }, tripleEquals);
   expect(pull(parent)).toBe('10');
 
   writeSource(count, -1);
@@ -1406,15 +1418,14 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
-
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('disposeDerivedNode (open decision 9 (a))', () => {
   test('the first pull, and the first pull after disposal, call no equals', () => {
     const calls = { equals: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const node = createDerivedNode(
       (reader) => readSource(reader, count),
       (previous, next) => {
@@ -1436,15 +1447,15 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
   test('marks the dependents Dirty, and their next pull recomputes the disposed node', () => {
     const calls = { scaled: 0, parent: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const scaled = createDerivedNode((reader) => {
       calls.scaled += 1;
       return readSource(reader, count) * 10;
-    }, strictEqual);
+    }, tripleEquals);
     const parent = createDerivedNode((reader) => {
       calls.parent += 1;
       return `${readDerived(reader, scaled)}`;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(parent)).toBe('10');
 
     disposeDerivedNode(scaled);
@@ -1466,13 +1477,13 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
   test('a dependent that stops reading a disposed node is detached from it', () => {
     const calls = { scaled: 0, parent: 0 };
-    const count = createSourceNode(1, strictEqual);
-    const useScaled = createSourceNode(true, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
+    const useScaled = createSourceNode(true, tripleEquals);
     // scaled is the node above.
     const parent = createDerivedNode((reader) => {
       calls.parent += 1;
       return readSource(reader, useScaled) ? readDerived(reader, scaled) : 0;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(parent)).toBe(10);
 
     disposeDerivedNode(scaled);
@@ -1489,11 +1500,11 @@ describe('disposeDerivedNode (open decision 9 (a))', () => {
 
   test('disposing a never-computed node, or a node twice, changes nothing else', () => {
     const calls = { node: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const node = createDerivedNode((reader) => {
       calls.node += 1;
       return readSource(reader, count);
-    }, strictEqual);
+    }, tripleEquals);
 
     disposeDerivedNode(node);
     disposeDerivedNode(node);
@@ -1514,30 +1525,30 @@ import {
   createSourceNode,
   disposeDerivedNode,
   markSourceDirty,
+  objectIs,
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
-
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
 
 describe('degenerate cases', () => {
   test('a derived node with no dependencies is computed once, never marked, and changed only by disposal', () => {
     const calls = { constant: 0, parity: 0, reader: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const constant = createDerivedNode(() => {
       calls.constant += 1;
       return 'fixed';
-    }, strictEqual);
+    }, tripleEquals);
     const parity = createDerivedNode((reader) => {
       calls.parity += 1;
       return readSource(reader, count) % 2 === 0 ? 'even' : 'odd';
-    }, strictEqual);
+    }, tripleEquals);
     const reader = createDerivedNode((reader) => {
       calls.reader += 1;
       return `${readDerived(reader, constant)} ${readDerived(reader, parity)}`;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(reader)).toBe('fixed odd');
 
     writeSource(count, 3);
@@ -1554,7 +1565,7 @@ describe('degenerate cases', () => {
   });
 
   test('a source with no dependents', () => {
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     writeSource(count, 2);
     markSourceDirty(count);
     expect(count.value).toBe(2);
@@ -1562,11 +1573,11 @@ describe('degenerate cases', () => {
 
   test('a pull of a never-computed node computes it once', () => {
     const calls = { node: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const node = createDerivedNode((reader) => {
       calls.node += 1;
       return readSource(reader, count);
-    }, strictEqual);
+    }, tripleEquals);
     expect(calls.node).toBe(0);
     expect(pull(node)).toBe(1);
     expect(pull(node)).toBe(1);
@@ -1577,16 +1588,16 @@ describe('degenerate cases', () => {
     const calls = { strictReader: 0, structuralReader: 0 };
     const sameElements = (previous: ReadonlyArray<number>, next: ReadonlyArray<number>) =>
       previous.length === next.length && previous.every((element, index) => element === next[index]);
-    const strictItems = createSourceNode<ReadonlyArray<number>>([1, 2], strictEqual);
+    const strictItems = createSourceNode<ReadonlyArray<number>>([1, 2], tripleEquals);
     const structuralItems = createSourceNode<ReadonlyArray<number>>([1, 2], sameElements);
     const strictReader = createDerivedNode((reader) => {
       calls.strictReader += 1;
       return readSource(reader, strictItems).length;
-    }, strictEqual);
+    }, tripleEquals);
     const structuralReader = createDerivedNode((reader) => {
       calls.structuralReader += 1;
       return readSource(reader, structuralItems).length;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(strictReader)).toBe(2);
     expect(pull(structuralReader)).toBe(2);
 
@@ -1608,10 +1619,10 @@ describe('degenerate cases', () => {
   });
 
   test('markSourceDirty after the value object changed in place', () => {
-    const scores = createSourceNode(new Map([['a', 1]]), strictEqual);
+    const scores = createSourceNode(new Map([['a', 1]]), tripleEquals);
     const score = createDerivedNode(
       (reader) => readSource(reader, scores).get('a'),
-      strictEqual,
+      tripleEquals,
     );
     expect(pull(score)).toBe(1);
 
@@ -1623,16 +1634,16 @@ describe('degenerate cases', () => {
 
   test('undefined is a value, distinct from never computed', () => {
     const calls = { nothing: 0, parent: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const nothing = createDerivedNode((reader) => {
       calls.nothing += 1;
       readSource(reader, count);
       return undefined;
-    }, strictEqual);
+    }, tripleEquals);
     const parent = createDerivedNode((reader) => {
       calls.parent += 1;
       return readDerived(reader, nothing) === undefined;
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(parent)).toBe(true);
     expect(pull(nothing)).toBe(undefined);
 
@@ -1643,23 +1654,23 @@ describe('degenerate cases', () => {
 
   test('the supplied equals decides cutoff for NaN', () => {
     const calls = { strictParent: 0, objectIsParent: 0 };
-    const count = createSourceNode(1, strictEqual);
+    const count = createSourceNode(1, tripleEquals);
     const strictNaN = createDerivedNode(
       (reader) => readSource(reader, count) * Number.NaN,
-      strictEqual,
+      tripleEquals,
     );
     const objectIsNaN = createDerivedNode(
       (reader) => readSource(reader, count) * Number.NaN,
-      Object.is,
+      objectIs,
     );
     const strictParent = createDerivedNode((reader) => {
       calls.strictParent += 1;
       return Number.isNaN(readDerived(reader, strictNaN));
-    }, strictEqual);
+    }, tripleEquals);
     const objectIsParent = createDerivedNode((reader) => {
       calls.objectIsParent += 1;
       return Number.isNaN(readDerived(reader, objectIsNaN));
-    }, strictEqual);
+    }, tripleEquals);
     expect(pull(strictParent)).toBe(true);
     expect(pull(objectIsParent)).toBe(true);
 
@@ -1670,17 +1681,17 @@ describe('degenerate cases', () => {
   });
 
   test('the supplied equals decides cutoff for 0 and -0', () => {
-    const sign = createSourceNode(1, strictEqual);
-    const strictZero = createDerivedNode((reader) => readSource(reader, sign) * 0, strictEqual);
-    const objectIsZero = createDerivedNode((reader) => readSource(reader, sign) * 0, Object.is);
+    const sign = createSourceNode(1, tripleEquals);
+    const strictZero = createDerivedNode((reader) => readSource(reader, sign) * 0, tripleEquals);
+    const objectIsZero = createDerivedNode((reader) => readSource(reader, sign) * 0, objectIs);
     const describeZero = (value: number) => (Object.is(value, -0) ? 'negative zero' : 'zero');
     const strictParent = createDerivedNode(
       (reader) => describeZero(readDerived(reader, strictZero)),
-      strictEqual,
+      tripleEquals,
     );
     const objectIsParent = createDerivedNode(
       (reader) => describeZero(readDerived(reader, objectIsZero)),
-      strictEqual,
+      tripleEquals,
     );
     expect(pull(strictParent)).toBe('zero');
     expect(pull(objectIsParent)).toBe('zero');
@@ -1704,21 +1715,20 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
   writeSource,
 } from '../src';
 
-const strictEqual = (previous: unknown, next: unknown): boolean => previous === next;
-
 test('readSource, readDerived, and pull return the node’s value type', () => {
-  const count = createSourceNode(1, strictEqual);
+  const count = createSourceNode(1, tripleEquals);
   const doubled = createDerivedNode((reader) => {
     expectTypeOf(readSource(reader, count)).toEqualTypeOf<number>();
     return readSource(reader, count) * 2;
-  }, strictEqual);
+  }, tripleEquals);
   const label = createDerivedNode((reader) => {
     expectTypeOf(readDerived(reader, doubled)).toEqualTypeOf<number>();
     return `${readDerived(reader, doubled)}`;
-  }, strictEqual);
+  }, tripleEquals);
   expectTypeOf(pull(label)).toEqualTypeOf<string>();
 });
 
@@ -1728,15 +1738,15 @@ test('a derived node of any value type is a DerivedNode<unknown>', () => {
 });
 
 test('a source node is not read with readDerived', () => {
-  const count = createSourceNode(1, strictEqual);
+  const count = createSourceNode(1, tripleEquals);
   createDerivedNode((reader) => {
     // @ts-expect-error readDerived does not take a source node.
     return readDerived(reader, count);
-  }, strictEqual);
+  }, tripleEquals);
 });
 
 test('writes and equalities are typed by the node', () => {
-  const count = createSourceNode(1, strictEqual);
+  const count = createSourceNode(1, tripleEquals);
   // @ts-expect-error writeSource does not write a string to a number source.
   writeSource(count, 'one');
   createDerivedNode(
@@ -1762,6 +1772,7 @@ libs/pico-js/
   tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts
   tsdown.config.ts          merges ../../tsdown.config.ts, dts.build true
   vitest.config.ts          typecheck enabled with tsconfig.test.json
+  src/equality.ts
   src/graph.ts
   src/index.ts
   test/*.test.ts, test/graph.test-d.ts   Tests
@@ -1898,7 +1909,7 @@ pico-runtime.md holds no copy of the engine. It references this doc by section f
 - A computation and an equality must not throw, and for a computation's throw the engine guarantees only that its own state is not corrupted (Throws, decision 3).
 - The derived nodes form a directed acyclic graph, and the engine has no cycle check (Cycles, decision 4).
 - Pull depth is a contract on the consumer; a pull that overflows the call stack throws `RangeError`, after which the engine does not guarantee its state; marking is iterative (Pull, decision 12). pico-runtime.md relies on client field nesting to bound it.
-- The engine defines no equality; `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, identical)` to each resolver node.
+- The engine has no default equality; `createSourceNode` and `createDerivedNode` take a required `equals` (decisions 6 and 8). pico-runtime.md's store passes `isUnchanged(key)` to each source node and `resolverResultsEqual(artifact, tripleEquals)` to each resolver node.
 - A read of `source.value` or a `pull` inside a computation is an untracked read (decision 10).
 
 pico-runtime.md's open decisions that restate this doc's state the same status: its 2 is this doc's 2; its 3 is 3; 8 is 4; 18 is 1; 19 is 5; 20 is 6; 21 is 7; 23 is 8; 24 is 9; 25 is 10; 26 is 11. When one of these is decided, both docs change in one commit.
@@ -1933,7 +1944,7 @@ Decided by the user: (a).
 
 ### 6. The engine's identity equality (decided)
 
-The engine defines no equality. `createDerivedNode` requires `equals`, with no optional parameter and no default, and the engine exports no comparison function. `===` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equals` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equals` decides cutoff.
+The engine has no default equality. `createDerivedNode` and `createSourceNode` require `equals`, with no optional parameter and no default. The package exports two comparisons, `tripleEquals` (`===`) and `objectIs` (`Object.is`), which a caller passes explicitly; a shared function avoids allocating a closure per node creation. `tripleEquals` is the Isograph layer's default, which it passes to each node it creates (pico-runtime.md open decision 20; upstream Isograph's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95` in `../isograph`). Under `===`, a node whose value is `NaN` never cuts off, so its readers recompute on every recomputation of it, and a change from `0` to `-0` cuts off, so its readers keep `0`. A caller that supplies its own `equals` gets that comparison and is not affected by the Isograph default. `degenerate.test.ts`'s last two tests assert that the supplied `equals` decides cutoff.
 
 ### 7. Whether a consumer can write a node's fields (decided)
 
@@ -1941,7 +1952,7 @@ pico-runtime.md open decision 21, restated. Decided by the user: nodes are plain
 
 ### 8. Whether `writeSource` compares the new value with the old (decided)
 
-Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equals)`, and `writeSource` compares the stored value with the new one by that `equals`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still defines no equality of its own (decision 6). `markSourceDirty` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
+Writing an equal value does not propagate. A source takes a required equality, as a derived node does: `createSourceNode(value, equals)`, and `writeSource` compares the stored value with the new one by that `equals`; when it accepts, `writeSource` stores nothing and marks nothing. The engine still has no default equality (decision 6). `markSourceDirty` stays, for a value object changed in place. This matches pico (`set_source`, `crates/pico/src/database.rs:310-329`), Reactively's `set`, and Preact's setter, with the equality supplied by the caller.
 
 ### 9. A pull of a disposed node
 

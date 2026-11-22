@@ -44,17 +44,18 @@ The calls the Isograph runtime makes, by export of the engine's index (pico-js.m
 - `createSourceNode`: `sourceNodeAt`, with `MISSING` and `isUnchanged(key)` (The store).
 - `writeSource`: `normalize`'s `writeValue` (`normalize` writes source nodes), and `storeFrom` in `test/fixtures.ts`.
 - `markSourceDirty`: `deleteRecord`, for each source node of the deleted container (The store).
-- `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, identical)` (Stored resolver results).
+- `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, tripleEquals)` (Stored resolver results).
 - `pull`: `readStoredResult` (Stored resolver results).
 - `readSource` and `readDerived`: `contextHooks`, with the node the resolver computation receives (Stored resolver results).
 - `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
+- `tripleEquals`: `resolverNodeAt`, as `outputEqual` (Stored resolver results).
 - The types `SourceNode`, `DerivedNode`, and `Computation`: `store.ts` and `storedResults.ts`.
 
-Every export has a caller in the Isograph runtime. The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
+Every export except `objectIs` has a caller in the Isograph runtime. The reader of `objectIs` is a project outside Isograph (Goal). The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
 
 ### Which layer owns each item
 
-Engine (`libs/pico-js/src/graph.ts`), as pico-js.md's Types and The implementation define them:
+Engine (`libs/pico-js/src/graph.ts` and `libs/pico-js/src/equality.ts`), as pico-js.md's The public API, Types, and The implementation define them:
 
 - Types: `SourceNode`, `DerivedNode`, `PrecalculatedValue`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
@@ -63,6 +64,7 @@ Engine (`libs/pico-js/src/graph.ts`), as pico-js.md's Types and The implementati
 - Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The reader).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
+- Equality (`equality.ts`): `tripleEquals`, `objectIs`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, per-world derived node state, and source overrides read through `readSource` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
@@ -1064,11 +1066,8 @@ import {
   pull,
   readDerived,
   readSource,
+  tripleEquals,
 } from '@isograph/pico-js';
-
-function identical(previous: unknown, next: unknown): boolean {
-  return previous === next;
-}
 
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
   store: Store,
@@ -1088,7 +1087,7 @@ export function resolverNodeAt(
   return getOrInsert(
     containerAt(store, root).derived,
     resolverStoreKey(artifact, variables),
-    () => createDerivedNode(resolverComputation(store, artifact, root, variables), resolverResultsEqual(artifact, identical)),
+    () => createDerivedNode(resolverComputation(store, artifact, root, variables), resolverResultsEqual(artifact, tripleEquals)),
   );
 }
 
@@ -1437,7 +1436,7 @@ Each is one commit, in order; each is independently shippable.
 
    Tests and fixtures. Every `storeOf(..)` that holds a leaf lists it as a link under the parent's key plus the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), and `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated with `Leaf` targets. New tests: in `test/normalize.test.ts`, "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", and "a custom scalar's JSON array below its list depth is one __value"; in `test/check.test.ts`, "a missing __value is missing its scalar record"; in `test/garbageCollection.test.ts`, "a scalar record no retained query reaches is deleted".
 
-4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/pico-js` with `src/graph.ts` and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
+4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/pico-js` with `src/equality.ts`, `src/graph.ts`, and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
 5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equals`, `storeValue` and `storeSnapshot` read `source.value`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceDirty` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceDirty` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 
    Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
@@ -1475,7 +1474,7 @@ Each is one commit, in order; each is independently shippable.
 
    Tests. The store fixture gains the Example's fields (`field Query.PetDetailPage`, `field String.toUppercase`, linked-only-selections.md, Generated files for the example). New: in `test/read.test.ts`, "PetDetailPage reads n1, n2 through toUppercase, and bestFriend", "a bare bestFriend is EMPTY_DATA, or null when the link is null", "a bare __self on a scalar record is its value", and "__self with a selection set reads at the same record".
 
-8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, identical)`), `resolverComputation`, `contextHooks` (`readSource`, `readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
+8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, tripleEquals)`), `resolverComputation`, `contextHooks` (`readSource`, `readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 
    Tests, in a new `libs/isograph-runtime/test/storedResults.test.ts`, each counting resolver calls with `vi.fn` as `test/read.test.ts` does: "a second read with no write calls no resolver and returns the same object"; "after a write to Pet:2.name, PetDetailPage runs and toUppercase does not"; "a write that leaves toUppercase's result equal reruns a reader that reads n1, and not a reader without n1"; "a resolver that throws is stored as ResolverThrew and is not called again until an input changes"; "MissingData on an absent record becomes Ok after normalize writes the record"; "deleting a record disposes the nodes it owns and the next read recomputes their readers"; "a refinement node is computed once and not marked by a write to its record"; "two selections of one field with equal arguments on one record share one node"; "F____n___2 with no variables and F with { n: 2 } are two nodes" (open decision 1); and, degenerate, "a resolver with an empty reader AST on an absent record is Ok and computed once". `demos/pet-demo/src/fetchAndRead.ts`'s output is unchanged.
 
@@ -1813,7 +1812,7 @@ Decided by the user: a computation must not throw (pico-js.md, Throws; Stored re
 
 ### 7. How a field supplies its output equality
 
-`resolverNodeAt` passes `identical` (`===`) as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
+`resolverNodeAt` passes `tripleEquals` (`===`, exported by `@isograph/pico-js`) as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
 
 - (a) A second argument to the function a field literal returns: `iso(`field Pet.Shape { name }`)(resolver, { equal: deepEqual })`. The Babel plugin replaces a field literal with `x => x` (`libs/isograph-babel-plugin/compileTag.js:53`); the replacement becomes `(resolver, options) => Object.assign(resolver, options)`, so the export is still the resolver function, now carrying `equal`. The generated `IdentityWithParam` (`fixtures/store/src/__isograph/iso.ts:44-48`) gains the optional parameter and returns the resolver's type with `readonly equal?: (previous: TOutput, next: TOutput) => boolean`, and `resolverNodeAt` passes `artifact.resolver.equal ?? identical`. This option is held and not decided. Reason: it is the simplest: no directive, no new iso syntax, no compiler change beyond the generated `iso` overload, and the comparator sits next to the resolver it belongs to. Cost: a property written onto the user's function object, and an optional property on the resolver's type.
 - (b) A declaration directive naming a built-in comparator (`field Pet.Shape @equality(kind: Deep) { name }`), from which the compiler writes `outputEqual: deepEqual` imported from the runtime. Cost: i2 accepts no declaration directive yet (`DeclarationDirectiveName` is empty, `crates/isograph_parser/src/directives.rs:38-41`); only built-in comparators.
@@ -1905,7 +1904,7 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 
 ### 20. The engine's identity equality (decided)
 
-Decided by the user: the engine has no default equality and exports no comparison; `equals` is a required argument of `createDerivedNode` and of `createSourceNode` (`refactors/pending/runtime/pico-js.md` open decision 6). The Isograph layer does not depend on an engine default: every resolver node passes `resolverResultsEqual(artifact, outputEqual)`, whose `outputEqual` is `===` (`identical`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source node passes `isUnchanged(key)` (The store).
+Decided by the user: the engine has no default equality and exports two comparisons, `tripleEquals` (`===`) and `objectIs` (`Object.is`), which a caller passes explicitly; `equals` is a required argument of `createDerivedNode` and of `createSourceNode` (`refactors/pending/runtime/pico-js.md` open decision 6). The Isograph layer does not depend on an engine default: every resolver node passes `resolverResultsEqual(artifact, outputEqual)`, whose `outputEqual` is `===` (`tripleEquals`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source node passes `isUnchanged(key)` (The store).
 
 ### 21. Whether a consumer can write a node's fields (decided)
 
