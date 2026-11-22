@@ -451,8 +451,14 @@ function setDependencies(
   previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
   next: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
 ): void {
-  if (sameDependencies(previous, next)) {
-    return;
+  if (previous.length === next.length) {
+    let index = 0;
+    while (index < previous.length && previous[index] === next[index]) {
+      index += 1;
+    }
+    if (index === previous.length) {
+      return;
+    }
   }
   for (const dependency of previous) {
     dependency.dependents.delete(node);
@@ -460,18 +466,6 @@ function setDependencies(
   for (const dependency of next) {
     dependency.dependents.add(node);
   }
-}
-
-function sameDependencies(previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>, next: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>): boolean {
-  if (previous.length !== next.length) {
-    return false;
-  }
-  for (let index = 0; index < previous.length; index += 1) {
-    if (previous[index] !== next[index]) {
-      return false;
-    }
-  }
-  return true;
 }
 ```
 
