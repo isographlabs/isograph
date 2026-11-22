@@ -58,16 +58,16 @@ A pull returns a derived node's current value.
 
 - `Clean` returns the stored value.
 - `Dirty` runs the computation.
-- `Check` pulls the node's derived dependencies in recorded order and stops at the first one whose value changed. That dependency's recomputation marked this node `Dirty`, so this node then runs its computation. When no dependency changed, the node becomes `Clean` without running.
+- `Check` brings the node's derived dependencies up to date in recorded order and stops at the first one that reports its value changed in that step, and this node then runs its computation. When every dependency reports no change, the node becomes `Clean` without running.
 
 ```text
 pull label: Check
   -> parity: Check
     -> sum: Dirty -> run sum: reads a, b -> 7, and 7 !== 3
-       -> sum Clean 7 -> sum.dependents = {parity} -> parity Dirty
-    -> parity Dirty -> run parity: reads sum -> 'odd', and 'odd' === 'odd'
-       -> parity Clean, keeps 'odd'; parity's dependents are not marked
-  -> label: parity did not change -> label Clean without running
+       -> sum Clean 7 -> sum.dependents = {parity} -> parity Dirty -> sum Changed
+    -> parity: sum Changed -> run parity: reads sum -> 'odd', and 'odd' === 'odd'
+       -> parity Clean, keeps 'odd'; parity's dependents are not marked -> parity Unchanged
+  -> label: parity Unchanged -> label Clean without running
 returns 'the sum is odd'
 ```
 
@@ -88,7 +88,7 @@ pull node       -> reads gate ('even'), then other (20); node.dependencies = [ga
 write x = 3     -> gate Dirty -> node Check
 write y = 11    -> other Dirty -> node already Check -> stop
 pull node: Check
-  -> gate: Dirty -> run gate -> 'odd' !== 'even' -> node Dirty -> stop the walk
+  -> gate: Dirty -> run gate -> 'odd' !== 'even' -> node Dirty -> gate Changed -> stop the walk
   -> run node: reads gate ('odd') -> 0; node.dependencies = [gate]
 other is never pulled, and its computation does not run
 ```
@@ -125,11 +125,11 @@ from a = 1, b = 2, all Clean, then write a = 3 -> sum Dirty, parity Check, label
 
 pull sum, then pull label
   pull sum: Dirty -> run sum -> 5 !== 3 -> sum Clean 5 -> parity Dirty
-  pull label: Check -> parity: Dirty -> run parity -> 'odd' === 'odd' -> parity Clean
+  pull label: Check -> parity: Dirty -> run parity -> 'odd' === 'odd' -> parity Clean, Unchanged
     -> label Clean without running
 pull label, then pull sum
-  pull label: Check -> parity: Check -> sum: Dirty -> run sum -> 5 !== 3 -> parity Dirty
-    -> run parity -> 'odd' === 'odd' -> label Clean without running
+  pull label: Check -> parity: Check -> sum: Dirty -> run sum -> 5 !== 3 -> parity Dirty -> sum Changed
+    -> run parity -> 'odd' === 'odd' -> parity Unchanged -> label Clean without running
   pull sum: Clean -> 5
 either order: sum runs once, parity once, label not at all
 ```
@@ -350,9 +350,26 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   if (precalculated === MISSING) {
     return computeFirst(node);
   }
+  refreshPrecalculated(node, precalculated);
+  return precalculated.value;
+}
+
+function refresh(node: DerivedNode<unknown>): 'Changed' | 'Unchanged' {
+  const precalculated = node.precalculated;
+  if (precalculated === MISSING) {
+    computeFirst(node);
+    return 'Changed';
+  }
+  return refreshPrecalculated(node, precalculated);
+}
+
+function refreshPrecalculated<TValue>(
+  node: DerivedNode<TValue>,
+  precalculated: PrecalculatedValue<TValue>,
+): 'Changed' | 'Unchanged' {
   switch (precalculated.status) {
     case 'Clean':
-      return precalculated.value;
+      return 'Unchanged';
     case 'Check':
       return verify(node, precalculated);
     case 'Dirty':
@@ -378,33 +395,30 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
 function verify<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
-): TValue {
+): 'Changed' | 'Unchanged' {
   for (const dependency of precalculated.dependencies) {
-    if (dependency.kind === 'Derived') {
-      pull(dependency);
-      if (precalculated.status === 'Dirty') {
-        return recompute(node, precalculated);
-      }
+    if (dependency.kind === 'Derived' && refresh(dependency) === 'Changed') {
+      return recompute(node, precalculated);
     }
   }
   precalculated.status = 'Clean';
-  return precalculated.value;
+  return 'Unchanged';
 }
 
 function recompute<TValue>(
   node: DerivedNode<TValue>,
   precalculated: PrecalculatedValue<TValue>,
-): TValue {
+): 'Changed' | 'Unchanged' {
   const value = compute(node);
   commitReads(node, precalculated);
   if (node.equals(precalculated.value, value)) {
     precalculated.status = 'Clean';
-    return precalculated.value;
+    return 'Unchanged';
   }
   precalculated.value = value;
   precalculated.status = 'Clean';
   markDirty(node.dependents);
-  return value;
+  return 'Changed';
 }
 
 function commitReads<TValue>(node: DerivedNode<TValue>, precalculated: PrecalculatedValue<TValue>): void {
@@ -439,7 +453,8 @@ A computation receives the derived node being computed, its consumer, and `compu
 
 There are two read functions in place of one `read(consumer, node)` that switches on `node.kind`: every caller knows statically whether it reads a source or a derived node, and a switch would test again what the caller's type already established, at a comparison per read.
 
-- `verify` reads the node's state again after each derived dependency's pull, because a dependency's `recompute` marks this node `Dirty` through `dependents`, and returns `recompute` at the first `Dirty`. A source dependency is not pulled and changes no mark. When the loop ends, the node is `Check`: only this node's own `recompute` or `verify` makes it `Clean`, and neither runs during the loop, because the graph is acyclic (Cycles). It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
+- `refresh` brings a derived node up to date and returns whether its value changed in that call: `computeFirst` is `'Changed'`, `recompute` is `'Changed'` exactly when `equals` rejected the new value, and a `Clean` node or a `Check` node that verified is `'Unchanged'`. `pull` is `refresh` followed by a read of the value; it calls `computeFirst` itself in the `MISSING` case so that it reads the value from a `PrecalculatedValue` the type has already narrowed, and `refreshPrecalculated` is the shared switch on the mark. This matches pico, whose `execute_memoized_function` returns `DidRecalculate` (`crates/pico/src/execute_memoized_function.rs:14-18`, `:59-63`) and whose `derived_node_changed_since` decides from that result (`:208-247`).
+- `verify` decides from `refresh`'s result: it returns `recompute` at the first derived dependency that reports `'Changed'`. A source dependency is not refreshed and changes no mark. `recompute` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency reported `'Unchanged'` and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no dependency list holds a node whose pull threw.
 - `recompute` calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency list, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
 - `computeFirst` marks no dependent. A node enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled it, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `recompute` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `recompute`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `computeFirst` runs on is therefore `Dirty`, and `markDirty` on `Dirty` nodes changes nothing.
@@ -448,7 +463,7 @@ There are two read functions in place of one `read(consumer, node)` that switche
 - A computation is synchronous; a read through its node after it returned breaks the contract (The consumer).
 - The consumer is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state. No state names the running computation, so `compute` saves and restores nothing and a throw out of a computation leaves nothing to reset.
 
-`pull`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about five frames per level on the `recompute` path (`pull`, `recompute`, `compute`, the computation, `readDerived`) and two on the `verify` path (`pull`, `verify`). The depth limit is the host's call stack. Pull depth is a contract on the caller (open decision 12): the derived nodes below any node a caller pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 2,000 levels of derived nodes at five frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
+`pull`, `refresh`, `refreshPrecalculated`, `verify`, `recompute`, `compute`, and `readDerived` recurse: a pull goes down one chain of calls per level of derived nodes below the pulled node, about six frames per level on the `recompute` path (`readDerived`, `pull`, `refreshPrecalculated`, `recompute`, `compute`, the computation) and three on the `verify` path (`verify`, `refresh`, `refreshPrecalculated`). The depth limit is the host's call stack. Pull depth is a contract on the caller (open decision 12): the derived nodes below any node a caller pulls must be well below the limit. In Node 24 with its default stack, a one-frame recursive function reaches about 10,000 frames before `RangeError`, so the limit is an estimated 1,600 levels of derived nodes at six frames per level; larger frames in a computation lower it. The estimate is not measured against the engine. The engine does not raise the limit, does not catch the `RangeError`, and has no iterative pull. A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its own state. The overflow can fire in any frame at the limit, including a `setDependencies` callback after it removed `node` from some `dependents` sets of `previous` and before it added `node` to those of `next`, so a node's edges may be partly moved, and its dependency list then names a dependency whose `dependents` set does not hold it. Marking is iterative (Mark) and never overflows. In the Isograph runtime, pull depth is bounded by client field nesting: each resolver node reads a client field it selects through `readDerived`, so the levels below a node are the nesting depth of client fields selected by client fields.
 
 ### Dependencies
 
@@ -580,7 +595,7 @@ pull(banner); // 'Free shipping' (runs all three)
 - A computation and an equality must not throw. A throw is a programmer error. A computation's throw propagates out of `pull`, and the engine guarantees only that its own state is consistent. The node that threw keeps its mark, value, and dependencies; nodes the failed computation pulled before the throw are `Clean` and correct.
 - `disposeDerivedNode` detaches a node you no longer need. Nodes that read it recompute on their next pull.
 - A computation must not read its own node, directly or through other nodes.
-- Keep the chain of derived nodes below any node you pull well below the call stack limit, an estimated 2,000 levels in Node with its default stack. A pull past the limit throws `RangeError`, and after it the engine does not guarantee its own state. Writes never overflow, at any height.
+- Keep the chain of derived nodes below any node you pull well below the call stack limit, an estimated 1,600 levels in Node with its default stack. A pull past the limit throws `RangeError`, and after it the engine does not guarantee its own state. Writes never overflow, at any height.
 ````
 
 The README's rules restate the engine's behavior under the option the body is written for: open decision 9 (a). Each decision that changes names the README line it changes.
@@ -617,7 +632,7 @@ Only `readSource` and `readDerived` record. A computation that reads a source as
 
 ### Verification
 
-A write marks the nodes above it. A pull of a `Check` node verifies: it pulls the node's derived dependencies in recorded order, each of which is `Clean` (one step), `Check` (verified the same way), or `Dirty` (recomputed). When one of them recomputes to a new value, its `recompute` marks this node `Dirty`, the walk stops, and this node recomputes. When the walk ends with the node still `Check`, every derived input came back equal and no source input was written, so the node becomes `Clean` without running.
+A write marks the nodes above it. A pull of a `Check` node verifies: it brings the node's derived dependencies up to date in recorded order with `refresh`, each of which is `Clean` (one step), `Check` (verified the same way), or `Dirty` (recomputed), and each reports whether its value changed in that step. When one of them reports `'Changed'`, the walk stops and this node recomputes. When every one reports `'Unchanged'`, every derived input came back equal and no source input was written, so the node becomes `Clean` without running. A recomputation that changes a value still marks its dependents `Dirty`, for the `Check` nodes that are not on the current walk.
 
 The walk stops at the first changed dependency because the recomputation that follows decides which nodes are read next. A dependency after the first changed one may be one the recomputation never reads, and pulling it would run a computation whose value nobody needs.
 
@@ -633,7 +648,7 @@ pico's equivalent is backdating: an equal recomputation keeps the old `time_upda
 
 `disposeDerivedNode(node)` is the only way a derived node leaves the graph. It detaches the node from what it read, resets it to never computed, and marks its dependents `Dirty` (Disposal). The engine does not decide when to dispose: there is no reachability walk, no LRU, and no reference count in the engine's first implementation. The caller disposes a node when it drops the key that held it. The Isograph runtime needs this: without disposal, after `deleteRecord` the old derived node recomputes, attaches to the source nodes of the new `Absent` container, and stays referenced and marked, and when it recomputes to an equal value a reader keeps it while `resolverNodeAt` creates a second node for the same key. Disposal removes its edges, resets it to `MISSING`, and marks its readers `Dirty`, so their recomputation reads the new node. pico collects instead (`run_garbage_collection`, `crates/pico/src/database.rs:169`), keeping the last 10,000 top-level calls and what they reach (pico.md, Garbage collection); a collection policy for the engine is pico-runtime.md's Later: collecting derived nodes.
 
-A derived node with no dependencies is computed once and stays `Clean` under every write, because no source lists it. A `Check` dependent's verify pulls it in one step. Only disposal changes it, which marks its dependents `Dirty`; its next pull computes it again. In the Isograph runtime, a refinement such as `asPet` is a derived node of this kind.
+A derived node with no dependencies is computed once and stays `Clean` under every write, because no source lists it. A `Check` dependent's verify refreshes it in one step. Only disposal changes it, which marks its dependents `Dirty`; its next pull computes it again. In the Isograph runtime, a refinement such as `asPet` is a derived node of this kind.
 
 ### Writes during a computation
 
@@ -1971,4 +1986,4 @@ The package ships alone, as its own change (pico-runtime.md core change 4), with
 
 ### 12. Pull depth (decided)
 
-Pull depth is a contract on the caller. `pull`, `verify`, `recompute`, and `compute` recurse once per level of derived nodes below the pulled node, so a graph's pull depth must stay well below the host's call stack limit, an estimated 2,000 derived levels (about five frames per level; an estimate, not a measurement) in Node 24 with its default stack (Pull). Marking is iterative and never overflows (Mark). A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its state: at the limit, a node's edges may be partly moved by `setDependencies` (Throws). The engine has no iterative pull. In the Isograph runtime, pull depth is bounded by client field nesting.
+Pull depth is a contract on the caller. `pull`, `refresh`, `refreshPrecalculated`, `verify`, `recompute`, and `compute` recurse once per level of derived nodes below the pulled node, so a graph's pull depth must stay well below the host's call stack limit, an estimated 1,600 derived levels (about six frames per level; an estimate, not a measurement) in Node 24 with its default stack (Pull). Marking is iterative and never overflows (Mark). A pull that overflows throws `RangeError`, and in that case alone the engine does not guarantee its state: at the limit, a node's edges may be partly moved by `setDependencies` (Throws). The engine has no iterative pull. In the Isograph runtime, pull depth is bounded by client field nesting.
