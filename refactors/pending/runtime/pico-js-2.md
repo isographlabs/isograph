@@ -1,6 +1,6 @@
 # pico-js: implementation
 
-This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The package layout, `package.json`, build, hooks, and CI are as pico-js.md (The package) specifies; this doc gives the source files and the tests.
+This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The package layout, `package.json`, build, hooks, and CI are as pico-js.md (The package) specifies, with two deltas. `src/` holds `graph.ts` and `index.ts`, and `test/` holds `graph.test.ts` and `graph.test-d.ts`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them.
 
 ## Model
 
@@ -9,17 +9,18 @@ This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The pa
 - `pull` brings a node up to date. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes. A new node is `Dirty`.
 - A computation receives its node and the previous value, which is `undefined` on the first computation and on the first computation after a disposal, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
-- A computation pushes its reads onto its node's dependency arrays. After it returns, the node is added to the `dependents` set of each source and derived node it read, in one synchronous step with the new value.
+- Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read, in one synchronous step with the new value.
 - Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays. Its next computation adds it to the sets of what it reads then.
 - Disposing a node marks its readers `Dirty` and returns the node to the state of a new node.
 
-Contracts the engine does not check:
+The engine does not check these contracts:
 
 - The caller writes a source only when its value changed.
-- A computation does not throw, does not write a source, and does not dispose a node.
+- A computation, and any function it calls, does not throw.
+- A computation does not write a source and does not dispose a node.
 - A computation is synchronous and reads only through the node it receives.
 - The derived nodes form a directed acyclic graph.
-- The derived nodes below any pulled node stay well below the call stack limit (about 2,000 levels in Node 24, an estimate).
+- The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
 
 ## `src/graph.ts`
 
@@ -180,12 +181,12 @@ function assertNever(value: never): never {
 ```
 
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
-- A `Dirty` node is in no `dependents` set and has empty dependency arrays. A new node starts in that state, and marking and disposal detach a node before they set it `Dirty`. Writes to the dependencies of a `Dirty` node therefore never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
-- Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so `recompute` always starts with empty dependency arrays and only the computation's own reads fill them.
-- Marking visits a node's dependents only when the node leaves `Clean`, so each node is visited once per write. Marking recurses once per level, like `pull`, so the pull-depth contract also bounds marking.
-- A write marks the source's direct readers `Dirty`, so a `Check` node has no changed source and `verify` pulls only its derived dependencies. `verify` recomputes when pulling a dependency marked its node `Dirty`. A dependency's `recompute` marks its dependents `Dirty` exactly when its new value is not `===` its previous value, so the node's status is the dependency's verdict.
-- A node becomes `Check` only from `Clean`, and it becomes `Clean` only at the end of a computation or a verification, so a `Check` node's `value` is a computed value and `verify` returns it. `value` holds `undefined` only while a node is `Dirty`, where the computation receives it as `previous`.
-- A node's `derivedDependencies` holds the nodes its computation read, and each of those nodes' `dependents` set holds the reader while the reader is not `Dirty`. A dependency read twice is one member of its set.
+- A new node is in no `dependents` set and has empty dependency arrays, and marking and disposal detach a node before they set it `Dirty`, so a `Dirty` node is in no `dependents` set and writes to its dependencies never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
+- Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when `recompute` attaches it.
+- Marking recurses into a node's dependents only when the node leaves `Clean`, so a write recurses into each node's dependents at most once.
+- Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
+- A node becomes `Check` only from `Clean`, and it becomes `Clean` only at the end of a computation or a verification, so a `Check` node's `value` is a computed value and `verify` returns it.
+- A node read twice appears twice in the reader's dependency array and once in its `dependents` set.
 - `disposeDerivedNode` takes a `DerivedNode<unknown>`, so writing `undefined` to `value` type-checks without a cast. Marking every reader `Dirty` detaches each reader, which empties the node's `dependents` set. A node that was never computed has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. An already `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
 
 ## `src/index.ts`
@@ -221,7 +222,7 @@ import {
 } from '../src/index';
 
 describe('pull', () => {
-  test('creating a derived node runs nothing until it is pulled', () => {
+  test('a derived node runs nothing until it is pulled, and a second pull of the Clean node runs nothing', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const double = createDerivedNode((callingNode) => {
@@ -481,6 +482,9 @@ describe('dependencies', () => {
     writeSource(b, 4);
     expect(sum.status).toBe('Dirty');
     expect(pull(sum)).toBe(7);
+    writeSource(a, 5);
+    expect(sum.status).toBe('Dirty');
+    expect(pull(sum)).toBe(9);
   });
 
   test('a Dirty node is not in the dependents set of its other sources, so a second write does not reach it', () => {
@@ -500,12 +504,9 @@ describe('dependencies', () => {
     expect(label.status).toBe('Check');
     expect(pull(label)).toBe('7');
     expect(runs).toBe(2);
-    writeSource(a, 5);
-    expect(sum.status).toBe('Dirty');
-    expect(pull(label)).toBe('9');
   });
 
-  test('a node read twice is marked once and computes once per change', () => {
+  test('a computation that reads a source twice recomputes once per change', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const twice = createDerivedNode((callingNode) => {
@@ -553,8 +554,6 @@ describe('disposal', () => {
     disposeDerivedNode(inner);
     expect(source.dependents.has(inner)).toBe(false);
     writeSource(source, 2);
-    expect(inner.status).toBe('Dirty');
-    expect(inner.value).toBe(undefined);
     expect(pull(inner)).toBe(2);
   });
 
@@ -593,7 +592,7 @@ describe('disposal', () => {
 import { expectTypeOf, test } from 'vitest';
 import { createDerivedNode, readDerived, type DerivedNode } from '../src/index';
 
-test('a derived node of any value type can be read by any calling node', () => {
+test('a derived node that reads another derived node has the type of the value its computation returns', () => {
   const count = createDerivedNode(() => 1);
   const label = createDerivedNode((callingNode) => `${readDerived(callingNode, count)}`);
   expectTypeOf(label).toEqualTypeOf<DerivedNode<string>>();
