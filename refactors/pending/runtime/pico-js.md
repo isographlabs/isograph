@@ -215,9 +215,9 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type fi
 
 ````markdown
 <!-- from libs/pico-js/README.md -->
-# @isograph/pico-js
+# pico-js
 
-`@isograph/pico-js` is a push-pull memoization engine. A write to a source node eagerly marks the derived nodes that depend on it, and a derived node lazily recomputes when it is pulled.
+pico-js is a push-pull memoization engine. A write to a source node eagerly marks the derived nodes that depend on it, and a derived node lazily recomputes when it is pulled.
 
 ## Model
 
@@ -331,7 +331,7 @@ export type SourceNode<TValue> = {
  * - When `status` is `Clean`, `value` is the up-to-date value, and the node is in the `dependents` set of every node in its dependency arrays.
  * - Every node in a `dependents` set is `Clean` or `Check`.
  *
- * These invariants form a discriminated union on `status`, but `DerivedNode` is a single object type. A node keeps its identity for its whole life, because callers and `dependents` sets hold it, so a status change assigns fields of the same object. TypeScript does not narrow an object to a different variant of a union when one of its fields is assigned, so a union type would need a cast at every status change. The other way to type it holds the current variant in a field of the node and replaces that variant object on each status change, as upstream isograph's `PromiseWrapper` does with its `result` field. That allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`. So `computedValue` and the throws in marking check these invariants at run time.
+ * These invariants form a discriminated union on `status`, but `DerivedNode` is a single object type. A node keeps its identity for its whole life, because callers and `dependents` sets hold it, so a status change assigns fields of the same object. TypeScript does not narrow an object to a different variant of a union when one of its fields is assigned, so a union type would need a cast at every status change. The other way to type it holds the current variant in a field of the node and replaces that variant object on each status change. That allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`. So `computedValue` and the throws in marking check these invariants at run time.
  */
 export type DerivedNode<TValue> = {
   value: Option<TValue>;
