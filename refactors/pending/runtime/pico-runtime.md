@@ -29,42 +29,39 @@ FC reads: root.2, root.3, other.2, other.3
 
 ## The engine
 
-The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its types and public functions (The public API), every function body (The implementation: Construction, Mark, Pull, Dependencies, Disposal, Throws, Cycles), the package README, the tests, and the package files (The package). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/pico-js` (open decision 18).
+The engine is `refactors/pending/runtime/pico-js.md`. That doc is the single specification of the engine: its model and contracts (Model), its package files and README (The package), every type and function body (`src/graph.ts`, `src/index.ts`), and its tests (Tests). This doc does not restate any of it. It specifies the Isograph layer and the calls that layer makes into the engine. The package is `@isograph/pico-js` in `libs/pico-js` (open decision 18).
 
-pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (pico-js.md, Reverse edges, no epochs).
+pico's shape: a source node holds a value that the outside world sets, and a derived node holds the value of a computation over source nodes and other derived nodes (`source.rs:83-86`, `derived_node.rs:55-58`, both kept by one database, `database.rs:78-80`). pico finds nodes by id and keeps forward edges only. The engine holds every edge as an object reference in both directions, and marks on write through the reverse edges, so a write costs the nodes it reaches, not the live graph (pico-js.md, `src/graph.ts`).
 
-The engine has no graph object and no write-during-computation check (pico-js.md decision 2; this doc's open decision 2, decided). Every engine call takes only the node it acts on: `createSourceNode(value, equals)`, `createDerivedNode(computation, equals)`, `writeSource(source, value)`, `markSourceDirty(source)`, `readSource(consumer, source)`, `readDerived(consumer, node)`, `pull(node)`, `disposeDerivedNode(node)`. An untracked read of a source is `source.value`.
+The engine has no graph object and no write-during-computation check (pico-js.md, Model; open decision 2, decided). Every engine call takes only the node it acts on: `createSourceNode(value)`, `createDerivedNode(computation)`, `writeSource(source, value)`, `readSource(callingNode, source)`, `readDerived(callingNode, node)`, `pull(node)`, `disposeDerivedNode(node)`. A computation is `(callingNode, previous) => value`, and `previous` is `undefined` on a node's first computation. `writeSource` marks the source's readers whether or not the value changed. Code outside a computation reads a source as `source.value`.
 
 ### The engine and the Isograph runtime
 
-The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `memo`, `sourceReads`, or `derivedReads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`markDependentsDirty`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `status`, `dependents`, `sourceDependencies`, or `derivedDependencies`; `storeValue`, `presentValues`, `writeValue`, and `deleteRecord` read a source's `value` (The store; `normalize` writes source nodes), and no Isograph function calls an engine function the index does not export (`markDependentsDirty`, `verify`, `computeFirst`, `recompute`, `computedValue`, `attach`, `detach`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff when a recomputed value is unchanged, and dependencies recorded per computation. The engine's cutoff compares by `===`, and pico's by `PartialEq` (`execute_memoized_function.rs:163`). A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and statuses are the engine's to maintain, as pico's epochs are.
 
-The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, The public API):
+The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, `src/index.ts`):
 
-- `createSourceNode`: `sourceNodeAt`, with `MISSING` and `isUnchanged(key)` (The store).
-- `writeSource`: `normalize`'s `writeValue` (`normalize` writes source nodes), and `storeFrom` in `test/fixtures.ts`.
-- `markSourceDirty`: `deleteRecord`, for each source node of the deleted container (The store).
-- `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` and `resolverResultsEqual(artifact, tripleEquals)` (Stored resolver results).
+- `createSourceNode`: `sourceNodeAt`, with `MISSING` (The store).
+- `writeSource`: `normalize`'s `writeValue`, when `isUnchanged(key)` finds the value changed (`normalize` writes source nodes); `deleteRecord`, as `writeSource(source, source.value)` for each source node of the deleted container (The store); and `storeFrom` in `test/fixtures.ts`.
+- `createDerivedNode`: `resolverNodeAt`, with `resolverComputation(..)` (Stored resolver results).
 - `pull`: `readStoredResult` (Stored resolver results).
-- `readSource` and `readDerived`: `contextHooks`, with the node the resolver computation receives (Stored resolver results).
+- `readSource` and `readDerived`: `contextHooks`, with the node the resolver computation receives as `callingNode` (Stored resolver results).
 - `disposeDerivedNode`: `deleteRecord`, for each derived node the deleted container owns (core change 8).
-- `tripleEquals`: `resolverNodeAt`, as `outputEqual` (Stored resolver results).
-- The types `SourceNode`, `DerivedNode`, and `Computation`: `store.ts` and `storedResults.ts`.
+- The types `SourceNode` and `DerivedNode`: `store.ts` and `storedResults.ts`.
 
-Every export except `objectIs` has a caller in the Isograph runtime. The reader of `objectIs` is a project outside Isograph (Goal). The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
+Every export except the type `Status` has a caller in the Isograph runtime. The reader of `Status` is a project outside Isograph (Goal). The computation of a resolver node reads only with `readSource` and `readDerived` on the node it receives (`contextHooks`, Stored resolver results), so the runtime makes no untracked read inside a computation (open decision 25).
 
 ### Which layer owns each item
 
-Engine (`libs/pico-js/src/graph.ts` and `libs/pico-js/src/equality.ts`), as pico-js.md's The public API, Types, and The implementation define them:
+Engine (`libs/pico-js/src/graph.ts`), as pico-js.md's `src/graph.ts` defines it:
 
-- Types: `SourceNode`, `DerivedNode`, `DerivedNodeMemo`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
-- The marks `Clean`, `Check`, and `Dirty`.
+- Types: `SourceNode`, `DerivedNode`, `Status`, and the unexported sentinel `NOT_SET`.
+- The statuses `Uncomputed`, `Dirty`, `Check`, and `Clean`.
 - Construction: `createSourceNode`, `createDerivedNode`.
-- Mark: `writeSource`, `markSourceDirty`, `markDependentsDirty`.
-- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The consumer).
-- Dependencies: `setDependencies`.
+- Mark: `writeSource`, `markDependentsDirty`.
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `computedValue`, and the dependency recording: `readSource`, `readDerived`.
+- Dependencies: `attach`, `detach`.
 - Disposal: `disposeDerivedNode`.
-- Equality (`equality.ts`): `tripleEquals`, `objectIs`.
 - Later: `rootCount` and `retainRoot` (Later: retention); the reachability walk `collect` needs, as a function over root nodes that returns the derived nodes they reach through `Derived` dependencies (Later: collecting derived nodes); `listen`, `notify`, and node effects with `reconcileEffects` (Later: keeping values up to date automatically); layers, worlds, per-world derived node state, and source overrides read through `readSource` (Later: a DAG of graphs).
 
 Isograph runtime (`libs/isograph-runtime/src`):
@@ -72,7 +69,7 @@ Isograph runtime (`libs/isograph-runtime/src`):
 - `store.ts`: `Store`, `RecordContainer`, `RecordPresence`, `StoreSourceNode`, `ResolverNode`, `MISSING` (not exported), `Missing`, `isMissing`, `recordContainer`, `containerAt`, `presentContainerAt`, `sourceNodeAt`, `storeValue`, `recordPresence`, `storeSnapshot`, `PlainStore`, `deleteRecord`.
 - `read.ts`: `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`, `ReadHooks`, `readData`, `readStoreValue`, `readButDoNotEvaluate`, `evaluatingHooks`, `read`, `readSelection`, `linkTargetValue`, `eachLink`, `nested`.
 - `artifacts.ts`: the reader AST (`ReaderSelection`), `EntityTable`, `EntityTables`, `FieldEntry`, `EntityShape`, `RecordStorage`, `NormalizationTarget`, and `NormalizationAst.tables`. `store.ts`: `VALUE_KEY`. `read.ts`: `EMPTY_DATA`, `readAt`, `fieldOf`, `tableOf`, `derivedLink`. `recordId.ts`: `omittedRecordId`, `recordId` over `RecordStorage`. `normalize.ts`: `leafRecords`, `storageOf`, `Normalization.tables`.
-- `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
+- `storedResults.ts`: `readStoredResult`, `resolverNodeAt`, `resolverComputation`, `identical`, `contextHooks`, `callResolver`, `resolverResultsEqual`; later `collect`, which iterates the containers' `derived` maps, calls the engine's reachability walk, and calls `disposeDerivedNode` and removes each unreached node from its container.
 - `storeKey.ts`: `resolverStoreKey`. `artifacts.ts`: `ReaderArtifact.parentEntityName`, `ReaderArtifact.selectableName`, `ReaderArtifact.tables`.
 - `normalize.ts`: `writeValue`. `store.ts`: `isUnchanged`, `leafUnchanged`, `compositeUnchanged`.
 - `check`, `garbageCollect` (mark and sweep), `test/fixtures.ts`'s `storeFrom`, the subscription re-read (`readSubscription`, `storedResultHooks`, `callSubscriptions`, `subscriptionResultsAreEqual`).
@@ -80,10 +77,10 @@ Isograph runtime (`libs/isograph-runtime/src`):
 
 ### What resists the split
 
-- Layering. Later: a DAG of graphs gives a derived node one slot per world and a source one value per world. Every access of `node.memo` is in `graph.ts`, so per-world state replaces those accesses there when it is built, and a derived node's per-world slot is the engine's alone. A source's per-world value is not: `storeValue` and `presentValues` read `source.value`, which is the base value, so layering changes those two reads as well as `readSource` (Later: a DAG of graphs).
-- Equality defaults. The engine has none: every node's `equals` is a constructor argument (pico-js.md open decision 6). `===` is the Isograph layer's default output equality inside `resolverResultsEqual`, which also reads the reader AST for walk-assembled data, so both stay Isograph's (open decision 20).
-- One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (pico-js.md, Types; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
-- Throws. A computation must not throw (pico-js.md, Throws). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching every throw of the resolver into `ResolverThrew` (Stored resolver results, open decision 30).
+- Layering. Later: a DAG of graphs gives a derived node one slot per world and a source one value per world. Every access of a derived node's `value` and `status` is in `graph.ts`, so per-world state replaces those accesses there when it is built, and a derived node's per-world slot is the engine's alone. A source's per-world value is not: `storeValue`, `presentValues`, `writeValue`, and `deleteRecord` read `source.value`, which is the base value, so layering changes those reads as well as `readSource` (Later: a DAG of graphs).
+- Structural equality. The engine cuts off by `===` only and takes no equality argument, and a computation that wants a structurally equal result to count as unchanged returns `previous` (pico-js.md, Model). `resolverResultsEqual` reads the reader AST for walk-assembled data, and `isUnchanged` chooses its comparison by store key, so both stay Isograph's (open decision 20).
+- One value type per graph. A standalone engine has nodes of different types, so `TValue` is per node and the links hold an erased node type (pico-js.md, `src/graph.ts`; open decision 19). In the Isograph runtime, a resolver node is a `DerivedNode<ResolverResult<unknown>>` and a store source node a `SourceNode<StoreValue | Missing>` (The store).
+- Throws. A computation must not throw (pico-js.md, Model). The engine stores no error and catches nothing; the Isograph layer keeps the contract by catching every throw of the resolver into `ResolverThrew` (Stored resolver results, open decision 30).
 - Field visibility. Nodes are plain objects, and a caller outside this repo can write a node's fields (open decision 21, decided).
 - Construction. `sourceNodeAt` calls `createSourceNode` and `resolverNodeAt` calls `createDerivedNode`, so the Isograph runtime builds no engine object by hand.
 
@@ -103,7 +100,7 @@ The package's files, its two pre-commit hooks, and its CI step are pico-js.md, T
 
 ### Exhaustive switches
 
-Every `switch` over a union in the Isograph runtime ends in `default: return assertNever(..)`, so a new variant is a compile error at every switch that does not handle it. Neither `libs/isograph-runtime/src` nor upstream's `libs/*/src` defines one, so `util.ts` gains it:
+Every `switch` over a union in the Isograph runtime ends in `default: return assertNever(..)`, so a new variant is a compile error at every switch that does not handle it. oxlint's `switch-exhaustiveness-check` accepts that arm on an exhaustive switch only under `allowDefaultCaseForExhaustiveSwitch: true` in `.oxlintrc.json`, which core change 4 sets (pico-js.md, `.oxlintrc.json`). Neither `libs/isograph-runtime/src` nor upstream's `libs/*/src` defines one, so `util.ts` gains it:
 
 ```ts
 // from libs/isograph-runtime/src/util.ts
