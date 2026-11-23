@@ -1,8 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import {
-  UNASSIGNED_STATE,
-  useUpdatableDisposableState,
-} from '@isograph/react-disposable-state';
+import { useDisposableArray } from '@isograph/react-disposable-state';
 import type { ReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { createReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
@@ -44,11 +41,6 @@ export type UsePaginationReturnValue<
       kind: 'NoMoreRecords';
       results: ReadonlyArray<TItem>;
     };
-
-type LoadedFragmentReferences<
-  TReadFromStore extends { parameters: object; data: object },
-  TItem,
-> = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
 
 type LoadedFragmentReference<
   TReadFromStore extends { parameters: object; data: object },
@@ -102,9 +94,11 @@ export function useConnectionSpecPagination<
     suspendIfInFlight: true,
     throwOnNetworkError: true,
   };
-  const { state, setState } =
-    useUpdatableDisposableState<
-      LoadedFragmentReferences<TReadFromStore, Connection<TItem>>
+  const { entries, setEntries } =
+    useDisposableArray<
+      ReferenceCountedPointer<
+        FragmentReference<TReadFromStore, Connection<TItem>>
+      >
     >();
 
   const environment = useIsographEnvironment();
@@ -232,29 +226,12 @@ export function useConnectionSpecPagination<
       });
       clonedPointers.push(newPointer);
 
-      const totalItemCleanupPair: ItemCleanupPair<
-        ReadonlyArray<
-          ItemCleanupPair<
-            ReferenceCountedPointer<
-              FragmentReference<TReadFromStore, Connection<TItem>>
-            >
-          >
-        >
-      > = [
-        clonedPointers,
-        () => {
-          clonedPointers.forEach(([, dispose]) => {
-            dispose();
-          });
-        },
-      ];
-
-      setState(totalItemCleanupPair);
+      setEntries(clonedPointers);
     };
 
   const [, rerender] = useState({});
 
-  const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
+  const loadedReferences = entries;
 
   const mostRecentItem:
     | LoadedFragmentReference<TReadFromStore, Connection<TItem>>

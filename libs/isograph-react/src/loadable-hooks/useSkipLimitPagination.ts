@@ -1,8 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import {
-  UNASSIGNED_STATE,
-  useUpdatableDisposableState,
-} from '@isograph/react-disposable-state';
+import { useDisposableArray } from '@isograph/react-disposable-state';
 import type { ReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { createReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
@@ -49,11 +46,6 @@ type ArrayFragmentReference<
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
-type LoadedFragmentReferences<
-  TReadFromStore extends { parameters: object; data: object },
-  TItem,
-> = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
-
 type LoadedFragmentReference<
   TReadFromStore extends { parameters: object; data: object },
   TItem,
@@ -93,9 +85,9 @@ export function useSkipLimitPagination<
     suspendIfInFlight: true,
     throwOnNetworkError: true,
   };
-  const { state, setState } =
-    useUpdatableDisposableState<
-      LoadedFragmentReferences<TReadFromStore, TItem>
+  const { entries, setEntries } =
+    useDisposableArray<
+      ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
     >();
 
   const environment = useIsographEnvironment();
@@ -216,29 +208,12 @@ export function useSkipLimitPagination<
       });
       clonedPointers.push(newPointer);
 
-      const totalItemCleanupPair: ItemCleanupPair<
-        ReadonlyArray<
-          ItemCleanupPair<
-            ReferenceCountedPointer<
-              ArrayFragmentReference<TReadFromStore, TItem>
-            >
-          >
-        >
-      > = [
-        clonedPointers,
-        () => {
-          clonedPointers.forEach(([, dispose]) => {
-            dispose();
-          });
-        },
-      ];
-
-      setState(totalItemCleanupPair);
+      setEntries(clonedPointers);
     };
 
   const [, rerender] = useState({});
 
-  const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
+  const loadedReferences = entries;
 
   const mostRecentItem:
     | LoadedFragmentReference<TReadFromStore, TItem>
