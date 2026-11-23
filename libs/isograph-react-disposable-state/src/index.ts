@@ -5,6 +5,7 @@ export * from './ParentCache';
 export * from './useCachedResponsivePrecommitValue';
 export * from './useDisposableArray';
 export * from './useDisposableState';
+export * from './useDisposableStateOnce';
 export * from './useEffectsRerunWithoutRender';
 export * from './useHasCommittedRef';
 export * from './useLazyDisposableState';
