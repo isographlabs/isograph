@@ -26,6 +26,10 @@ The engine does not check these contracts:
 
 ```ts
 // from libs/pico-js/src/graph.ts
+const MISSING: unique symbol = Symbol('Missing');
+
+type Option<TValue> = TValue | typeof MISSING;
+
 export type Status = 'Clean' | 'Check' | 'Dirty';
 
 export type SourceNode<TValue> = {
@@ -34,7 +38,7 @@ export type SourceNode<TValue> = {
 };
 
 export type DerivedNode<TValue> = {
-  value: TValue;
+  value: Option<TValue>;
   status: Status;
   readonly sourceDependencies: Array<SourceNode<unknown>>;
   readonly derivedDependencies: Array<DerivedNode<unknown>>;
@@ -50,7 +54,7 @@ export function createDerivedNode<TValue>(
   computation: (callingNode: DerivedNode<unknown>, previous: TValue | undefined) => TValue,
 ): DerivedNode<TValue> {
   return {
-    value: undefined as unknown as TValue,
+    value: MISSING,
     status: 'Dirty',
     sourceDependencies: [],
     derivedDependencies: [],
@@ -78,7 +82,7 @@ export function readDerived<TValue>(callingNode: DerivedNode<unknown>, node: Der
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   switch (node.status) {
     case 'Clean':
-      return node.value;
+      return computedValue(node);
     case 'Check':
       return verify(node);
     case 'Dirty':
@@ -92,7 +96,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   markDependentsDirty(node.dependents);
   detach(node);
   node.status = 'Dirty';
-  node.value = undefined;
+  node.value = MISSING;
 }
 
 function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
@@ -140,19 +144,27 @@ function verify<TValue>(node: DerivedNode<TValue>): TValue {
     }
   }
   node.status = 'Clean';
-  return node.value;
+  return computedValue(node);
 }
 
 function recompute<TValue>(node: DerivedNode<TValue>): TValue {
-  const value = node.computation(node, node.value);
+  const previous = node.value;
+  const value = node.computation(node, previous === MISSING ? undefined : previous);
   attach(node);
   node.status = 'Clean';
   if (value === node.value) {
-    return node.value;
+    return computedValue(node);
   }
   node.value = value;
   markDependentsDirty(node.dependents);
   return value;
+}
+
+function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
+  if (node.value === MISSING) {
+    throw new Error('A Clean or Check node has no value');
+  }
+  return node.value;
 }
 
 function attach(node: DerivedNode<unknown>): void {
@@ -185,9 +197,9 @@ function assertNever(value: never): never {
 - Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when `recompute` attaches it.
 - Marking recurses into a node's dependents only when the node leaves `Clean`, so a write recurses into each node's dependents at most once.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
-- A `Clean` or `Check` node's `value` is a value its computation returned. A node becomes `Clean` only at the end of a computation or a verification, and `Check` only from `Clean`. A `Dirty` node's `value` is its previous value, or the `undefined` that `createDerivedNode` or disposal writes. The engine reads a `Dirty` node's `value` only in `recompute`, as `previous`, which is typed `TValue | undefined`, and as the cutoff comparison.
+- A `Clean` or `Check` node's `value` is a value its computation returned, which can be `undefined`. A node becomes `Clean` only at the end of a computation or a verification, and `Check` only from `Clean`. A `Dirty` node's `value` is its previous value or `MISSING`. `MISSING` and `Option` are private to `graph.ts`, so no `TValue` contains `MISSING`. `recompute` passes `MISSING` to the computation as `undefined`, and a value compared with `MISSING` is never `===` to it, so the first computation and the first computation after a disposal never cut off. A new node has no readers, and disposal has already marked the node's readers `Dirty`, so that cutoff would skip no marking. `computedValue` throws if a `Clean` or `Check` node holds `MISSING`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node. TypeScript does not narrow the generic `Option<TValue>` to `TValue` after `value === node.value`, so the cutoff return also calls `computedValue`.
 - A node read twice appears twice in the reader's dependency array and once in its `dependents` set.
-- `disposeDerivedNode` takes a `DerivedNode<unknown>`, so writing `undefined` to `value` type-checks without a cast. Marking every reader `Dirty` detaches each reader, which empties the node's `dependents` set. A node that was never computed has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. An already `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
+- Disposal marks every reader `Dirty`, which detaches each reader and empties the node's `dependents` set. A node that was never computed has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. An already `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
 
 ## `src/index.ts`
 
@@ -521,7 +533,7 @@ describe('dependencies', () => {
 });
 
 describe('disposal', () => {
-  test('disposing a node leaves it Dirty with no value, marks its readers Dirty, and its next pull computes it with previous undefined', () => {
+  test('disposing a node leaves it Dirty, marks its readers Dirty, and its next pull computes it with previous undefined', () => {
     const runs = { inner: 0, outer: 0 };
     const innerPreviousValues: Array<number | undefined> = [];
     const source = createSourceNode(1);
@@ -537,7 +549,6 @@ describe('disposal', () => {
     expect(pull(outer)).toBe(2);
     disposeDerivedNode(inner);
     expect(inner.status).toBe('Dirty');
-    expect(inner.value).toBe(undefined);
     expect(outer.status).toBe('Dirty');
     expect(pull(outer)).toBe(2);
     expect(runs).toEqual({ inner: 2, outer: 2 });
@@ -557,18 +568,23 @@ describe('disposal', () => {
     expect(pull(inner)).toBe(2);
   });
 
-  test('disposing a Dirty node marks its Check readers Dirty', () => {
+  test('disposing a Dirty node marks its Check readers Dirty, and its next pull computes it with previous undefined', () => {
+    const innerPreviousValues: Array<number | undefined> = [];
     const source = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) => readSource(callingNode, source));
+    const inner = createDerivedNode<number>((callingNode, previous) => {
+      innerPreviousValues.push(previous);
+      return readSource(callingNode, source);
+    });
     const outer = createDerivedNode((callingNode) => readDerived(callingNode, inner) + 1);
     pull(outer);
     writeSource(source, 2);
     expect(inner.status).toBe('Dirty');
     expect(outer.status).toBe('Check');
     disposeDerivedNode(inner);
-    expect(inner.value).toBe(undefined);
+    expect(inner.status).toBe('Dirty');
     expect(outer.status).toBe('Dirty');
     expect(pull(outer)).toBe(3);
+    expect(innerPreviousValues).toEqual([undefined, undefined]);
   });
 
   test('disposing a node that was never computed changes nothing', () => {
@@ -580,7 +596,6 @@ describe('disposal', () => {
     });
     disposeDerivedNode(node);
     expect(node.status).toBe('Dirty');
-    expect(node.value).toBe(undefined);
     expect(pull(node)).toBe(1);
     expect(previousValues).toEqual([undefined]);
   });
