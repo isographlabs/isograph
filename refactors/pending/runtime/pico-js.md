@@ -153,24 +153,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them. The engine has no class, so the ES private field rule does not apply. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body with the option below, which allows the `default: assertNever(..)` arm that throws when a value outside the union reaches the switch at run time.
-
-### `.oxlintrc.json`
-
-`switch-exhaustiveness-check` reports a `default` arm in a switch that already handles every member of the union. The option `allowDefaultCaseForExhaustiveSwitch` (typescript-eslint's name, read by `oxlint-tsgolint` 0.9.0) turns that report off and keeps the report on a switch that is not exhaustive. The same change goes into upstream isograph's `.oxlintrc.json`.
-
-```json
-// from .oxlintrc.json, before
-    "typescript/switch-exhaustiveness-check": "error",
-```
-
-```json
-// from .oxlintrc.json, after
-    "typescript/switch-exhaustiveness-check": [
-      "error",
-      { "allowDefaultCaseForExhaustiveSwitch": true }
-    ],
-```
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them. The engine has no class, so the ES private field rule does not apply. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body.
 
 ### Pre-commit hooks
 
@@ -416,8 +399,6 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
       return verify(node);
     case 'Dirty':
       return recompute(node);
-    default:
-      return assertNever(node.status);
   }
 }
 
@@ -449,8 +430,6 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         throw new Error(
           'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
         );
-      default:
-        assertNever(node.status);
     }
   }
   let marked: DerivedNode<unknown> | undefined;
@@ -471,8 +450,6 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
           throw new Error(
             'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
           );
-        default:
-          assertNever(dependent.status);
       }
     }
   }
@@ -537,12 +514,6 @@ function detach(node: DerivedNode<unknown>): void {
   }
   node.sourceDependencies.length = 0;
   node.derivedDependencies.length = 0;
-}
-
-function assertNever(value: never): never {
-  throw new Error(
-    `A switch received a value outside its union: ${String(value)}. This is indicative of a bug in pico-js.`,
-  );
 }
 ```
 
