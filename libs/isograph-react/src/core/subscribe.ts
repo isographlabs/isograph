@@ -11,6 +11,7 @@ import type {
 import { logMessage } from './logging';
 import { type WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import type { ReaderAst } from './reader';
+import { assertNever } from './util';
 
 export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
@@ -103,6 +104,8 @@ export function callSubscriptions(
           }
           return;
         }
+        default:
+          assertNever(subscription);
       }
     }),
   );

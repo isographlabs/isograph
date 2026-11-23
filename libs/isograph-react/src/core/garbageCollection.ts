@@ -16,6 +16,7 @@ import {
   type PromiseWrapper,
   type PromiseWrapperOk,
 } from './PromiseWrapper';
+import { assertNever } from './util';
 
 export type RetainedQuery = {
   readonly normalizationAst: PromiseWrapper<NormalizationAst>;
@@ -221,6 +222,8 @@ function recordReachableIdsFromRecord(
         continue;
       case 'Scalar':
         continue;
+      default:
+        assertNever(selection);
     }
   }
 }

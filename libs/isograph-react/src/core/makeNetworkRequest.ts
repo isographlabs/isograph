@@ -40,6 +40,7 @@ import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
 import { callSubscriptions } from './subscribe';
+import { assertNever } from './util';
 
 let networkRequestId = 0;
 
@@ -64,7 +65,8 @@ export function maybeMakeNetworkRequest<
   > | null,
   fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
+  const shouldFetch = fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
+  switch (shouldFetch) {
     case 'Yes': {
       return makeNetworkRequest(
         environment,
@@ -117,6 +119,8 @@ export function maybeMakeNetworkRequest<
         );
       }
     }
+    default:
+      return assertNever(shouldFetch);
   }
 }
 
@@ -456,6 +460,8 @@ function readDataForOnComplete<
             : undefined),
         });
       }
+      default:
+        assertNever(readerArtifact);
     }
   }
   return null;

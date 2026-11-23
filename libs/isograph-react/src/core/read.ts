@@ -50,7 +50,7 @@ import type {
   ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import type { Arguments } from './util';
+import { type Arguments, assertNever } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -268,6 +268,8 @@ function readData<TReadFromStore>(
         target[field.alias] = data.data;
         break;
       }
+      default:
+        assertNever(field);
     }
   }
   return {
@@ -523,6 +525,8 @@ function writeQueryArgsToVariables(
         targetVariables[name] = argType.value;
         break;
       }
+      default:
+        assertNever(argType);
     }
   }
 }
@@ -610,6 +614,8 @@ export function readResolverFieldData(
         ),
       };
     }
+    default:
+      return assertNever(readerWithRefetchQueries.readerArtifact);
   }
 }
 

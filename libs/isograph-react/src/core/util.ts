@@ -57,3 +57,7 @@ export function stableCopy<T>(value: T): T {
   }
   return stable as any;
 }
+
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled variant: ${String(value)}`);
+}

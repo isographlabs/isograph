@@ -1,5 +1,6 @@
 import { Container } from '@mui/material';
 import React from 'react';
+import { assertNever } from './assertNever';
 import { HomeRoute } from './HomeRoute';
 import { PullRequestRoute } from './PullRequestRoute';
 import { RepositoryRoute } from './RepositoryRoute';
@@ -77,8 +78,6 @@ function Router({
     case 'PullRequest':
       return <PullRequestRoute route={route} setRoute={setRoute} />;
     default:
-      const _: never = route;
-      _;
-      throw new Error('Unexpected route kind');
+      return assertNever(route);
   }
 }

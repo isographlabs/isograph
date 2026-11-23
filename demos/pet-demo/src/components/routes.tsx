@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router';
+import { assertNever } from './assertNever';
 
 export type PetId = string;
 
@@ -78,6 +79,8 @@ function toRouteUrl(route: Route): string {
       return `/only-one-root-loadble/${route.id}`;
     case 'RestEndpointDemo':
       return '/rest-endpoint-demo';
+    default:
+      return assertNever(route);
   }
 }
 

@@ -9,6 +9,7 @@ import {
   getNetworkRequestOptionsWithDefaults,
 } from '../core/read';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
+import { assertNever } from '../core/util';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
@@ -63,5 +64,7 @@ export function useResult<
       // @ts-expect-error
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
+    default:
+      return assertNever(fragmentReference.readerArtifactKind);
   }
 }

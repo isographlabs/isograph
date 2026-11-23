@@ -37,6 +37,7 @@ import {
 } from './read';
 import type { ReaderAst } from './reader';
 import { callSubscriptions } from './subscribe';
+import { assertNever } from './util';
 
 export function getOrCreateCachedStartUpdate<
   TReadFromStore extends UnknownTReadFromStore,
@@ -335,6 +336,8 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
         target[field.alias] = root;
         break;
       }
+      default:
+        assertNever(field);
     }
   }
 

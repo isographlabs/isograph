@@ -9,6 +9,7 @@ import type {
 import { getLink } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { getStoreRecordProxy } from './optimisticProxy';
+import { assertNever } from './util';
 
 export type ShouldFetch = RequiredShouldFetch | 'IfNecessary';
 export type RequiredShouldFetch = 'Yes' | 'No';
@@ -206,6 +207,8 @@ function checkFromRecord(
 
         continue normalizationAstLoop;
       }
+      default:
+        assertNever(normalizationAstNode);
     }
   }
 

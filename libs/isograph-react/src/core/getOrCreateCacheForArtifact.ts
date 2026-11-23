@@ -21,7 +21,7 @@ import {
   ROOT_ID,
 } from './IsographEnvironment';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import { stableCopy } from './util';
+import { assertNever, stableCopy } from './util';
 
 export function getOrCreateCacheForArtifact<
   TReadFromStore extends UnknownTReadFromStore,
@@ -51,6 +51,8 @@ export function getOrCreateCacheForArtifact<
         entrypoint.networkRequestInfo.operation.operationId +
         JSON.stringify(stableCopy(variables));
       break;
+    default:
+      assertNever(entrypoint.networkRequestInfo.operation);
   }
   const factory = () => {
     const { fieldName, readerArtifactKind, readerWithRefetchQueries } =

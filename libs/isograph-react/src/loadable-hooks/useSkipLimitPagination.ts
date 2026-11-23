@@ -19,6 +19,7 @@ import {
 } from '../core/read';
 import type { LoadableField, ReaderAst } from '../core/reader';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
+import { assertNever } from '../core/util';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { maybeUnwrapNetworkRequest } from '../react/maybeUnwrapNetworkRequest';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
@@ -326,6 +327,8 @@ export function useSkipLimitPagination<
         fetchMore: getFetchMore(results.length),
       };
     }
+    default:
+      return assertNever(networkRequestStatus.state);
   }
 }
 

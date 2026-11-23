@@ -30,7 +30,7 @@ import type {
   WithEncounteredRecords,
 } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
-import { isArray } from './util';
+import { assertNever, isArray } from './util';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -290,5 +290,7 @@ export function getOrLoadReaderWithRefetchQueries(
         fieldName: readerWithRefetchQueries.fieldName,
         readerArtifactKind: readerWithRefetchQueries.readerArtifactKind,
       };
+    default:
+      return assertNever(readerWithRefetchQueries);
   }
 }

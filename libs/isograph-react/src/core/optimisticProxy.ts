@@ -7,6 +7,7 @@ import type {
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
+import { assertNever } from './util';
 
 export function getOrInsertRecord(
   dataLayer: StoreLayerData,
@@ -179,6 +180,8 @@ export function addNetworkResponseStoreLayer(
 
       return node;
     }
+    default:
+      return assertNever(parent);
   }
 }
 
@@ -236,6 +239,8 @@ export function addStartUpdateStoreLayer(
       startUpdate(node);
       return node;
     }
+    default:
+      return assertNever(parent);
   }
 }
 
@@ -262,6 +267,8 @@ export function addOptimisticUpdaterStoreLayer(
 
       return node;
     }
+    default:
+      return assertNever(parent);
   }
 }
 
@@ -285,6 +292,8 @@ export function addOptimisticNetworkResponseStoreLayer(
 
       return node;
     }
+    default:
+      return assertNever(parent);
   }
 }
 
@@ -356,6 +365,8 @@ function reexecuteUpdatesAndMergeData(
         storeLayer.startUpdate(storeLayer);
         break;
       }
+      default:
+        assertNever(storeLayer);
     }
     mergeDataLayer(newMergedData, storeLayer.data);
 

@@ -3,6 +3,7 @@ import type {
   Factory,
   ItemCleanupPair,
 } from '@isograph/disposable-types';
+import { assertNever } from './assertNever';
 
 const DEFAULT_TEMPORARY_RETAIN_TIME = 5000;
 
@@ -108,6 +109,8 @@ export class CacheItem<T> {
             'This indicates a bug in react-disposable-state.',
         );
       }
+      default:
+        return assertNever(this.__state);
     }
   }
 
@@ -148,6 +151,8 @@ export class CacheItem<T> {
                     'This indicates a bug in react-disposable-state.',
                 );
               }
+              default:
+                assertNever(this.__state);
             }
           },
         ];
@@ -181,6 +186,8 @@ export class CacheItem<T> {
                     'This indicates a bug in react-disposable-state.',
                 );
               }
+              default:
+                assertNever(this.__state);
             }
           },
         ];
@@ -189,6 +196,8 @@ export class CacheItem<T> {
         // The CacheItem is disposed, so disposeOfTemporaryRetain is a no-op
         return null;
       }
+      default:
+        return assertNever(this.__state);
     }
   }
 
@@ -224,6 +233,8 @@ export class CacheItem<T> {
                     'This indicates a bug in react-disposable-state.',
                 );
               }
+              default:
+                assertNever(this.__state);
             }
           }
         };
@@ -243,6 +254,8 @@ export class CacheItem<T> {
                   'This indicates a bug in react-disposable-state.',
               );
             }
+            default:
+              assertNever(this.__state);
           }
         };
 
@@ -259,6 +272,8 @@ export class CacheItem<T> {
             'This indicates a bug in react-disposable-state.',
         );
       }
+      default:
+        return assertNever(this.__state);
     }
   }
 
@@ -292,6 +307,8 @@ export class CacheItem<T> {
                   'This indicates a bug in react-disposable-state.',
               );
             }
+            default:
+              assertNever(this.__state);
           }
         };
       }
@@ -319,6 +336,8 @@ export class CacheItem<T> {
                   'This indicates a bug in react-disposable-state.',
               );
             }
+            default:
+              assertNever(this.__state);
           }
         };
       }
@@ -328,6 +347,8 @@ export class CacheItem<T> {
             'This indicates a bug in react-disposable-state.',
         );
       }
+      default:
+        return assertNever(this.__state);
     }
   }
 

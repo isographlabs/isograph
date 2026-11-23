@@ -1,5 +1,6 @@
 import type { StoreLink } from './IsographEnvironment';
 import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
+import { assertNever } from './util';
 
 function mergeUsingReaderAst(
   field: ReaderScalarField | ReaderLinkedField,
@@ -27,6 +28,8 @@ function mergeUsingReaderAst(
       }
 
       return mergeObjectsUsingReaderAst(field.selections, oldItem, newItem);
+    default:
+      return assertNever(field);
   }
 }
 
@@ -114,6 +117,8 @@ export function mergeObjectsUsingReaderAst(
       case 'ImperativelyLoadedField':
       case 'LoadablySelectedField':
         break;
+      default:
+        assertNever(field);
     }
   }
 

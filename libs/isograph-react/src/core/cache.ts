@@ -27,7 +27,13 @@ import {
   type StoreLayerWithData,
 } from './optimisticProxy';
 import type { ReaderLinkedField, ReaderScalarField } from './reader';
-import { type Argument, type ArgumentValue, isArray, stableCopy } from './util';
+import {
+  type Argument,
+  type ArgumentValue,
+  assertNever,
+  isArray,
+  stableCopy,
+} from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -206,6 +212,8 @@ function normalizeDataIntoRecord(
           recordHasBeenUpdated || inlineFragmentResultedInChange;
         break;
       }
+      default:
+        assertNever(normalizationNode);
     }
   }
   if (recordHasBeenUpdated) {
@@ -506,6 +514,8 @@ function getStoreKeyChunkForArgumentValue(
     case 'Enum': {
       return argumentValue.value;
     }
+    default:
+      return assertNever(argumentValue);
   }
 }
 
@@ -587,6 +597,8 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
     case 'Enum': {
       return 'e_' + argumentValue.value;
     }
+    default:
+      return assertNever(argumentValue);
   }
 }
 
