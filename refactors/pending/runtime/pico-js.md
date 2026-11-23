@@ -388,9 +388,9 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         node.status = 'Dirty';
         break;
       case 'Dirty':
-        throw new Error('A Dirty node is in a dependents set');
+        throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
       case 'Uncomputed':
-        throw new Error('An Uncomputed node is in a dependents set');
+        throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
       default:
         assertNever(node.status);
     }
@@ -407,9 +407,9 @@ function markDependentsCheck(dependents: Set<DerivedNode<unknown>>): void {
       case 'Check':
         break;
       case 'Dirty':
-        throw new Error('A Dirty node is in a dependents set');
+        throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
       case 'Uncomputed':
-        throw new Error('An Uncomputed node is in a dependents set');
+        throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
       default:
         assertNever(node.status);
     }
@@ -450,7 +450,7 @@ function recompute<TValue>(node: DerivedNode<TValue>): TValue {
 
 function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
   if (node.value === NOT_SET) {
-    throw new Error('A node that is not Uncomputed has no value');
+    throw new Error('A node that is not Uncomputed has no value. This is indicative of a bug in pico-js.');
   }
   return node.value;
 }
@@ -476,7 +476,7 @@ function detach(node: DerivedNode<unknown>): void {
 }
 
 function assertNever(value: never): never {
-  throw new Error(`Unhandled variant: ${String(value)}`);
+  throw new Error(`A switch received a value outside its union: ${String(value)}. This is indicative of a bug in pico-js.`);
 }
 ```
 
