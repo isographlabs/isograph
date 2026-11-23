@@ -261,7 +261,7 @@ Each `readSource` and `readDerived` call during a computation records a dependen
 
 ## Cutoff
 
-When a recompute returns a value `===` to its previous value, the node marks none of its readers `Dirty`, and a `Check` reader becomes `Clean` without running. A computation that returns `previous` when its new result is structurally equal to `previous` extends the cutoff to structural equality.
+When a recompute returns a value `===` to its previous value, the node marks none of its readers `Dirty`, and a `Check` reader becomes `Clean` without running. The engine compares only by `===`. Structural sharing is the computation's responsibility: a computation that wants a structurally equal result to count as unchanged compares its new result with `previous` and returns `previous` when they are equal.
 
 ## Disposal
 
