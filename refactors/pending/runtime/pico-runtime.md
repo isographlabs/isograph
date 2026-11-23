@@ -118,7 +118,7 @@ The store is the set of source nodes. A record is a container that holds its sou
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-import { createSourceNode, type DerivedNode, type SourceNode } from '@isograph/pico-js';
+import { createSourceNode, disposeDerivedNode, writeSource, type DerivedNode, type SourceNode } from '@isograph/pico-js';
 
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
 
@@ -182,13 +182,12 @@ export function presentContainerAt(store: Store, link: StoreLink): RecordContain
 
 /** `sourceNodeAt` inserts a `MISSING` source node, and an `Absent` container, when `link` has none for `key`. */
 export function sourceNodeAt(store: Store, link: StoreLink, key: StoreKey): StoreSourceNode {
-  return getOrInsert(containerAt(store, link).sources, key, () => createSourceNode(MISSING, isUnchanged(key)));
+  return getOrInsert(containerAt(store, link).sources, key, () => createSourceNode(MISSING));
 }
 
-function isUnchanged(key: StoreKey): (previous: StoreValue | Missing, next: StoreValue | Missing) => boolean {
+export function isUnchanged(key: StoreKey): (stored: StoreValue | Missing, written: StoreValue) => boolean {
   const unchanged = key === VALUE_KEY ? leafUnchanged : compositeUnchanged;
-  return (previous, next) =>
-    previous === MISSING || next === MISSING ? previous === next : unchanged(previous, next);
+  return (stored, written) => stored !== MISSING && unchanged(stored, written);
 }
 
 function leafUnchanged(stored: StoreValue, written: StoreValue): boolean {
@@ -264,7 +263,7 @@ export function deleteRecord(store: Store, link: StoreLink): void {
   if (containers === undefined || container === undefined) {
     return;
   }
-  container.sources.forEach((source) => markSourceDirty(source));
+  container.sources.forEach((source) => writeSource(source, source.value));
   container.derived.forEach((node) => disposeDerivedNode(node));
   containers.delete(link.id);
   if (containers.size === 0) {
@@ -273,7 +272,7 @@ export function deleteRecord(store: Store, link: StoreLink): void {
 }
 ```
 
-`deleteRecord` calls `markSourceDirty` on every source node of the container, `MISSING` ones included, disposes every derived node the container owns, and then removes the container (open decision 31). `storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store. `deleteRecord`'s `container.derived` line arrives with `derived` in core change 8; in core change 5 the container has no `derived` map.
+`deleteRecord` writes every source node of the container with its own value, `MISSING` ones included, which marks its readers because `writeSource` marks whether or not the value changed (pico-js.md, Model). It then disposes every derived node the container owns and removes the container (open decision 31). `storeValue` and `recordPresence` insert nothing, so `check`, the mark, a v1 read, and a snapshot never grow the store. `deleteRecord`'s `container.derived` line arrives with `derived` in core change 8; in core change 5 the container has no `derived` map.
 
 The sweep, after (`libs/isograph-runtime/src/garbageCollection.ts:32-41`):
 
@@ -432,7 +431,7 @@ Before (`libs/isograph-runtime/src/areEqualWithDeepComparison.ts:9-44`): `select
 
 - A resolver's return value: `outputEqual`, `===` unless the field supplies one (open decision 7). A primitive or a reused object cuts off; a new object marks the dependents.
 - Objects the runtime itself creates get a structural rule. `MissingData` is built from strings and links. A fragment's data object is assembled by the walk (`readSelectionSet`, `read.ts:101-121`); when a resolver returns that object (`({ data }) => data`, as every store fixture resolver does), the result is tagged `WalkData` and two such results compare by `selectionSetDataAreEqual` over the artifact's tables at its parent entity (below), which reads each selection's entry in the entity's table as the walk does: a `Derived` entry with target `null` compares by `===`; a `Source` entry, a `Derived` entry with a target, and `__self` compare `null` to `null`, lists by length and item at any depth, and each linked record's value by its selections recursively (at the entry's target) or, with `selections: null`, by `===` (a scalar's `__value`, or `EMPTY_DATA`). That is upstream's `mergeObjectsUsingReaderAst` rule (`areEqualWithDeepComparison.ts:55-121`) without the recycling. So `{ initials }` assembled by the walk compares equal when `initials` is the same string, a link moved to a record with equal data cuts off, and an opaque derived output is never compared structurally.
-- Source writes: each store source node compares a written value with the stored one by `isUnchanged` (The store): `leafUnchanged` for `__value` and `compositeUnchanged` for every other key, as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
+- Source writes: `writeValue` compares a written value with the stored one by `isUnchanged` (The store) before it calls `writeSource`: `leafUnchanged` for `__value` and `compositeUnchanged` for every other key, as upstream does (`normalizeScalarField`, `cache.ts:232-249`; `normalizeLinkedField` and `dataIdsAreTheSame`, `:255-393`).
 
 ```ts
 // from libs/isograph-runtime/src/read.ts
@@ -1173,22 +1172,25 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 
 ## `normalize` writes source nodes
 
-`normalize` keeps its parameters and its `void` return (`libs/isograph-runtime/src/normalize.ts:31-50`). It writes each value into its source node with `writeSource`, which marks as it writes. A value the source's equality accepts (`isUnchanged`, The store) writes nothing and marks nothing, and the stored value object keeps its identity.
+`normalize` keeps its parameters and its `void` return (`libs/isograph-runtime/src/normalize.ts:31-50`). It writes each value into its source node with `writeSource`, which marks as it writes. `writeSource` marks the source's readers whether or not the value changed (pico-js.md, Model), so `writeValue` compares the written value with the stored one by `isUnchanged` (The store) first. A value `isUnchanged` accepts writes nothing and marks nothing, and the stored value object keeps its identity.
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
 import { writeSource } from '@isograph/pico-js';
 
 function writeValue(normalization: Normalization, link: StoreLink, key: StoreKey, value: StoreValue): void {
-  writeSource(sourceNodeAt(normalization.store, link, key), value);
+  const source = sourceNodeAt(normalization.store, link, key);
+  if (!isUnchanged(key)(source.value, value)) {
+    writeSource(source, value);
+  }
 }
 ```
 
-Deltas from v1 (`normalize.ts`): `writeSelection` calls `writeValue` where it called `record.set` (`:96-109`), and `leafRecords` calls it for a scalar record's `__value` (Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). The comparison core change 1 adds to `normalize` on v1's plain store moves into the source nodes' equality in core change 5, where source nodes first exist: `leafUnchanged` and `compositeUnchanged` move from `normalize.ts` to `store.ts`, and the key decides which applies, because after core change 3 only `__value` holds a leaf.
+Deltas from v1 (`normalize.ts`): `writeSelection` calls `writeValue` where it called `record.set` (`:96-109`), and `leafRecords` calls it for a scalar record's `__value` (Scalar records); `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`; `recordAt` is `presentContainerAt` (`:163-169`). The comparison core change 1 adds to `normalize` on v1's plain store stays in `writeValue`. In core change 5, where source nodes first exist, `isUnchanged`, `leafUnchanged`, and `compositeUnchanged` move from `normalize.ts` to `store.ts`, because `isUnchanged` compares with `MISSING`, which is private to `store.ts`. The key decides which comparison applies, because after core change 3 only `__value` holds a leaf.
 
 Deltas from upstream: upstream compares a scalar with `!==` only (`cache.ts:248-249`), so a list of scalars counts as changed on every response; here a leaf list compares by length and item at any depth. Upstream compares a link by `__link` and `__typename` and a list of links one level deep (`cache.ts:337-338`, `:372-393`); here a link compares by `entityName` and `id`, and lists nest at any depth. A leaf that is a JSON object compares by `===`, so it counts as changed on every rewrite: one mark too many, never a missed one.
 
-Contract: a caller must not mutate a response object after passing it to `normalize`. `writeValue` stores the response's own leaf value, not a copy, so a leaf whose value is an object or an array (a JSON scalar) is the same object in the response and in the `__value` source node. A caller that mutates that object in place and normalizes the same response again passes `written === stored`: `leafUnchanged` answers unchanged (`stored === written` for an object; for an array, each item compared with itself), `writeSource` marks nothing, and every reader that read the `__value` keeps a stored result computed from the object's earlier contents. The mutation already changed the stored value before the second `normalize`, with no write and no mark, which is the rule Equality states for stored values (returned values are shared, not copied). Links are not affected: `compositeValue` builds each link object, so a link source never holds a response object. The engine-level escape for a value mutated in place is `markSourceDirty(source)` on that `__value` source node, which marks its dependents without comparing (pico-js.md, Functions and Mark); the package index exports no runtime function that calls it, so the supported path is a new response object.
+Contract: a caller must not mutate a response object after passing it to `normalize`. `writeValue` stores the response's own leaf value, not a copy, so a leaf whose value is an object or an array (a JSON scalar) is the same object in the response and in the `__value` source node. A caller that mutates that object in place and normalizes the same response again passes `written === stored`: `leafUnchanged` answers unchanged (`stored === written` for an object; for an array, each item compared with itself), `writeValue` does not call `writeSource`, and every reader that read the `__value` keeps a stored result computed from the object's earlier contents. The mutation already changed the stored value before the second `normalize`, with no write and no mark, which is the rule Equality states for stored values (returned values are shared, not copied). Links are not affected: `compositeValue` builds each link object, so a link source never holds a response object. The engine-level escape for a value mutated in place is `writeSource(source, source.value)` on that `__value` source node, which marks its readers without comparing (pico-js.md, Model). The runtime's package index exports no function that makes that call, so the supported path is a new response object.
 
 Writing marks as it goes, so a response that throws part-way has marked every write it made. `normalize` throws v1's error unchanged (open decision 4). Absent to present is `presentContainerAt` and marks nothing: presence is not a source, and every reader of the absent record read a key, which the write marks if it sets it.
 
@@ -1335,7 +1337,7 @@ Upstream's collection deletes records only and runs only when the base layer is 
 
 Each is one commit, in order; each is independently shippable.
 
-1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and core change 5 moves the same comparison into the source nodes' `equals`, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched. The two comparisons live in `normalize.ts` until core change 5 moves them to `store.ts`; `compositeUnchanged` and `leafUnchanged` are the bodies of The store, Accessors, unchanged. On the plain store a leaf is stored under its own key, so the comparison is chosen by the selection's target, not by the key:
+1. Prefactor: `normalize` skips an unchanged value (`writeValue`, `isUnchanged`, `leafUnchanged`, `compositeUnchanged`) on v1's plain store, comparing before `record.set`. It stays a prefactor rather than folding into the record containers change: it is observable and shippable on the plain store with no engine, and `writeValue` keeps the same comparison before `writeSource` from core change 5 on, unchanged in behavior. Observable: normalizing the same response twice keeps every stored list and link object (`toBe`). In the pet script, the `PetDetailRoute` response leaves `Pet:0.firstName`'s stored value untouched. The two comparisons live in `normalize.ts` until core change 5 moves them to `store.ts`; `compositeUnchanged` and `leafUnchanged` are the bodies of The store, Accessors, unchanged. On the plain store a leaf is stored under its own key, so the comparison is chosen by the selection's target, not by the key:
 
    ```ts
    // from libs/isograph-runtime/src/normalize.ts
@@ -1437,7 +1439,7 @@ Each is one commit, in order; each is independently shippable.
    Tests and fixtures. Every `storeOf(..)` that holds a leaf lists it as a link under the parent's key plus the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), and `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated with `Leaf` targets. New tests: in `test/normalize.test.ts`, "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", and "a custom scalar's JSON array below its list depth is one __value"; in `test/check.test.ts`, "a missing __value is missing its scalar record"; in `test/garbageCollection.test.ts`, "a scalar record no retained query reaches is deleted".
 
 4. Prefactor: the engine package, shipped alone before the Isograph runtime uses it (open decision 26). This change implements `refactors/pending/runtime/pico-js.md`: `libs/pico-js` with `src/equality.ts`, `src/graph.ts`, and `src/index.ts` as its The public API and The implementation write them, its test files (Tests) and `README.md` (The package README), and its `package.json`, tsconfig, tsdown, and vitest files, its two pre-commit hooks, and its CI step (The package). Nothing in the Isograph runtime imports it yet. Observable: `pnpm --filter @isograph/pico-js test` passes the sum, parity, and label example (`sum` and `parity` run twice, `label` once); `pnpm compile-libs` writes its `dist/index.cjs` and `dist/index.mjs`; its `package.json` lists no dependencies. Its reader is the stated goal, a project outside Isograph; the runtime is its first workspace caller in change 5.
-5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode` with `isUnchanged(key)`, so `normalize`'s comparison moves out of `normalize` into each source's `equals`, `storeValue` and `storeSnapshot` read `source.value`, `writeValue` calls `writeSource`, and `deleteRecord` calls `markSourceDirty` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` and `markSourceDirty` mark nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
+5. Prefactor: the store becomes record containers (`Store` as a map of `RecordContainer`s, `RecordContainer`, `presence`, `sources`, the accessors, `storeSnapshot`, `deleteRecord` without derived nodes). The runtime gains its dependency on the engine (The engine package and the runtime) and its three pre-commit hooks match the engine's directory. A container's `sources` hold the engine's source nodes: `sourceNodeAt` calls `createSourceNode(MISSING)`, `isUnchanged`, `leafUnchanged`, and `compositeUnchanged` move to `store.ts`, `storeValue` and `storeSnapshot` read `source.value`, `writeValue` calls `writeSource` when `isUnchanged` finds the value changed, and `deleteRecord` calls `writeSource(source, source.value)` for each source node. No derived node exists, so every `dependents` set stays empty and `writeSource` marks nothing. `check`, `garbageCollect`, `read`, and `normalize` read and write through the accessors; tests compare `storeSnapshot`. The type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: none in behavior; `environment.store` is no longer v1's nested map, and `storeSnapshot(environment.store)` is.
 
    Tests. `storeSnapshot(store)` replaces `store` wherever a test compares the store: `expect(store).toEqual(storeOf(..))` in `test/normalize.test.ts` and `test/garbageCollection.test.ts`, `expect(store).toEqual(before)` with `before = storeSnapshot(store)` in place of `structuredClone(store)` (`test/check.test.ts:236-242`), and `expect(environment.store).toEqual(new Map())` in `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), `test/environment.test.ts:95`, and `test/garbageCollection.test.ts` (`:42`, `:46`), which compare with `new Map()` as a `PlainStore`. Every in-place mutation of a stored record goes through The store's test fixtures rule: a key deleted (`test/check.test.ts:114`, `:179`, `:187`, `:193`) builds the store with `storeFrom` without that key; a record deleted (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) calls `deleteRecord`; a value set (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) calls `writeSource(sourceNodeAt(..), 'x')`. New: in `test/store.test.ts`, "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", and "storeFrom then storeSnapshot is the identity on a PlainStore".
 
@@ -1709,7 +1711,7 @@ Upstream has stacks, not trees: each layer has one `childStoreLayer` (`optimisti
 
 ## Later: other derived node kinds
 
-A source other than a server field is a source node its owner holds, written with `writeSource` or marked with `markSourceDirty` by the code that owns the value. User code reaches it only through a selection, so the walk records the read.
+A source other than a server field is a source node its owner holds, written with `writeSource` by the code that owns the value, which compares before it writes when an equal value should not mark the readers. User code reaches it only through a selection, so the walk records the read.
 
 - Request state. The state of a request is a source node on its request entry (network-and-subscriptions.md, Request entries in the store). Which request a selection refers to is open decision 14.
 - Browser-owned state (a `localStorage` key, a cookie, the URL): the environment mirrors each value as events arrive and writes the mirror's source node. Such a value is current only when every write to it reports a change: the `storage` event does not fire in the window that made the change (MDN, Window: storage event), and a `document.cookie` assignment fires none (the Cookie Store API's `change` event does, MDN, CookieStore: change event). Polling is not an option (AGENTS.md, Wake on events). This doc does not plan it.
@@ -1919,7 +1921,7 @@ This deviates from AGENTS.md's "Never rely on discipline what we can enforce wit
 
 ### 23. Whether `writeSource` compares the new value with the old (decided)
 
-`refactors/pending/runtime/pico-js.md` open decision 8. Decided by the user: writing an equal value does not propagate. `createSourceNode(value, equals)` takes a required equality and `writeSource` marks nothing when it accepts (pico-js.md, Mark). The store passes `isUnchanged(key)` for every source node (The store), so `normalize` compares nothing itself.
+Decided by the user: writing an equal value does not propagate. The engine's `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes (pico-js.md, Model). `writeValue` compares with `isUnchanged(key)` (The store) and calls `writeSource` only for a changed value (`normalize` writes source nodes).
 
 ### 24. A pull of a disposed node
 
@@ -1966,4 +1968,4 @@ Moot under open decision 2: the engine throws no error of its own, so `callResol
 
 ### 31. How `deleteRecord` marks the readers of a deleted record's source nodes (decided)
 
-Decided by the user: (a). `deleteRecord` calls `markSourceDirty(source)` on each source node of the container, `MISSING` ones included, which marks without comparing (The store). A reader of a deleted record's source node must recompute, or it keeps depending on a source node the store no longer holds and never sees a later write of that key into a new container. `writeSource(source, MISSING)` would mark nothing for a source that already holds `MISSING`, because `isUnchanged` answers `previous === next` when either side is `MISSING`, so a reader of a missing key on a deleted record would stay `Clean` on the removed node. `isUnchanged` keeps that rule.
+Decided by the user: (a). `deleteRecord` calls `writeSource(source, source.value)` on each source node of the container, `MISSING` ones included. `writeSource` marks the source's readers whether or not the value changed (pico-js.md, Model), so this call marks without comparing (The store). A reader of a deleted record's source node must recompute, or it keeps depending on a source node the store no longer holds and never sees a later write of that key into a new container. `deleteRecord` does not write through `writeValue`, because `isUnchanged` would accept the source's own value and skip the write, so a reader of the deleted record would stay `Clean` on the removed node.
