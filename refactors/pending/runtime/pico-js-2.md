@@ -35,8 +35,8 @@ export type SourceNode<TValue> = {
 export type DerivedNode<TValue> = {
   value: TValue;
   status: Status;
-  sourceDependencies: Array<SourceNode<unknown>>;
-  derivedDependencies: Array<DerivedNode<unknown>>;
+  readonly sourceDependencies: Array<SourceNode<unknown>>;
+  readonly derivedDependencies: Array<DerivedNode<unknown>>;
   readonly dependents: Set<DerivedNode<unknown>>;
   computation(callingNode: DerivedNode<unknown>, previous: TValue | undefined): TValue;
 };
