@@ -947,18 +947,18 @@ field Query.PetDetailPage($id: ID!) { pet(id: $id) { n1: name n2: name { toUpper
 field String.toUppercase { __self }
 ```
 
-The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__value` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__value` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `Query.PetDetailPage/{"id":"1"}` on `Query:__ROOT`. `X.__value` is the `__value` source node of the scalar record `X`; `T.f` names the entry of `f` in `T`'s table.
+The generated artifacts are in linked-only-selections.md, Generated files for the example. The store holds `Query:__ROOT.pet____id___"1"` linking to `Pet:1`; `Pet:1.name` linking to `String:Pet:1.name`, whose `__value` is `"Ricky"`; `Pet:1.bestFriend` linking to `Pet:2`; `Pet:2.name` linking to `String:Pet:2.name`, whose `__value` is `"Mango"`. `PetDetailPage` is read with `{ id: "1" }`; its node is `Query.PetDetailPage/{"id":"1"}` on `Query:__ROOT`. `X.__value` is the `__value` source node of the scalar record `X`; `T.f` names the entry of `f` in `T`'s table. A `{..}` after a node is its `dependents` set once the computations that read it have returned, because the engine adds a node to the `dependents` set of each node it read after its computation returns (pico-js.md, Model). Marking a node `Dirty` removes it from every `dependents` set it is in.
 
 First read:
 
 ```text
-read PetDetailPage: absent -> create Dirty, no value -> recompute at Query:__ROOT as Query
+read PetDetailPage: absent -> create Uncomputed -> compute at Query:__ROOT as Query
   pet: Query.pet Source, target Pet -> Query:__ROOT.pet____id___"1" -> dependents {PetDetailPage} -> Pet:1 -> selections at Pet:1 as Pet
     n1: Pet.name Source, target String -> Pet:1.name -> {PetDetailPage} -> String:Pet:1.name, no selections
       String shape Leaf -> String:Pet:1.name.__value -> {PetDetailPage} -> "Ricky"
     n2: Pet.name Source -> Pet:1.name (second entry) -> String:Pet:1.name -> selections at String:Pet:1.name as String
-      toUppercase: String.toUppercase Derived, target null -> String:Pet:1.name.derived "String.toUppercase/{}" absent -> create Dirty
-        -> recompute at String:Pet:1.name as String, with toUppercase's tables
+      toUppercase: String.toUppercase Derived, target null -> String:Pet:1.name.derived "String.toUppercase/{}" absent -> create Uncomputed
+        -> compute at String:Pet:1.name as String, with toUppercase's tables
         __self -> String:Pet:1.name as String, no selections -> String shape Leaf
           -> String:Pet:1.name.__value -> {PetDetailPage, toUppercase@String:Pet:1.name} -> "Ricky"
         resolver({ data: { __self: "Ricky" }, parameters: {}, link: String:Pet:1.name }) -> toUppercase Clean "RICKY"
@@ -997,7 +997,7 @@ Write `Pet:1.name` to a value with the same uppercase:
 ```text
 normalize Pet:1.name = "rex": String:Pet:1.name.__value -> {PetDetailPage, toUppercase} -> both Dirty
 read PetDetailPage: Dirty -> recompute
-  n1 "rex"; n2: toUppercase Dirty -> recompute "REX" === "REX" -> Clean, keeps "REX", marks nothing
+  n1 "rex"; n2: toUppercase Dirty -> recompute "REX" === "REX" -> returns previous -> Clean, marks nothing
   -> PetDetailPage Clean p4 (n1 changed)
 ```
 
@@ -1007,12 +1007,12 @@ read PetDetailPage: Dirty -> recompute
 
 ```text
 normalize Pet:1.name = null: leafRecords -> null, writes no scalar record
-  Pet:1.name: link -> null -> compositeUnchanged rejects -> {PetDetailPage} -> Dirty
+  Pet:1.name: link -> null -> compositeUnchanged rejects -> {PetDetailPage} -> Dirty, removed from every dependents set
   toUppercase@String:Pet:1.name is not marked: it reads only String:Pet:1.name.__value
 read PetDetailPage: Dirty -> recompute
   n1: Pet:1.name -> null -> null; n2: Pet:1.name -> null -> null, toUppercase not read; bestFriend -> "Mango"
   -> PetDetailPage Clean p5 = { pet: { n1: null, n2: null, bestFriend: { name: "Mango" } } }
-  toUppercase@String:Pet:1.name.dependents -= PetDetailPage -> {}; String:Pet:1.name.__value.dependents = {toUppercase}
+  toUppercase@String:Pet:1.name.dependents = {}; String:Pet:1.name.__value.dependents = {toUppercase}
 collection: no retained query reaches String:Pet:1.name through Pet:1.name -> deleteRecord(String:Pet:1.name)
   -> dispose toUppercase@String:Pet:1.name (no dependents) -> container removed
 ```
@@ -1037,8 +1037,8 @@ A refinement, `field Query.F { node(id: "1") { asPet { name } } }`:
 ```text
 read F: recompute at Query:__ROOT as Query
   node: Query.node Source, target Node -> Query:__ROOT.node____id___"1" -> {F} -> Pet:1 -> selections at Pet:1 as Node
-    asPet: Node.asPet Derived, target Pet -> Pet:1.derived "Node.asPet/{}" absent -> create Dirty
-      -> recompute at Pet:1 as Node: empty reader AST, reads nothing
+    asPet: Node.asPet Derived, target Pet -> Pet:1.derived "Node.asPet/{}" absent -> create Uncomputed
+      -> compute at Pet:1 as Node: empty reader AST, reads nothing
       resolver({ data: {}, parameters: {}, link: Pet:1 }) -> link.entityName is "Pet" -> Pet:1 -> asPet Clean Pet:1, dependencies []
     asPet@Pet:1.dependents = {F} -> Pet:1 is a link -> selections at Pet:1 as Pet
       name: Pet.name -> Pet:1.name -> String:Pet:1.name -> Leaf -> String:Pet:1.name.__value -> {F}
@@ -1195,86 +1195,87 @@ Writing marks as it goes, so a response that throws part-way has marked every wr
 
 ## Traces
 
+A computation records each node it reads, and the engine adds the node to those nodes' `dependents` sets after its computation returns. Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays (pico-js.md, Model).
+
 First read:
 
 ```text
-read FP: absent -> create FP Dirty, no value -> recompute FP
-  root.1 -> root.1.dependents = {FP}
-  root.2 -> root.2.dependents = {FP}            (link to other)
-  other.1 -> other.1.dependents = {FP}
-  other.2 -> other.2.dependents = {FP}
-  FC: absent -> create FC Dirty, no value -> recompute FC
-    root.2 -> root.2.dependents = {FP, FC}
-    root.3 -> root.3.dependents = {FC}
-    other.2 -> other.2.dependents = {FP, FC}
-    other.3 -> other.3.dependents = {FC}
-    FC Clean v1
-  FC.dependents = {FP}
-  FP Clean p1
+read FP: absent -> create FP Uncomputed -> compute FP
+  reads root.1, root.2 (link to other), other.1, other.2
+  FC: absent -> create FC Uncomputed -> compute FC
+    reads root.2, root.3, other.2, other.3
+    FC Clean v1 -> root.2, root.3, other.2, other.3 dependents += FC
+  reads FC
+  FP Clean p1 -> root.1, root.2, other.1, other.2, FC dependents += FP
+  root.2.dependents = {FC, FP}, other.2.dependents = {FC, FP}, FC.dependents = {FP}
 read FP: Clean -> p1
 ```
 
 Write and mark:
 
 ```text
-write root.3 -> root.3.dependents = {FC} -> FC Dirty -> FC.dependents = {FP} -> FP Check
-write other.3 -> other.3.dependents = {FC} -> FC already Dirty -> stop
-write root.1 -> root.1.dependents = {FP} -> FP Check -> FP Dirty (dependents already marked)
+write root.3 -> root.3.dependents = {FC} -> FC Dirty, removed from root.2, root.3, other.2, other.3 -> FC.dependents = {FP} -> FP Check
+write other.3 -> other.3.dependents = {} -> nothing marked
+write root.1 -> root.1.dependents = {FP} -> FP Check -> FP Dirty, removed from root.1, root.2, other.1, other.2, FC
 ```
 
 Pull with short circuit, after only `write root.3`:
 
 ```text
-read FP: Check -> FC Dirty -> recompute -> v2 === v1 -> FC Clean, keeps v1 -> FP Clean without running
+read FP: Check -> FC Dirty -> recompute -> v2 equal to v1 -> returns previous v1 -> FC Clean -> FP Clean without running
 ```
 
 The same pull when `FC` changed:
 
 ```text
-read FP: Check -> FC Dirty -> recompute -> v2 !== v1 -> FC Clean v2 -> FC.dependents = {FP} -> FP Dirty
+read FP: Check -> FC Dirty -> recompute -> v2 not equal to v1 -> FC Clean v2 -> FC.dependents = {FP} -> FP Dirty
   -> recompute FP: root.1, root.2, other.1, other.2, FC Clean -> v2 -> FP Clean p2
 ```
 
 A source only `FP` read:
 
 ```text
-write root.1 -> root.1.dependents = {FP} -> FP Dirty -> FP.dependents = {}
+write root.1 -> root.1.dependents = {FP} -> FP Dirty, removed from root.1, root.2, other.1, other.2, FC -> FP.dependents = {}
 read FP: Dirty -> recompute FP: root.1, root.2, other.1, other.2, FC Clean -> v1 (FC not run) -> FP Clean
 ```
 
 A link retarget: `root.2` moves from `other` to `next`.
 
 ```text
-write root.2 = next -> root.2.dependents = {FP, FC} -> FP Dirty, FC Dirty -> FC.dependents = {FP} (already Dirty)
+write root.2 = next -> root.2.dependents = {FC, FP}
+  -> FC Dirty, removed from root.2, root.3, other.2, other.3
+  -> FP Dirty, removed from root.1, root.2, other.1, other.2, FC
+  -> FC.dependents = {}, FP.dependents = {}
 read FP: Dirty -> recompute FP
   root.1, root.2 -> next, next.1, next.2
   FC: Dirty -> recompute FC: root.2, root.3, next.2, next.3 -> FC Clean
-    other.2.dependents -= FC, other.3.dependents -= FC, next.2.dependents += FC, next.3.dependents += FC
+    root.2, root.3, next.2, next.3 dependents += FC
   FP Clean
-    other.1.dependents -= FP, other.2.dependents -= FP, next.1.dependents += FP, next.2.dependents += FP
+    root.1, root.2, next.1, next.2, FC dependents += FP
 write other.2 -> other.2.dependents = {} -> nothing marked
 ```
 
 Record deletion of `other`:
 
 ```text
-delete other -> other.1.dependents = {FP} -> FP Dirty
-             -> other.2.dependents = {FP, FC} -> FC Dirty
-             -> other.3.dependents = {FC}
+delete other -> writeSource(other.1, other.1.value) -> other.1.dependents = {FP} -> FP Dirty, removed from every dependents set
+             -> writeSource(other.2, ..) -> other.2.dependents = {FC} -> FC Dirty, removed from every dependents set
+             -> writeSource(other.3, ..) -> other.3.dependents = {} -> nothing marked
              -> other.derived = {} -> nothing to dispose -> container removed
 read FP: Dirty -> recompute FP: root.1, root.2 -> other, other.1: no container -> other Absent, other.1 MISSING
   -> MissingData naming other.1 -> walk stops -> FP Clean MissingData
-  FP now reads root.1, root.2, other.1; FC.dependents -= FP; FC stays Dirty with v1, read by nothing
+  FP now reads root.1, root.2, other.1; FC stays Dirty with v1, read by nothing
 ```
 
 Record deletion of `root`, which owns `FP` and `FC`:
 
 ```text
-delete root -> root.1, root.2, root.3 dependents -> FP, FC Dirty
-            -> root.derived = {FP, FC} -> dispose FP: remove from root.1, root.2, other.1, other.2, FC dependents
-                                       -> dispose FC: remove from root.2, root.3, other.2, other.3 dependents
+delete root -> root.1.dependents = {FP} -> FP Dirty, removed from every dependents set
+            -> root.2.dependents = {FC} -> FC Dirty, removed from every dependents set
+            -> root.3.dependents = {} -> nothing marked
+            -> root.derived = {FP, FC} -> dispose FP, dispose FC: no readers, no dependencies -> both Uncomputed
             -> container removed
-read FP: root absent -> create root Absent, FP Dirty, no value -> recompute FP: root.1 MISSING -> FP Clean MissingData
+read FP: root absent -> create root Absent, a new FP Uncomputed -> compute FP: root.1 MISSING -> FP Clean MissingData
 ```
 
 ## End-user experience
@@ -1636,9 +1637,9 @@ export type Entrypoint<TOutput> = {
 A `Retention` has `ast` and `variables`, so it is a `RetainedQuery` (`garbageCollection.ts:18-21`), and the store's mark keeps its records. `makeNetworkRequest` and `retainQueryWithoutMakingNetworkRequest` take a `Retention` where they take a `RetainedQuery` (`libs/isograph-runtime/src/network.ts:107-125`, `:163-170`), and their cleanups call `dispose`. This is upstream's `retainQuery` and `unretainQuery` (`garbageCollection.ts:40-63`) with the root hold added.
 
 ```text
-retainEntrypoint HomeRoute -> HomeRoute absent -> create Dirty, no value -> rootCount 1
+retainEntrypoint HomeRoute -> HomeRoute absent -> create Uncomputed -> rootCount 1
 HomeRoute response -> writes, marks nothing (no node has read anything)
-read HomeRoute -> Dirty -> recompute -> creates and computes PetSummaryCard@Pet:0, @Pet:1, fullName@...
+read HomeRoute -> Uncomputed -> compute -> creates and computes PetSummaryCard@Pet:0, @Pet:1, fullName@...
 ```
 
 With `shouldFetch` `IfNecessary`, `fetchEntrypoint` pulls the root node at fetch time, before the network call, and fetches when it is `MissingData`; it serves from the store otherwise. `check` stays a plain exported function (`libs/isograph-runtime/src/index.ts:43`).
@@ -1777,10 +1778,12 @@ Decided by the user: no guard and no database object. The engine gives up no per
 
 ```text
 P Dirty -> recompute P: reads C Clean -> P's resolver calls normalize -> write c.1 -> c.1.dependents = {C} -> C Dirty
-  -> C.dependents = {} (P is added only after compute returns)
-P finishes -> setDependencies: C.dependents = {P} -> P Clean, reading a Dirty C
-write c.1 again -> C already Dirty -> stop -> P is never marked
+  -> C removed from c.1.dependents -> C.dependents = {} (P is added only after its computation returns)
+P finishes -> C.dependents += P -> P Clean, reading a Dirty C
+write c.1 again -> c.1.dependents = {} -> nothing marked
 ```
+
+`P` stays `Clean` over the changed `c.1` until another reader pulls `C` and `C` recomputes to a changed value, which marks `P` `Dirty`.
 
 The engine has no `Graph`, so `Store` is the map of record containers (The store), and every engine call takes only the node it acts on (The engine).
 
