@@ -6,12 +6,13 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 
 - A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it.
 - A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation.
-- `pull` brings a node up to date. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes. A new node is `Dirty`.
-- A computation receives its node and the previous value, which is `undefined` on the first computation and on the first computation after a disposal, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
+- A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. A new node is `Uncomputed`.
+- `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes.
+- A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
 - Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read.
 - Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays. Its next computation adds it to the sets of what it reads then.
-- Disposing a node marks its readers `Dirty` and returns the node to the state of a new node.
+- Disposing a node marks its readers `Dirty` and returns the node to `Uncomputed`, the state of a new node.
 
 The engine does not check these contracts:
 
@@ -201,7 +202,7 @@ const MISSING: unique symbol = Symbol('Missing');
 
 type Option<TValue> = TValue | typeof MISSING;
 
-export type Status = 'Clean' | 'Check' | 'Dirty';
+export type Status = 'Uncomputed' | 'Dirty' | 'Check' | 'Clean';
 
 export type SourceNode<TValue> = {
   value: TValue;
@@ -226,7 +227,7 @@ export function createDerivedNode<TValue>(
 ): DerivedNode<TValue> {
   return {
     value: MISSING,
-    status: 'Dirty',
+    status: 'Uncomputed',
     sourceDependencies: [],
     derivedDependencies: [],
     dependents: new Set(),
@@ -252,6 +253,8 @@ export function readDerived<TValue>(callingNode: DerivedNode<unknown>, node: Der
 
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   switch (node.status) {
+    case 'Uncomputed':
+      return computeFirst(node);
     case 'Clean':
       return computedValue(node);
     case 'Check':
@@ -266,7 +269,7 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   markDependentsDirty(node.dependents);
   detach(node);
-  node.status = 'Dirty';
+  node.status = 'Uncomputed';
   node.value = MISSING;
 }
 
@@ -284,6 +287,8 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         break;
       case 'Dirty':
         throw new Error('A Dirty node is in a dependents set');
+      case 'Uncomputed':
+        throw new Error('An Uncomputed node is in a dependents set');
       default:
         assertNever(node.status);
     }
@@ -301,6 +306,8 @@ function markDependentsCheck(dependents: Set<DerivedNode<unknown>>): void {
         break;
       case 'Dirty':
         throw new Error('A Dirty node is in a dependents set');
+      case 'Uncomputed':
+        throw new Error('An Uncomputed node is in a dependents set');
       default:
         assertNever(node.status);
     }
@@ -318,13 +325,21 @@ function verify<TValue>(node: DerivedNode<TValue>): TValue {
   return computedValue(node);
 }
 
-function recompute<TValue>(node: DerivedNode<TValue>): TValue {
-  const previous = node.value;
-  const value = node.computation(node, previous === MISSING ? undefined : previous);
+function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
+  const value = node.computation(node, undefined);
   attach(node);
   node.status = 'Clean';
-  if (value === node.value) {
-    return computedValue(node);
+  node.value = value;
+  return value;
+}
+
+function recompute<TValue>(node: DerivedNode<TValue>): TValue {
+  const previous = computedValue(node);
+  const value = node.computation(node, previous);
+  attach(node);
+  node.status = 'Clean';
+  if (value === previous) {
+    return previous;
   }
   node.value = value;
   markDependentsDirty(node.dependents);
@@ -333,7 +348,7 @@ function recompute<TValue>(node: DerivedNode<TValue>): TValue {
 
 function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
   if (node.value === MISSING) {
-    throw new Error('A Clean or Check node has no value');
+    throw new Error('A node that is not Uncomputed has no value');
   }
   return node.value;
 }
@@ -364,13 +379,15 @@ function assertNever(value: never): never {
 ```
 
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
-- A new node is in no `dependents` set and has empty dependency arrays, and marking and disposal detach a node before they set it `Dirty`, so a `Dirty` node is in no `dependents` set and writes to its dependencies never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
-- Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when `recompute` attaches it.
+- A new node is in no `dependents` set and has empty dependency arrays, and marking and disposal detach a node before they set it `Dirty` or `Uncomputed`, so an `Uncomputed` or `Dirty` node is in no `dependents` set and writes to its dependencies never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
+- Only an `Uncomputed` or `Dirty` node runs its computation, and the node is attached after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when it is attached.
 - Marking recurses into a node's dependents only when the node leaves `Clean`, so a write recurses into each node's dependents at most once.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
-- A `Clean` or `Check` node's `value` is a value its computation returned, which can be `undefined`. A node becomes `Clean` only at the end of a computation or a verification, and `Check` only from `Clean`. A `Dirty` node's `value` is its previous value or `MISSING`. `MISSING` and `Option` are private to `graph.ts`, so no `TValue` contains `MISSING`. `recompute` passes `MISSING` to the computation as `undefined`, and a value compared with `MISSING` is never `===` to it, so the first computation and the first computation after a disposal never cut off. A new node has no readers, and disposal has already marked the node's readers `Dirty`, so that cutoff would skip no marking. `computedValue` throws if a `Clean` or `Check` node holds `MISSING`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node. TypeScript does not narrow the generic `Option<TValue>` to `TValue` after `value === node.value`, so the cutoff return also calls `computedValue`.
+- A node's `status` is `Uncomputed` exactly when its `value` is `MISSING`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `MISSING` and `Option` are private to `graph.ts`, so no `TValue` contains `MISSING`. `DerivedNode` is one object type whose `status` and `value` change in place, and TypeScript does not retype an object when a field is assigned, so the type does not tie `value` to `status`. `computedValue` throws if a node that is not `Uncomputed` holds `MISSING`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
+- A first computation has no cutoff and marks nothing, because an `Uncomputed` node has an empty `dependents` set: a new node has no readers, and disposal marked every reader `Dirty`, which detached them.
+- On cutoff the node keeps its stored value, so a recompute that returns `-0` where the stored value is `0` leaves `0` stored and returned, and every reader of the node reads the same value.
 - A node read twice appears twice in the reader's dependency array and once in its `dependents` set.
-- Disposal marks every reader `Dirty`, which detaches each reader and empties the node's `dependents` set. A node that was never computed has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. An already `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
+- Disposal marks every reader `Dirty`, which detaches each reader and empties the node's `dependents` set, and discards the node's value, so its next computation receives `previous` `undefined`. An `Uncomputed` node has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. A `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
 
 ## `src/index.ts`
 
@@ -413,8 +430,9 @@ describe('pull', () => {
       return readSource(callingNode, a) * 2;
     });
     expect(runs).toBe(0);
-    expect(double.status).toBe('Dirty');
+    expect(double.status).toBe('Uncomputed');
     expect(pull(double)).toBe(2);
+    expect(double.status).toBe('Clean');
     expect(pull(double)).toBe(2);
     expect(runs).toBe(1);
   });
@@ -536,6 +554,32 @@ describe('cutoff', () => {
     expect(reader.status).toBe('Clean');
     expect(pull(parity)).toBe(first);
     expect(readerRuns).toBe(1);
+  });
+
+  test('a node whose computation returns undefined is Clean, and a recompute that returns undefined again leaves its reader Clean without running it', () => {
+    const runs = { node: 0, reader: 0 };
+    const previousValues: Array<undefined> = [];
+    const a = createSourceNode(1);
+    const node = createDerivedNode<undefined>((callingNode, previous) => {
+      runs.node += 1;
+      previousValues.push(previous);
+      readSource(callingNode, a);
+      return undefined;
+    });
+    const reader = createDerivedNode((callingNode) => {
+      runs.reader += 1;
+      return readDerived(callingNode, node) === undefined;
+    });
+    expect(pull(reader)).toBe(true);
+    expect(node.status).toBe('Clean');
+    expect(pull(node)).toBeUndefined();
+    expect(runs).toEqual({ node: 1, reader: 1 });
+    writeSource(a, 2);
+    expect(node.status).toBe('Dirty');
+    expect(pull(reader)).toBe(true);
+    expect(reader.status).toBe('Clean');
+    expect(runs).toEqual({ node: 2, reader: 1 });
+    expect(previousValues).toEqual([undefined, undefined]);
   });
 
   test('a projection of a new object that recomputes to the same value leaves its reader Clean without running it', () => {
@@ -704,7 +748,7 @@ describe('dependencies', () => {
 });
 
 describe('disposal', () => {
-  test('disposing a node leaves it Dirty, marks its readers Dirty, and its next pull computes it with previous undefined', () => {
+  test('disposing a node returns it to Uncomputed, marks its readers Dirty, and its next pull computes it with previous undefined', () => {
     const runs = { inner: 0, outer: 0 };
     const innerPreviousValues: Array<number | undefined> = [];
     const source = createSourceNode(1);
@@ -719,7 +763,7 @@ describe('disposal', () => {
     });
     expect(pull(outer)).toBe(2);
     disposeDerivedNode(inner);
-    expect(inner.status).toBe('Dirty');
+    expect(inner.status).toBe('Uncomputed');
     expect(outer.status).toBe('Dirty');
     expect(pull(outer)).toBe(2);
     expect(runs).toEqual({ inner: 2, outer: 2 });
@@ -734,6 +778,7 @@ describe('disposal', () => {
     const inner = createDerivedNode((callingNode) => readSource(callingNode, source));
     pull(inner);
     disposeDerivedNode(inner);
+    expect(inner.status).toBe('Uncomputed');
     expect(source.dependents.has(inner)).toBe(false);
     writeSource(source, 2);
     expect(pull(inner)).toBe(2);
@@ -752,7 +797,7 @@ describe('disposal', () => {
     expect(inner.status).toBe('Dirty');
     expect(outer.status).toBe('Check');
     disposeDerivedNode(inner);
-    expect(inner.status).toBe('Dirty');
+    expect(inner.status).toBe('Uncomputed');
     expect(outer.status).toBe('Dirty');
     expect(pull(outer)).toBe(3);
     expect(innerPreviousValues).toEqual([undefined, undefined]);
@@ -765,8 +810,9 @@ describe('disposal', () => {
       previousValues.push(previous);
       return readSource(callingNode, source);
     });
+    expect(node.status).toBe('Uncomputed');
     disposeDerivedNode(node);
-    expect(node.status).toBe('Dirty');
+    expect(node.status).toBe('Uncomputed');
     expect(pull(node)).toBe(1);
     expect(previousValues).toEqual([undefined]);
   });
