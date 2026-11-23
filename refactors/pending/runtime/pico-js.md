@@ -22,7 +22,7 @@ The engine does not check these contracts:
 - A computation is synchronous and reads only through the node it receives.
 - A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
 - The derived nodes form a directed acyclic graph.
-- The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
+- The chains of derived nodes that a pull descends stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
 
 ## The package
 
@@ -294,7 +294,7 @@ The engine does not check these contracts:
 - A computation is synchronous and reads only through the node it receives.
 - A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
 - The derived nodes form a directed acyclic graph.
-- The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
+- The chains of derived nodes that a pull descends stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
 ````
 
 The contract list copies the Model section's list word for word, and the API, statuses, cutoff, and disposal sections describe `src/graph.ts` above.
@@ -393,12 +393,13 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
 }
 
 function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
+  const stack: Array<DerivedNode<unknown>> = [];
   for (const node of dependents) {
     switch (node.status) {
       case 'Clean':
         detach(node);
         node.status = 'Dirty';
-        markDependentsCheck(node.dependents);
+        stack.push(node);
         break;
       case 'Check':
         detach(node);
@@ -412,23 +413,23 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         assertNever(node.status);
     }
   }
-}
-
-function markDependentsCheck(dependents: Set<DerivedNode<unknown>>): void {
-  for (const node of dependents) {
-    switch (node.status) {
-      case 'Clean':
-        node.status = 'Check';
-        markDependentsCheck(node.dependents);
-        break;
-      case 'Check':
-        break;
-      case 'Dirty':
-        throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
-      case 'Uncomputed':
-        throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
-      default:
-        assertNever(node.status);
+  let marked: DerivedNode<unknown> | undefined;
+  while ((marked = stack.pop()) !== undefined) {
+    for (const dependent of marked.dependents) {
+      switch (dependent.status) {
+        case 'Clean':
+          dependent.status = 'Check';
+          stack.push(dependent);
+          break;
+        case 'Check':
+          break;
+        case 'Dirty':
+          throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
+        case 'Uncomputed':
+          throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
+        default:
+          assertNever(dependent.status);
+      }
     }
   }
 }
@@ -500,7 +501,7 @@ function assertNever(value: never): never {
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
 - A new node is in no `dependents` set and has empty dependency arrays, and marking and disposal detach a node before they set it `Dirty` or `Uncomputed`, so an `Uncomputed` or `Dirty` node is in no `dependents` set and writes to its dependencies never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
 - Only an `Uncomputed` or `Dirty` node runs its computation, and the node is attached after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when it is attached.
-- Marking recurses into a node's dependents only when the node leaves `Clean`, so a write recurses into each node's dependents at most once.
+- Marking pushes a node onto its stack only when the node leaves `Clean`, so a write visits each node's dependents at most once. The stack is an array local to the write, so the depth of the marked chain does not reach the call stack.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
 - A node's `status` is `Uncomputed` exactly when its `value` is `NOT_SET`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `NOT_SET` and `Option` are private to `graph.ts`, so no `TValue` contains `NOT_SET`. `computedValue` throws if a node that is not `Uncomputed` holds `NOT_SET`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
 - A first computation has no cutoff and marks nothing, because an `Uncomputed` node has an empty `dependents` set: a new node has no readers, and disposal marked every reader `Dirty`, which detached them.
@@ -631,6 +632,20 @@ describe('marking', () => {
       'Check',
       'Check',
     ]);
+  });
+
+  test('a write marks a chain of 100,000 derived nodes', () => {
+    const source = createSourceNode(0);
+    const bottom = createDerivedNode((callingNode) => readSource(callingNode, source));
+    pull(bottom);
+    const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>((below) => {
+      const node = createDerivedNode((callingNode) => readDerived(callingNode, below) + 1);
+      pull(node);
+      return node;
+    }, bottom);
+    writeSource(source, 1);
+    expect(bottom.status).toBe('Dirty');
+    expect(top.status).toBe('Check');
   });
 });
 
