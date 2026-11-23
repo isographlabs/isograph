@@ -230,13 +230,27 @@ A pull brings one node up to date and runs only the computations that requires. 
 ## Example
 
 ```ts
-import { createDerivedNode, createSourceNode, pull, readDerived, readSource, writeSource } from '@isograph/pico-js';
+import {
+  createDerivedNode,
+  createSourceNode,
+  pull,
+  readDerived,
+  readSource,
+  writeSource,
+} from '@isograph/pico-js';
 
 const person = createSourceNode({ first: 'Ada', last: 'Lovelace', age: 36 });
 
-const name = createDerivedNode<{ readonly first: string; readonly last: string }>((callingNode, previous) => {
+const name = createDerivedNode<{
+  readonly first: string;
+  readonly last: string;
+}>((callingNode, previous) => {
   const { first, last } = readSource(callingNode, person);
-  return previous !== undefined && previous.first === first && previous.last === last ? previous : { first, last };
+  return previous !== undefined &&
+    previous.first === first &&
+    previous.last === last
+    ? previous
+    : { first, last };
 });
 
 let greetingRuns = 0;
@@ -339,7 +353,10 @@ export type DerivedNode<TValue> = {
   readonly sourceDependencies: Array<SourceNode<unknown>>;
   readonly derivedDependencies: Array<DerivedNode<unknown>>;
   readonly dependents: Set<DerivedNode<unknown>>;
-  computation(callingNode: DerivedNode<unknown>, previous: TValue | undefined): TValue;
+  computation(
+    callingNode: DerivedNode<unknown>,
+    previous: TValue | undefined,
+  ): TValue;
 };
 
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
@@ -347,7 +364,10 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
 }
 
 export function createDerivedNode<TValue>(
-  computation: (callingNode: DerivedNode<unknown>, previous: TValue | undefined) => TValue,
+  computation: (
+    callingNode: DerivedNode<unknown>,
+    previous: TValue | undefined,
+  ) => TValue,
 ): DerivedNode<TValue> {
   return {
     value: NOT_SET,
@@ -359,17 +379,26 @@ export function createDerivedNode<TValue>(
   };
 }
 
-export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
+export function writeSource<TValue>(
+  source: SourceNode<TValue>,
+  value: TValue,
+): void {
   source.value = value;
   markDependentsDirty(source.dependents);
 }
 
-export function readSource<TValue>(callingNode: DerivedNode<unknown>, source: SourceNode<TValue>): TValue {
+export function readSource<TValue>(
+  callingNode: DerivedNode<unknown>,
+  source: SourceNode<TValue>,
+): TValue {
   callingNode.sourceDependencies.push(source);
   return source.value;
 }
 
-export function readDerived<TValue>(callingNode: DerivedNode<unknown>, node: DerivedNode<TValue>): TValue {
+export function readDerived<TValue>(
+  callingNode: DerivedNode<unknown>,
+  node: DerivedNode<TValue>,
+): TValue {
   const value = pull(node);
   callingNode.derivedDependencies.push(node);
   return value;
@@ -411,9 +440,13 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         node.status = 'Dirty';
         break;
       case 'Dirty':
-        throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
+        throw new Error(
+          'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
+        );
       case 'Uncomputed':
-        throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
+        throw new Error(
+          'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+        );
       default:
         assertNever(node.status);
     }
@@ -429,9 +462,13 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         case 'Check':
           break;
         case 'Dirty':
-          throw new Error('A Dirty node is in a dependents set. This is indicative of a bug in pico-js.');
+          throw new Error(
+            'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
+          );
         case 'Uncomputed':
-          throw new Error('An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.');
+          throw new Error(
+            'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+          );
         default:
           assertNever(dependent.status);
       }
@@ -473,7 +510,9 @@ function recompute<TValue>(node: DerivedNode<TValue>): TValue {
 
 function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
   if (node.value === NOT_SET) {
-    throw new Error('A node that is not Uncomputed has no value. This is indicative of a bug in pico-js.');
+    throw new Error(
+      'A node that is not Uncomputed has no value. This is indicative of a bug in pico-js.',
+    );
   }
   return node.value;
 }
@@ -499,7 +538,9 @@ function detach(node: DerivedNode<unknown>): void {
 }
 
 function assertNever(value: never): never {
-  throw new Error(`A switch received a value outside its union: ${String(value)}. This is indicative of a bug in pico-js.`);
+  throw new Error(
+    `A switch received a value outside its union: ${String(value)}. This is indicative of a bug in pico-js.`,
+  );
 }
 ```
 
@@ -566,7 +607,9 @@ describe('pull', () => {
     const source = createSourceNode(1);
     let inner: DerivedNode<number> | undefined;
     const outer = createDerivedNode((callingNode) => {
-      inner ??= createDerivedNode((innerCallingNode) => readSource(innerCallingNode, source) * 10);
+      inner ??= createDerivedNode(
+        (innerCallingNode) => readSource(innerCallingNode, source) * 10,
+      );
       return readDerived(callingNode, inner);
     });
     expect(pull(outer)).toBe(10);
@@ -625,10 +668,19 @@ describe('marking', () => {
 
   test('in a diamond, a write marks the shared node Dirty and every node above it Check', () => {
     const source = createSourceNode(1);
-    const shared = createDerivedNode((callingNode) => readSource(callingNode, source) + 1);
-    const left = createDerivedNode((callingNode) => readDerived(callingNode, shared) * 2);
-    const right = createDerivedNode((callingNode) => readDerived(callingNode, shared) * 3);
-    const top = createDerivedNode((callingNode) => readDerived(callingNode, left) + readDerived(callingNode, right));
+    const shared = createDerivedNode(
+      (callingNode) => readSource(callingNode, source) + 1,
+    );
+    const left = createDerivedNode(
+      (callingNode) => readDerived(callingNode, shared) * 2,
+    );
+    const right = createDerivedNode(
+      (callingNode) => readDerived(callingNode, shared) * 3,
+    );
+    const top = createDerivedNode(
+      (callingNode) =>
+        readDerived(callingNode, left) + readDerived(callingNode, right),
+    );
     pull(top);
     writeSource(source, 2);
     expect([shared.status, left.status, right.status, top.status]).toEqual([
@@ -641,13 +693,20 @@ describe('marking', () => {
 
   test('a write marks a chain of 100,000 derived nodes', () => {
     const source = createSourceNode(0);
-    const bottom = createDerivedNode((callingNode) => readSource(callingNode, source));
+    const bottom = createDerivedNode((callingNode) =>
+      readSource(callingNode, source),
+    );
     pull(bottom);
-    const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>((below) => {
-      const node = createDerivedNode((callingNode) => readDerived(callingNode, below) + 1);
-      pull(node);
-      return node;
-    }, bottom);
+    const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>(
+      (below) => {
+        const node = createDerivedNode(
+          (callingNode) => readDerived(callingNode, below) + 1,
+        );
+        pull(node);
+        return node;
+      },
+      bottom,
+    );
     writeSource(source, 1);
     expect(bottom.status).toBe('Dirty');
     expect(top.status).toBe('Check');
@@ -678,10 +737,14 @@ describe('cutoff', () => {
   test('a computation that returns previous leaves its readers Clean without running them', () => {
     let readerRuns = 0;
     const a = createSourceNode(1);
-    const parity = createDerivedNode<{ readonly even: boolean }>((callingNode, previous) => {
-      const even = readSource(callingNode, a) % 2 === 0;
-      return previous !== undefined && previous.even === even ? previous : { even };
-    });
+    const parity = createDerivedNode<{ readonly even: boolean }>(
+      (callingNode, previous) => {
+        const even = readSource(callingNode, a) % 2 === 0;
+        return previous !== undefined && previous.even === even
+          ? previous
+          : { even };
+      },
+    );
     const reader = createDerivedNode((callingNode) => {
       readerRuns += 1;
       return readDerived(callingNode, parity).even;
@@ -784,7 +847,9 @@ describe('verification', () => {
     });
     const node = createDerivedNode((callingNode) => {
       runs.node += 1;
-      return readDerived(callingNode, gate) === 1 ? readDerived(callingNode, other) : 0;
+      return readDerived(callingNode, gate) === 1
+        ? readDerived(callingNode, other)
+        : 0;
     });
     expect(pull(node)).toBe(1);
     writeSource(gateSource, 2);
@@ -808,7 +873,9 @@ describe('source writes and verification', () => {
       return 0;
     });
     const foo = createDerivedNode((callingNode) =>
-      readSource(callingNode, a) ? readDerived(callingNode, b) : readDerived(callingNode, c),
+      readSource(callingNode, a)
+        ? readDerived(callingNode, b)
+        : readDerived(callingNode, c),
     );
     expect(pull(foo)).toBe(1);
     writeSource(bInput, 2);
@@ -827,7 +894,9 @@ describe('dependencies', () => {
     const b = createSourceNode(2);
     const pick = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(callingNode, useA) ? readSource(callingNode, a) : readSource(callingNode, b);
+      return readSource(callingNode, useA)
+        ? readSource(callingNode, a)
+        : readSource(callingNode, b);
     });
     expect(pull(pick)).toBe(1);
     writeSource(useA, false);
@@ -841,7 +910,9 @@ describe('dependencies', () => {
   test('a recompute that reads the same nodes stays marked by each of them', () => {
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode((callingNode) => readSource(callingNode, a) + readSource(callingNode, b));
+    const sum = createDerivedNode(
+      (callingNode) => readSource(callingNode, a) + readSource(callingNode, b),
+    );
     pull(sum);
     writeSource(a, 3);
     expect(pull(sum)).toBe(5);
@@ -861,7 +932,9 @@ describe('dependencies', () => {
       runs += 1;
       return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    const label = createDerivedNode((callingNode) => `${readDerived(callingNode, sum)}`);
+    const label = createDerivedNode(
+      (callingNode) => `${readDerived(callingNode, sum)}`,
+    );
     pull(label);
     writeSource(a, 3);
     expect(b.dependents.has(sum)).toBe(false);
@@ -914,7 +987,9 @@ describe('disposal', () => {
 
   test('a disposed node is in no dependents set of the sources it read', () => {
     const source = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) => readSource(callingNode, source));
+    const inner = createDerivedNode((callingNode) =>
+      readSource(callingNode, source),
+    );
     pull(inner);
     disposeDerivedNode(inner);
     expect(inner.status).toBe('Uncomputed');
@@ -930,7 +1005,9 @@ describe('disposal', () => {
       innerPreviousValues.push(previous);
       return readSource(callingNode, source);
     });
-    const outer = createDerivedNode((callingNode) => readDerived(callingNode, inner) + 1);
+    const outer = createDerivedNode(
+      (callingNode) => readDerived(callingNode, inner) + 1,
+    );
     pull(outer);
     writeSource(source, 2);
     expect(inner.status).toBe('Dirty');
@@ -965,7 +1042,9 @@ import { createDerivedNode, readDerived, type DerivedNode } from '../src/index';
 
 test('a derived node that reads another derived node has the type of the value its computation returns', () => {
   const count = createDerivedNode(() => 1);
-  const label = createDerivedNode((callingNode) => `${readDerived(callingNode, count)}`);
+  const label = createDerivedNode(
+    (callingNode) => `${readDerived(callingNode, count)}`,
+  );
   expectTypeOf(label).toEqualTypeOf<DerivedNode<string>>();
 });
 ```
