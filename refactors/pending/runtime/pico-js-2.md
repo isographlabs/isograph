@@ -109,7 +109,7 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         node.status = 'Dirty';
         break;
       case 'Dirty':
-        break;
+        throw new Error('A Dirty node is in a dependents set');
       default:
         assertNever(node.status);
     }
@@ -493,7 +493,7 @@ describe('dependencies', () => {
     expect(pull(sum)).toBe(7);
   });
 
-  test('a Dirty node is not marked again by a second write to another of its sources', () => {
+  test('a Dirty node is not in the dependents set of its other sources, so a second write does not reach it', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const b = createSourceNode(2);
@@ -504,6 +504,7 @@ describe('dependencies', () => {
     const label = createDerivedNode((callingNode) => `${readDerived(callingNode, sum)}`);
     pull(label);
     writeSource(a, 3);
+    expect(b.dependents.has(sum)).toBe(false);
     writeSource(b, 4);
     expect(sum.status).toBe('Dirty');
     expect(label.status).toBe('Check');
