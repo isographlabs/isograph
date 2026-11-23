@@ -41,8 +41,6 @@ export type DerivedNode<TValue> = {
   computation(callingNode: DerivedNode<unknown>, previous: TValue | undefined): TValue;
 };
 
-const stack: Array<DerivedNode<unknown>> = [];
-
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
   return { value, dependents: new Set() };
 }
@@ -97,6 +95,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
 }
 
 function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
+  const stack: Array<DerivedNode<unknown>> = [];
   for (const node of dependents) {
     switch (node.status) {
       case 'Clean':
@@ -177,7 +176,7 @@ function assertNever(value: never): never {
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
 - A `Dirty` node is in no `dependents` set and has empty dependency arrays. A new node starts in that state, and marking and disposal detach a node before they set it `Dirty`. Writes to the dependencies of a `Dirty` node therefore never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
 - Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so `recompute` always starts with empty dependency arrays and only the computation's own reads fill them.
-- `markDependentsDirty` pushes a node only when it leaves `Clean`, so the marks are the visited set: each node is pushed at most once and each `dependents` set is walked at most once per write. `markDependentsDirty` shares one module-level stack across calls, which is safe because marking runs no computation and so never re-enters `markDependentsDirty`, and the while loop pops the stack empty before the function returns.
+- `markDependentsDirty` pushes a node only when it leaves `Clean`, so the marks are the visited set: each node is pushed at most once and each `dependents` set is walked at most once per write.
 - A write marks the source's direct readers `Dirty`, so a `Check` node has no changed source and `verify` pulls only its derived dependencies. `verify` recomputes when pulling a dependency marked its node `Dirty`. A dependency's `recompute` marks its dependents `Dirty` exactly when its new value is not `===` its previous value, so the node's status is the dependency's verdict.
 - A node becomes `Check` only from `Clean`, and it becomes `Clean` only at the end of a computation or a verification, so a `Check` node's `value` is a computed value and `verify` returns it. `value` holds `undefined` only while a node is `Dirty`, where the computation receives it as `previous`.
 - A node's `derivedDependencies` holds the nodes its computation read, and each of those nodes' `dependents` set holds the reader while the reader is not `Dirty`. A dependency read twice is one member of its set.
