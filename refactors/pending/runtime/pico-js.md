@@ -282,9 +282,9 @@ AGENTS.md says we do not have anything we do not use, and tests-only is not a re
 
 ```ts
 // from libs/pico-js/src/graph.ts
-const MISSING: unique symbol = Symbol('Missing');
+const NOT_SET: unique symbol = Symbol('NOT_SET');
 
-type Option<TValue> = TValue | typeof MISSING;
+type Option<TValue> = TValue | typeof NOT_SET;
 
 export type Status = 'Uncomputed' | 'Dirty' | 'Check' | 'Clean';
 
@@ -310,7 +310,7 @@ export function createDerivedNode<TValue>(
   computation: (callingNode: DerivedNode<unknown>, previous: TValue | undefined) => TValue,
 ): DerivedNode<TValue> {
   return {
-    value: MISSING,
+    value: NOT_SET,
     status: 'Uncomputed',
     sourceDependencies: [],
     derivedDependencies: [],
@@ -354,7 +354,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
   markDependentsDirty(node.dependents);
   detach(node);
   node.status = 'Uncomputed';
-  node.value = MISSING;
+  node.value = NOT_SET;
 }
 
 function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
@@ -431,7 +431,7 @@ function recompute<TValue>(node: DerivedNode<TValue>): TValue {
 }
 
 function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
-  if (node.value === MISSING) {
+  if (node.value === NOT_SET) {
     throw new Error('A node that is not Uncomputed has no value');
   }
   return node.value;
@@ -467,7 +467,7 @@ function assertNever(value: never): never {
 - Only an `Uncomputed` or `Dirty` node runs its computation, and the node is attached after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when it is attached.
 - Marking recurses into a node's dependents only when the node leaves `Clean`, so a write recurses into each node's dependents at most once.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
-- A node's `status` is `Uncomputed` exactly when its `value` is `MISSING`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `MISSING` and `Option` are private to `graph.ts`, so no `TValue` contains `MISSING`. `DerivedNode` is one object type whose `status` and `value` change in place, and TypeScript does not retype an object when a field is assigned, so the type does not tie `value` to `status`. `computedValue` throws if a node that is not `Uncomputed` holds `MISSING`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
+- A node's `status` is `Uncomputed` exactly when its `value` is `NOT_SET`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `NOT_SET` and `Option` are private to `graph.ts`, so no `TValue` contains `NOT_SET`. `DerivedNode` is one object type whose `status` and `value` change in place, and TypeScript does not retype an object when a field is assigned, so the type does not tie `value` to `status`. `computedValue` throws if a node that is not `Uncomputed` holds `NOT_SET`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
 - A first computation has no cutoff and marks nothing, because an `Uncomputed` node has an empty `dependents` set: a new node has no readers, and disposal marked every reader `Dirty`, which detached them.
 - On cutoff the node keeps its stored value, so a recompute that returns `-0` where the stored value is `0` leaves `0` stored and returned, and every reader of the node reads the same value.
 - A node read twice appears twice in the reader's dependency array and once in its `dependents` set.
