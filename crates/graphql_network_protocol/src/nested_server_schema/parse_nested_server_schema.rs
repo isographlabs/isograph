@@ -24,7 +24,7 @@ use isograph_schema::{
     to_isograph_constant_value,
 };
 use prelude::Postfix;
-
+use crate::nested_server_schema::server_scalar_directives::ServerScalarDirectives;
 use crate::graphql_network_protocol::GraphQLRootTypes;
 use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLFetchableInfo,
@@ -536,6 +536,9 @@ fn process_graphql_documents(
                     GraphQLTypeSystemDefinition::ScalarTypeDefinition(
                         graphql_scalar_type_definition,
                     ) => {
+                        let _server_scalar_directives: ServerScalarDirectives =
+                     from_graphql_directives(graphql_scalar_type_definition.directives)?;
+
                         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
                             schema,
                             DataModelEntity {
