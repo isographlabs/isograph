@@ -93,7 +93,7 @@ export function callSubscriptions(
           if (
             recordsEncounteredWhenNormalizing
               .get(subscription.recordLink.__typename)
-              ?.has(subscription.recordLink.__link) != null
+              ?.has(subscription.recordLink.__link) === true
           ) {
             logAnyError(
               environment,
