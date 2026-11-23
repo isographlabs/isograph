@@ -301,7 +301,7 @@ export type SourceNode<TValue> = {
  * - When `status` is `Clean`, `value` is the up-to-date value, and the node is in the `dependents` set of every node in its dependency arrays.
  * - Every node in a `dependents` set is `Clean` or `Check`.
  *
- * These invariants describe a discriminated union on `status`. `DerivedNode` is one object type for two reasons. TypeScript does not change an object to another variant of a union when code assigns `status` in place. Holding the variant in a separate object that each status change replaces, as upstream isograph's `PromiseWrapper` does with its `result` field, allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`.
+ * These invariants form a discriminated union on `status`, but `DerivedNode` is a single object type. A node keeps its identity for its whole life, because callers and `dependents` sets hold it, so a status change assigns fields of the same object. TypeScript does not narrow an object to a different variant of a union when one of its fields is assigned, so a union type would need a cast at every status change. The other way to type it holds the current variant in a field of the node and replaces that variant object on each status change, as upstream isograph's `PromiseWrapper` does with its `result` field. That allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`. So `computedValue` and the throws in marking check these invariants at run time.
  */
 export type DerivedNode<TValue> = {
   value: Option<TValue>;
