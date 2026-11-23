@@ -1,32 +1,32 @@
 export type User__RepositoryConnection__raw_response_type = {
-  node____id___v_id?: ({
-    __typename: "User",
-    id: string,
-    repositories____first___v_first____after___v_after: {
-      edges?: (ReadonlyArray<({
-        node?: ({
-          id: string,
-          description?: (string | null),
-          forkCount: number,
-          name: string,
-          nameWithOwner: string,
-          owner: {
-            __typename: "Organization" | "User",
-            id: string,
-            login: string,
+  readonly node____id___v_id?: ({
+    readonly __typename: "User",
+    readonly id: string,
+    readonly repositories____first___v_first____after___v_after: {
+      readonly edges?: (ReadonlyArray<({
+        readonly node?: ({
+          readonly id: string,
+          readonly description?: (string | null),
+          readonly forkCount: number,
+          readonly name: string,
+          readonly nameWithOwner: string,
+          readonly owner: {
+            readonly __typename: "Organization" | "User",
+            readonly id: string,
+            readonly login: string,
           },
-          pullRequests: {
-            totalCount: number,
+          readonly pullRequests: {
+            readonly totalCount: number,
           },
-          stargazerCount: number,
-          watchers: {
-            totalCount: number,
+          readonly stargazerCount: number,
+          readonly watchers: {
+            readonly totalCount: number,
           },
         } | null),
       } | null)> | null),
-      pageInfo: {
-        endCursor?: (string | null),
-        hasNextPage: boolean,
+      readonly pageInfo: {
+        readonly endCursor?: (string | null),
+        readonly hasNextPage: boolean,
       },
     },
   } | null),

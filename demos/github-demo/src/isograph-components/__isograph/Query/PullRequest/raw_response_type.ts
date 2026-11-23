@@ -1,29 +1,29 @@
 export type Query__PullRequest__raw_response_type = {
-  repository____owner___v_repositoryOwner____name___v_repositoryName?: ({
-    id: string,
-    pullRequest____number___v_pullRequestNumber?: ({
-      id: string,
-      bodyHTML: unknown,
-      comments____last___l_10: {
-        edges?: (ReadonlyArray<({
-          node?: ({
-            id: string,
-            author?: ({
-              __typename: "Bot" | "EnterpriseUserAccount" | "Mannequin" | "Organization" | "User",
-              login: string,
+  readonly repository____owner___v_repositoryOwner____name___v_repositoryName?: ({
+    readonly id: string,
+    readonly pullRequest____number___v_pullRequestNumber?: ({
+      readonly id: string,
+      readonly bodyHTML: unknown,
+      readonly comments____last___l_10: {
+        readonly edges?: (ReadonlyArray<({
+          readonly node?: ({
+            readonly id: string,
+            readonly author?: ({
+              readonly __typename: "Bot" | "EnterpriseUserAccount" | "Mannequin" | "Organization" | "User",
+              readonly login: string,
             } | null),
-            bodyText: string,
-            createdAt: unknown,
+            readonly bodyText: string,
+            readonly createdAt: unknown,
           } | null),
         } | null)> | null),
       },
-      title: string,
+      readonly title: string,
     } | null),
   } | null),
-  viewer: {
-    id: string,
-    avatarUrl: unknown,
-    name?: (string | null),
+  readonly viewer: {
+    readonly id: string,
+    readonly avatarUrl: unknown,
+    readonly name?: (string | null),
   },
 }
 

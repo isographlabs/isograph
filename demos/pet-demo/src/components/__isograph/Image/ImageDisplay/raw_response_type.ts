@@ -1,8 +1,8 @@
 export type Image__ImageDisplay__raw_response_type = {
-  node____id___v_id?: ({
-    __typename: "Image",
-    id: string,
-    url: string,
+  readonly node____id___v_id?: ({
+    readonly __typename: "Image",
+    readonly id: string,
+    readonly url: string,
   } | null),
 }
 
