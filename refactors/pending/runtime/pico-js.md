@@ -176,7 +176,7 @@ export function objectIs<T>(a: T, b: T): boolean {
 }
 ```
 
-`Memo` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no caller names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a caller can read and write (decision 7, decided).
+`DerivedNodeMemo` and `Status` are exported from `graph.ts` because the declaration of `DerivedNode` names them, and not from the package index: no caller names them. `MISSING`, `Missing`, and `Option` are not exported from `graph.ts`; tsc 5.6 emits them as local declarations in `graph.d.ts` beside the exported `DerivedNode` that names them. Nodes are plain objects whose fields a caller can read and write (decision 7, decided).
 
 ### Types
 
@@ -185,19 +185,19 @@ export function objectIs<T>(a: T, b: T): boolean {
 export type SourceNode<TValue> = {
   value: TValue;
   equals(previous: TValue, next: TValue): boolean;
-  readonly dependents: Set<Memo<unknown>>;
+  readonly dependents: Set<DerivedNodeMemo<unknown>>;
 };
 
 export type DerivedNode<TValue> = {
   readonly computation: Computation<TValue>;
   equals(previous: TValue, next: TValue): boolean;
-  memo: Option<Memo<TValue>>;
+  memo: Option<DerivedNodeMemo<TValue>>;
   sourceReads: SourceNode<unknown>[];
   derivedReads: DerivedNode<unknown>[];
-  readonly dependents: Set<Memo<unknown>>;
+  readonly dependents: Set<DerivedNodeMemo<unknown>>;
 };
 
-export type Memo<TValue> = {
+export type DerivedNodeMemo<TValue> = {
   value: TValue;
   status: Status;
   sourceDependencies: SourceNode<unknown>[];
@@ -218,7 +218,7 @@ export type Computation<TValue> = (consumer: DerivedNode<unknown>) => TValue;
 
 A `dependents` set holds the memos of the derived nodes that read the node, and a memo exists only after its node computed, so a `dependents` set cannot hold an uncomputed node. A dependency list holds nodes, because `verify` pulls through the node. The traces write a memo in a `dependents` set by its node's name.
 
-`Memo` takes its name from Salsa, whose `Memo<V>` holds a query's cached value, its verification state, and its recorded dependencies; pico uses the word for the same concept (pico.md, Memo).
+A `DerivedNode` lives from its creation until the caller drops it; a `DerivedNodeMemo` is the result of its last computation (the value, the status, and the reads behind it), created on the first computation and replaced by a new one on the first computation after a disposal. `DerivedNodeMemo` takes its name from Salsa, whose `Memo<V>` holds a query's cached value, its verification state, and its recorded dependencies; pico uses the word for the same concept (pico.md, Memo).
 
 `TValue` is per node: a `DerivedNode<string>` reads a `DerivedNode<number>` and a `SourceNode<number>`. The links hold `DerivedNode<unknown>` and `SourceNode<unknown>`, written out at each use with no alias, and the engine's functions are generic in the node they receive, so a memo reached through `dependents` is handled at `TValue = unknown`. `equals` is a method signature: under `strict` (`tsconfig.build.json`), TypeScript checks the parameters of a function-typed property contravariantly and those of a method bivariantly, so with `readonly equals: (previous: TValue, next: TValue) => boolean` a `DerivedNode<number>` is not assignable to `DerivedNode<unknown>`. The engine calls `equals` only in `recompute`, with two values the node's own computation produced, so the bivariance admits no call the engine makes with a value of another type (open decision 5).
 
@@ -304,15 +304,15 @@ export function markSourceDirty(source: SourceNode<unknown>): void {
   markDependentsDirty(source.dependents);
 }
 
-function markDependentsDirty(dependents: Set<Memo<unknown>>): void {
-  const stack: Memo<unknown>[] = [];
+function markDependentsDirty(dependents: Set<DerivedNodeMemo<unknown>>): void {
+  const stack: DerivedNodeMemo<unknown>[] = [];
   for (const dependent of dependents) {
     if (dependent.status === 'Clean') {
       stack.push(dependent);
     }
     dependent.status = 'Dirty';
   }
-  let memo: Memo<unknown> | undefined;
+  let memo: DerivedNodeMemo<unknown> | undefined;
   while ((memo = stack.pop()) !== undefined) {
     for (const dependent of memo.node.dependents) {
       if (dependent.status !== 'Clean') {
@@ -358,7 +358,7 @@ function assertNever(value: never): never {
 
 function verify<TValue>(
   node: DerivedNode<TValue>,
-  memo: Memo<TValue>,
+  memo: DerivedNodeMemo<TValue>,
 ): TValue {
   for (const dependency of memo.derivedDependencies) {
     const before = dependency.memo;
@@ -378,7 +378,7 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = compute(node);
   const sourceDependencies = node.sourceReads;
   const derivedDependencies = node.derivedReads;
-  const memo: Memo<TValue> = { value, status: 'Clean', sourceDependencies, derivedDependencies, node };
+  const memo: DerivedNodeMemo<TValue> = { value, status: 'Clean', sourceDependencies, derivedDependencies, node };
   node.sourceReads = [];
   node.derivedReads = [];
   node.memo = memo;
@@ -387,7 +387,7 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   return value;
 }
 
-function recompute<TValue>(node: DerivedNode<TValue>, memo: Memo<TValue>): TValue {
+function recompute<TValue>(node: DerivedNode<TValue>, memo: DerivedNodeMemo<TValue>): TValue {
   const value = compute(node);
   commitReads(node, memo);
   if (node.equals(memo.value, value)) {
@@ -400,7 +400,7 @@ function recompute<TValue>(node: DerivedNode<TValue>, memo: Memo<TValue>): TValu
   return value;
 }
 
-function commitReads<TValue>(node: DerivedNode<TValue>, memo: Memo<TValue>): void {
+function commitReads<TValue>(node: DerivedNode<TValue>, memo: DerivedNodeMemo<TValue>): void {
   const previousSources = memo.sourceDependencies;
   setDependencies(memo, previousSources, node.sourceReads);
   memo.sourceDependencies = node.sourceReads;
@@ -438,12 +438,12 @@ A computation receives the derived node being computed, its consumer, and `compu
 There are two read functions in place of one `read(consumer, node)`: every caller knows statically whether it reads a source or a derived node, so `readSource` pushes onto the consumer's `sourceReads` and `readDerived` onto its `derivedReads`, and no node carries a `kind` field for the engine to test. `verify` walks only `derivedDependencies`, in the order the computation read derived nodes; the order between a source read and a derived read is not recorded, because verification never checks a source.
 
 - `pull` is the only function that brings a derived node up to date: `computeFirst` for a node with no memo, and otherwise a switch on the mark. `computeFirst`, `verify`, and `recompute` return the node's value, so a pull allocates no result object.
-- `verify` reads a dependency's value before it pulls the dependency and compares it with the value the pull returns, by `Object.is`. It reads `before.value` into `previousValue` before the pull because `recompute` writes the new value into the same `Memo`. It returns `recompute` at the first derived dependency whose value is not `Object.is` its previous value. This relies on `recompute` keeping the previous value object whenever `equals` accepts, so a dependency whose `equals` accepted returns the identical value. When `equals` rejects a value that is `Object.is` the previous one (`tripleEquals` on `NaN`), `verify` also treats the dependency as unchanged; the two values are indistinguishable, so the verified node's value is the value its computation would return. The comparison is `Object.is` in place of `!==` because `0 === -0` while a reader can tell them apart: under `objectIs`, a dependency that recomputes from `0` to `-0` is rejected by `equals`, and `!==` would leave its reader `Clean` over `0`. A derived dependency of a `Check` node is never `MISSING`: a node in a `derivedDependencies` list holds a `Memo` from the computation that pulled it, and disposing it marks every dependent `Dirty`, so no `Check` node is left over it. The type does not exclude `MISSING`, so `verify` throws on it, and TypeScript narrows `before` after the throw. Source dependencies are not walked. `recompute` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency returned its previous value and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
+- `verify` reads a dependency's value before it pulls the dependency and compares it with the value the pull returns, by `Object.is`. It reads `before.value` into `previousValue` before the pull because `recompute` writes the new value into the same `DerivedNodeMemo`. It returns `recompute` at the first derived dependency whose value is not `Object.is` its previous value. This relies on `recompute` keeping the previous value object whenever `equals` accepts, so a dependency whose `equals` accepted returns the identical value. When `equals` rejects a value that is `Object.is` the previous one (`tripleEquals` on `NaN`), `verify` also treats the dependency as unchanged; the two values are indistinguishable, so the verified node's value is the value its computation would return. The comparison is `Object.is` in place of `!==` because `0 === -0` while a reader can tell them apart: under `objectIs`, a dependency that recomputes from `0` to `-0` is rejected by `equals`, and `!==` would leave its reader `Clean` over `0`. A derived dependency of a `Check` node is never `MISSING`: a node in a `derivedDependencies` list holds a `DerivedNodeMemo` from the computation that pulled it, and disposing it marks every dependent `Dirty`, so no `Check` node is left over it. The type does not exclude `MISSING`, so `verify` throws on it, and TypeScript narrows `before` after the throw. Source dependencies are not walked. `recompute` still marks the dependents of a changed node `Dirty`, because other `Check` nodes that read it are not on this walk and find the mark on their own pull. When the loop ends, every derived dependency returned its previous value and no source dependency was written, so the node becomes `Clean`. It is a `for` loop with `return` in place of `some`, which allocated a closure per verify; a verify is one step of every pull of a `Check` node.
 - `readDerived` records the dependency after the pull returns. A pull that throws records nothing, and the throw leaves the reading computation, so no `derivedDependencies` list holds a node whose pull threw.
 - `recompute` on a computed node calls `commitReads` once, before `equals`. Both outcomes store the new reads as the dependency lists, so a node whose value came back equal still depends on what it read this time. `equals` compares two values and reads no node, so it does not depend on which dependency list the state holds.
 - `computeFirst` marks no dependent. A memo enters a `dependents` set only through the `setDependencies` of a reader whose computation pulled the node, so a never-computed node has no dependents. `disposeDerivedNode` marks every dependent of the node it disposes `Dirty`. A dependent stays in that set until its own `recompute` (or its disposal) runs `setDependencies`, and a `Dirty` node leaves `Dirty` only through `recompute`, which either drops the disposed node from its dependencies or pulled it during its computation, while the dependent was still `Dirty`. Every dependent of a node `computeFirst` runs on is therefore `Dirty`, and `markDependentsDirty` on `Dirty` nodes changes nothing.
-- A node that was never computed or was disposed holds `MISSING` in place of a `Memo`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a `dependents` set holds memos. The `Memo` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
-- A node's source dependency list (`Memo.sourceDependencies`) and `node.sourceReads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. `derivedDependencies` and `derivedReads` are a second pair, swapped the same way. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The consumer). A throw out of the computation leaves the reads buffers partly filled and the state untouched; the next `compute` clears them. `createDerivedNode` allocates the first pair of reads buffers and `computeFirst` the next pair, two arrays per node creation and two per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `SourceNode<unknown>[]` and `DerivedNode<unknown>[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
+- A node that was never computed or was disposed holds `MISSING` in place of a `DerivedNodeMemo`, so its value cannot be read without first ruling `MISSING` out. Its first pull is `computeFirst`, which calls no `equals`. Marking never reaches such a node, because a `dependents` set holds memos. The `DerivedNodeMemo` is allocated once per first computation; every later mark change and recomputation writes `status` and `value` in place, so marking and recomputing allocate no state object.
+- A node's source dependency list (`DerivedNodeMemo.sourceDependencies`) and `node.sourceReads` are two arrays the node owns, swapped by every `commitReads`: the reads become the dependency list, and the previous dependency list becomes the buffer the next computation clears and fills. `derivedDependencies` and `derivedReads` are a second pair, swapped the same way. A computation allocates no array, no result object, and no context object: `compute` returns the value alone and passes the node itself (The consumer). A throw out of the computation leaves the reads buffers partly filled and the state untouched; the next `compute` clears them. `createDerivedNode` allocates the first pair of reads buffers and `computeFirst` the next pair, two arrays per node creation and two per first computation; no array is shared between two nodes, and `NO_DEPENDENCIES` is only read. The dependency lists are `SourceNode<unknown>[]` and `DerivedNode<unknown>[]` in place of `ReadonlyArray`, because the engine reuses them as buffers.
 - A computation is synchronous; a read through its node after it returned breaks the contract (The consumer).
 - The consumer is a parameter: the running node itself. There is no ambient current computation (Reactively's `CurrentReaction`, Preact's `evalContext`), so a computation that keeps its contract cannot have its reads recorded on another node, and two graphs never share tracking state. No state names the running computation, so `compute` saves and restores nothing and a throw out of a computation leaves nothing to reset.
 
@@ -454,7 +454,7 @@ There are two read functions in place of one `read(consumer, node)`: every calle
 ```ts
 // from libs/pico-js/src/graph.ts
 function setDependencies(
-  memo: Memo<unknown>,
+  memo: DerivedNodeMemo<unknown>,
   previous: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
   next: ReadonlyArray<SourceNode<unknown> | DerivedNode<unknown>>,
 ): void {
@@ -497,7 +497,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
 }
 ```
 
-- Its memo leaves the `dependents` set of everything the node read, so no later write reaches it, and its `Memo`, which held its dependency lists, is dropped, so it lists no dependency that does not list it back.
+- Its memo leaves the `dependents` set of everything the node read, so no later write reaches it, and its `DerivedNodeMemo`, which held its dependency lists, is dropped, so it lists no dependency that does not list it back.
 - Its memo becomes `MISSING`, so the engine holds no reference to the value, and its next pull calls `computeFirst`.
 - Its dependents are marked `Dirty`: their last computation read a value that no longer exists. Their `derivedDependencies` lists still name the disposed node, and `node.dependents` still holds their memos, so the inverse holds. Their next recomputation either reads the node again, which computes it from scratch (open decision 9), or does not, and `setDependencies` removes their memos from `node.dependents`.
 - Disposing a node that was never computed or was already disposed changes nothing but marking its dependents, of which a never-computed node has none.
@@ -679,7 +679,7 @@ The engine takes Reactively's marking and pull, pico's equality and per-computat
 No published library has the engine's contract. Reactively, alien-signals, signal-polyfill, Preact signals, Vue's reactivity, MobX, Solid, Jotai, `@tldraw/state`, and `@liby-tools/salsa` each record reads through ambient tracking state, make equality optional or fix it, and have no explicit disposal of a derived node. alien-signals' `createReactiveSystem` (`src/system.ts:34`) is the only workable base: it holds no module state, and the caller supplies `update`, `notify`, and `unwatched`. The engine does not use it, for five reasons:
 
 - The engine imports nothing (Goal), and a dependency on alien-signals breaks that.
-- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `Memo`, which a later layered graph keeps once per layer, has no place.
+- Its marks are bit flags on one `flags` field of the node (`ReactiveFlags`, `:24-32`), so the engine's `DerivedNodeMemo`, which a later layered graph keeps once per layer, has no place.
 - `link` returns early when the dependency read is the one read just before (`:52-55`), so consecutive repeated reads are merged into one link, where the engine records each read in its dependency list, and a node read twice is listed twice (pico-runtime.md, Example, Duplicate dependency entries).
 - A node whose computation threw is left marked clean, where the engine leaves every mark as it was before the throwing run (Throws).
 - It has had three major versions since its first release in 2024-10 (1.0.0 2025-01, 2.0.0 2025-04, 3.0.0 2025-09).
@@ -1853,7 +1853,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.memo`, `DerivedNode.sourceReads`, `DerivedNode.derivedReads`, and the fields of `Memo`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and the reads buffers, which the engine reuses as buffers (Pull). The engine has no class (decision 7), so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`; every type field is `readonly` except `SourceNode.value`, `DerivedNode.memo`, `DerivedNode.sourceReads`, `DerivedNode.derivedReads`, and the fields of `DerivedNodeMemo`, which the engine writes; arrays are `ReadonlyArray` except the dependency lists and the reads buffers, which the engine reuses as buffers (Pull). The engine has no class (decision 7), so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
 
 ### Pre-commit hooks
 
@@ -1939,7 +1939,7 @@ pico-runtime.md open decision 19, restated.
 
 Decided by the user: (a).
 
-- (a) No alias: a link is written `DerivedNode<unknown>`, `SourceNode<unknown>`, or `SourceNode<unknown> | DerivedNode<unknown>` at each use, and `equals` is a method signature so that `DerivedNode<T>` is assignable to `DerivedNode<unknown>`. tsc 5.6 under `strict` accepts pushing a `DerivedNode<number>` into a dependency array, adding a `Memo<number>` to a `Set<Memo<unknown>>`, and passing one as `consumer`, and rejects all three when `equals` is a function-typed property. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as DerivedNode<unknown>).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
+- (a) No alias: a link is written `DerivedNode<unknown>`, `SourceNode<unknown>`, or `SourceNode<unknown> | DerivedNode<unknown>` at each use, and `equals` is a method signature so that `DerivedNode<T>` is assignable to `DerivedNode<unknown>`. tsc 5.6 under `strict` accepts pushing a `DerivedNode<number>` into a dependency array, adding a `DerivedNodeMemo<number>` to a `Set<DerivedNodeMemo<unknown>>`, and passing one as `consumer`, and rejects all three when `equals` is a function-typed property. Reason: no cast and no wrapper; the engine calls `equals` only with two values the node's own computation produced. Cost: method bivariance also accepts a call such as `(node as DerivedNode<unknown>).equals('a', 'b')` on a `DerivedNode<number>`; only code outside the engine could make it.
 - (b) One value type per graph. Cost: a caller whose nodes have different value types declares a union and narrows every `readDerived` result.
 - (c) An existential encoding: a link holds `<R>(visit: <T>(node: DerivedNode<T>) => R) => R`. Cost: one closure per link and a call per traversal step; it is sound.
 

@@ -57,7 +57,7 @@ Every export except `objectIs` has a caller in the Isograph runtime. The reader 
 
 Engine (`libs/pico-js/src/graph.ts` and `libs/pico-js/src/equality.ts`), as pico-js.md's The public API, Types, and The implementation define them:
 
-- Types: `SourceNode`, `DerivedNode`, `Memo`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
+- Types: `SourceNode`, `DerivedNode`, `DerivedNodeMemo`, `Status`, `Computation`, and the unexported `MISSING`, `Missing`, and `Option`.
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction: `createSourceNode`, `createDerivedNode`.
 - Mark: `writeSource`, `markSourceDirty`, `markDependentsDirty`.
