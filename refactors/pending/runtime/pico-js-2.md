@@ -19,6 +19,7 @@ The engine does not check these contracts:
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
 - A computation is synchronous and reads only through the node it receives.
+- A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
 - The derived nodes form a directed acyclic graph.
 - The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
 
