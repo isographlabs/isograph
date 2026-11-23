@@ -1,6 +1,6 @@
 # pico-js: implementation
 
-This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The package layout, `package.json`, build, hooks, and CI are as pico-js.md (The package) specifies, with two deltas. `src/` holds `graph.ts` and `index.ts`, and `test/` holds `graph.test.ts` and `graph.test-d.ts`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them.
+This doc is the complete source and package of `@isograph/pico-js` in `libs/pico-js`.
 
 ## Model
 
@@ -21,6 +21,176 @@ The engine does not check these contracts:
 - A computation is synchronous and reads only through the node it receives.
 - The derived nodes form a directed acyclic graph.
 - The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
+
+## The package
+
+### Location and files
+
+The engine is a workspace library at `libs/pico-js`, covered by `pnpm-workspace.yaml`'s `libs/*`. Its build and test setup copies `libs/isograph-runtime`'s without the Babel plugin, which only the runtime's fixtures need.
+
+```text
+libs/pico-js/
+  package.json
+  tsconfig.json             references tsconfig.package.json and tsconfig.test.json
+  tsconfig.package.json     extends ../../tsconfig.build.json, includes src/**/*.ts
+  tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts
+  tsdown.config.ts          merges ../../tsdown.config.ts, dts.build true
+  vitest.config.ts          typecheck enabled with tsconfig.test.json
+  src/graph.ts
+  src/index.ts
+  test/graph.test.ts, test/graph.test-d.ts   Tests
+```
+
+Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm install`), which the same commit includes.
+
+### `package.json`
+
+```json
+// from libs/pico-js/package.json
+{
+  "name": "@isograph/pico-js",
+  "description": "A graph of source nodes and derived nodes, recomputed on read when an input changed.",
+  "private": true,
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "license": "MIT",
+  "scripts": {
+    "compile-libs": "tsdown",
+    "watch-libs": "tsdown --watch",
+    "test": "vitest run",
+    "test-watch": "vitest watch",
+    "coverage": "vitest run --coverage",
+    "prepack": "pnpm run test && pnpm run compile-libs",
+    "tsc": "tsc -b",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "vitest": "^2.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isographlabs/isograph.git",
+    "directory": "libs/pico-js"
+  },
+  "sideEffects": false,
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  }
+}
+```
+
+Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned. The one export is `.`, built from `src/index.ts` by the root `tsdown.config.ts` (`entry: ['src/index.ts']`, `format: ['commonjs', 'esm']`).
+
+### TypeScript, tsdown, vitest
+
+`tsconfig.json`, `tsconfig.package.json`, and `tsdown.config.ts` are the runtime's, byte for byte (`libs/isograph-runtime/tsconfig.json`, `tsconfig.package.json`, `tsdown.config.ts`). The engine compiles under the root `tsconfig.build.json`: `target: ES2022`, `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`.
+
+```json
+// from libs/pico-js/tsconfig.json
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.package.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
+}
+```
+
+```json
+// from libs/pico-js/tsconfig.package.json
+{
+  "extends": "../../tsconfig.build.json",
+  "include": ["src/**/*.ts"]
+}
+```
+
+```ts
+// from libs/pico-js/tsdown.config.ts
+import { mergeConfig } from 'tsdown';
+import baseConfig from '../../tsdown.config.ts';
+
+export default mergeConfig(baseConfig, {
+  dts: {
+    build: true,
+  },
+});
+```
+
+```json
+// from libs/pico-js/tsconfig.test.json
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "noUnusedLocals": false
+  },
+  "include": ["test/**/*.ts"],
+  "exclude": ["**/node_modules", "**/dist"]
+}
+```
+
+```ts
+// from libs/pico-js/vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: { typecheck: { enabled: true, tsconfig: './tsconfig.test.json' } },
+});
+```
+
+Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
+
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them. The engine has no class, so the ES private field rule does not apply. oxlint's `switch-exhaustiveness-check` and `strict-boolean-expressions` (`.oxlintrc.json`) hold for every `switch` and condition in the body.
+
+### Pre-commit hooks
+
+`.pre-commit-config.yaml` gains two hooks, after `disposable-types-typecheck`:
+
+```yaml
+# from .pre-commit-config.yaml
+      - id: pico-js-test
+        name: engine test
+        entry: pnpm --filter @isograph/pico-js test
+        language: system
+        files: '^libs/pico-js/'
+        pass_filenames: false
+      - id: pico-js-typecheck
+        name: engine typecheck
+        entry: pnpm --filter @isograph/pico-js tsc
+        language: system
+        files: '^(libs/pico-js/|tsconfig\.build\.json$)'
+        pass_filenames: false
+```
+
+`prettier` and `oxlint` already cover every file in the workspace. When the Isograph runtime gains its dependency on the engine (pico-runtime.md core change 5), the runtime's three hooks also match the engine's directory:
+
+```yaml
+# from .pre-commit-config.yaml
+      # runtime-dependencies-build and runtime-typecheck, files:
+        files: '^(libs/isograph-runtime/|libs/isograph-disposable-types/|libs/pico-js/|tsconfig\.build\.json$)'
+      # runtime-test, files:
+        files: '^libs/(isograph-runtime|isograph-disposable-types|pico-js)/'
+```
+
+### CI
+
+`.github/workflows/js.yml`'s `babel-plugin` job runs `pnpm compile-libs`, which turbo runs for every workspace package with a `compile-libs` script; turbo's `compile-libs` task depends on `tsc` (`turbo.json`), so the engine is type-checked and built there with no change. The job gains one step after "Test @isograph/disposable-types":
+
+```yaml
+# from .github/workflows/js.yml
+      - name: Test @isograph/pico-js
+        run: pnpm --filter @isograph/pico-js test
+```
+
+### Readers before the Isograph runtime depends on it
+
+AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 4 ships the package before its first workspace caller on that ground; core change 5 is the first caller of the source functions and core change 8 of the derived-node functions. The package ships alone, as its own change.
 
 ## `src/graph.ts`
 
