@@ -502,6 +502,32 @@ describe('verification', () => {
   });
 });
 
+describe('source writes and verification', () => {
+  test('a node whose source changed recomputes without pulling the derived node it read before', () => {
+    const runs = { b: 0, c: 0 };
+    const a = createSourceNode(true, tripleEquals);
+    const bInput = createSourceNode(1, tripleEquals);
+    const b = createDerivedNode((consumer) => {
+      runs.b += 1;
+      return readSource(consumer, bInput);
+    }, tripleEquals);
+    const c = createDerivedNode(() => {
+      runs.c += 1;
+      return 0;
+    }, tripleEquals);
+    const foo = createDerivedNode(
+      (consumer) => (readSource(consumer, a) ? readDerived(consumer, b) : readDerived(consumer, c)),
+      tripleEquals,
+    );
+    expect(pull(foo)).toBe(1);
+    writeSource(bInput, 2);
+    writeSource(a, false);
+    expect(statusOf(foo)).toBe('Dirty');
+    expect(pull(foo)).toBe(0);
+    expect(runs).toEqual({ b: 1, c: 1 });
+  });
+});
+
 describe('dependencies', () => {
   test('a computation that stops reading a source is no longer marked by it', () => {
     let runs = 0;
