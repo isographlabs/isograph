@@ -5,7 +5,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 ## Model
 
 - A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it.
-- A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation. `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes.
+- A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation.
 - A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. A new node is `Uncomputed`.
 - `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes after the first pull that leaves it `Dirty`. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, it becomes `Clean` without running. A `Dirty` node recomputes.
 - A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
@@ -17,6 +17,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 
 The engine does not check these contracts:
 
+- The caller writes a source only when its value changed.
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
 - A computation is synchronous, and every `readSource` and `readDerived` call it makes receives, as `callingNode`, the node the computation received.
@@ -274,7 +275,7 @@ After the first `writeSource`, `name` recomputes and returns `previous`, so `gre
 ## API
 
 - `createSourceNode(value)` returns a source node that holds `value`.
-- `writeSource(source, value)` stores `value` in `source` and marks the derived nodes that read it. It runs no computation. `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes.
+- `writeSource(source, value)` stores `value` in `source` and marks the derived nodes that read it. It runs no computation.
 - `createDerivedNode(computation)` returns an `Uncomputed` derived node whose value `computation(callingNode, previous)` computes.
 - `readSource(callingNode, source)` returns the value of `source` and records `source` as a dependency of `callingNode`.
 - `readDerived(callingNode, node)` pulls `node`, returns its value, and records `node` as a dependency of `callingNode`.
@@ -305,6 +306,7 @@ When a recompute returns a value `===` to its previous value, the node marks non
 
 The engine does not check these contracts:
 
+- The caller writes a source only when its value changed.
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
 - A computation is synchronous, and every `readSource` and `readDerived` call it makes receives, as `callingNode`, the node the computation received.
@@ -650,20 +652,6 @@ describe('marking', () => {
     expect(sum.status).toBe('Dirty');
     expect(label.status).toBe('Check');
     expect(runs).toEqual({ sum: 1, label: 1 });
-  });
-
-  test('a write marks readers even when the value is the same', () => {
-    let runs = 0;
-    const a = createSourceNode(1);
-    const double = createDerivedNode((callingNode) => {
-      runs += 1;
-      return readSource(callingNode, a) * 2;
-    });
-    pull(double);
-    writeSource(a, 1);
-    expect(double.status).toBe('Dirty');
-    expect(pull(double)).toBe(2);
-    expect(runs).toBe(2);
   });
 
   test('in a diamond, a write marks the shared node Dirty and every node above it Check', () => {
