@@ -11,6 +11,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 - A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
 - Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read.
+- Code outside a computation reads a source's current value as `source.value`. An untracked read inside a computation, `source.value` or `pull(node)`, records no dependency and is allowed. A later change to a node read that way does not mark the computing node.
 - Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays. Its next computation adds it to the sets of what it reads then.
 - Disposing a node marks its readers `Dirty` and returns the node to `Uncomputed`, the state of a new node.
 
@@ -18,7 +19,10 @@ The engine does not check these contracts:
 
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
-- A computation is synchronous and reads only through the node it receives.
+- A computation is synchronous, and every `readSource` and `readDerived` call it makes receives, as `callingNode`, the node the computation received.
+- `readSource` and `readDerived` are called only while the computation of the `callingNode` they receive is running.
+- A computation's result depends only on what it reads through `readSource` and `readDerived` and on `previous`.
+- A caller does not write a field of a source node or a derived node.
 - A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
 - The derived nodes form a directed acyclic graph.
 - The chains of derived nodes that a pull descends stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
@@ -266,7 +270,7 @@ After the first `writeSource`, `name` recomputes and returns `previous`, so `gre
 - `DerivedNode<TValue>` is the type of a derived node whose value has type `TValue`.
 - `Status` is the type of a derived node's `status` field.
 
-Each `readSource` and `readDerived` call during a computation records a dependency. A node's dependencies are the nodes its latest computation read.
+Each `readSource` and `readDerived` call during a computation records a dependency. A node's dependencies are the nodes its latest computation read. Code outside a computation reads a source's current value as `source.value`. An untracked read inside a computation, `source.value` or `pull(node)`, records no dependency and is allowed. A later change to a node read that way does not mark the computing node.
 
 ## Statuses
 
@@ -289,7 +293,10 @@ The engine does not check these contracts:
 
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
-- A computation is synchronous and reads only through the node it receives.
+- A computation is synchronous, and every `readSource` and `readDerived` call it makes receives, as `callingNode`, the node the computation received.
+- `readSource` and `readDerived` are called only while the computation of the `callingNode` they receive is running.
+- A computation's result depends only on what it reads through `readSource` and `readDerived` and on `previous`.
+- A caller does not write a field of a source node or a derived node.
 - A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
 - The derived nodes form a directed acyclic graph.
 - The chains of derived nodes that a pull descends stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
