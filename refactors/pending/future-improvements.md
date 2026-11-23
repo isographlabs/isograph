@@ -37,3 +37,7 @@ Delete those commented-out variants and the TODO on the skip regex. The commente
 ## Per-client index of editor buffer paths
 
 `IsographDb::remove_editor_buffers_of_client` (lsp-open-files.md change 5) runs on every `ClientConnectionEvent::Gone`. It scans every key of `editor_buffer_map`, across every client, to find that client's keys. A per-client index of editor buffer paths, maintained by `set_editor_buffer` and `remove_editor_buffer`, would let disconnect cleanup visit only that client's paths. The index is state `handle` owns outside any memo; no memo reads it.
+
+## `deleteRecord` drops source nodes that still have dependents
+
+pico-runtime.md's `deleteRecord` removes a deleted record's source nodes from the store. A derived node that read one of them while it held `MISSING` keeps depending on the removed node, so a later write of that key goes to a new source node and never marks the reader, which returns `MissingData` from then on. The store's key-to-node map must keep resolving a key to the same node while the node has dependents, as pico's `id_for_key` does: `deleteRecord` writes `MISSING` to a present source and keeps any node with dependents, and the sweep removes it once its dependents are gone. Upstream does not have this bug: its store holds plain values and a subscription re-reads after every write (`libs/isograph-react/src/core/subscribe.ts`).
