@@ -95,13 +95,12 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
 }
 
 function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
-  const stack: Array<DerivedNode<unknown>> = [];
   for (const node of dependents) {
     switch (node.status) {
       case 'Clean':
         detach(node);
         node.status = 'Dirty';
-        stack.push(node);
+        markDependentsCheck(node.dependents);
         break;
       case 'Check':
         detach(node);
@@ -113,14 +112,21 @@ function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         assertNever(node.status);
     }
   }
-  let marked: DerivedNode<unknown> | undefined;
-  while ((marked = stack.pop()) !== undefined) {
-    for (const dependent of marked.dependents) {
-      if (dependent.status !== 'Clean') {
-        continue;
-      }
-      dependent.status = 'Check';
-      stack.push(dependent);
+}
+
+function markDependentsCheck(dependents: Set<DerivedNode<unknown>>): void {
+  for (const node of dependents) {
+    switch (node.status) {
+      case 'Clean':
+        node.status = 'Check';
+        markDependentsCheck(node.dependents);
+        break;
+      case 'Check':
+        break;
+      case 'Dirty':
+        throw new Error('A Dirty node is in a dependents set');
+      default:
+        assertNever(node.status);
     }
   }
 }
@@ -176,7 +182,7 @@ function assertNever(value: never): never {
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
 - A `Dirty` node is in no `dependents` set and has empty dependency arrays. A new node starts in that state, and marking and disposal detach a node before they set it `Dirty`. Writes to the dependencies of a `Dirty` node therefore never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
 - Only a `Dirty` node recomputes, and `recompute` attaches the node after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so `recompute` always starts with empty dependency arrays and only the computation's own reads fill them.
-- `markDependentsDirty` pushes a node only when it leaves `Clean`, so the marks are the visited set: each node is pushed at most once and each `dependents` set is walked at most once per write.
+- Marking visits a node's dependents only when the node leaves `Clean`, so each node is visited once per write. Marking recurses once per level, like `pull`, so the pull-depth contract also bounds marking.
 - A write marks the source's direct readers `Dirty`, so a `Check` node has no changed source and `verify` pulls only its derived dependencies. `verify` recomputes when pulling a dependency marked its node `Dirty`. A dependency's `recompute` marks its dependents `Dirty` exactly when its new value is not `===` its previous value, so the node's status is the dependency's verdict.
 - A node becomes `Check` only from `Clean`, and it becomes `Clean` only at the end of a computation or a verification, so a `Check` node's `value` is a computed value and `verify` returns it. `value` holds `undefined` only while a node is `Dirty`, where the computation receives it as `previous`.
 - A node's `derivedDependencies` holds the nodes its computation read, and each of those nodes' `dependents` set holds the reader while the reader is not `Dirty`. A dependency read twice is one member of its set.
@@ -304,21 +310,6 @@ describe('marking', () => {
       'Check',
       'Check',
     ]);
-  });
-
-  test('marking a chain of 100,000 nodes completes', () => {
-    const source = createSourceNode(0);
-    const bottom = createDerivedNode((callingNode) => readSource(callingNode, source));
-    pull(bottom);
-    let top = bottom;
-    for (let index = 1; index < 100_000; index += 1) {
-      const below = top;
-      top = createDerivedNode((callingNode) => readDerived(callingNode, below));
-      pull(top);
-    }
-    writeSource(source, 1);
-    expect(bottom.status).toBe('Dirty');
-    expect(top.status).toBe('Check');
   });
 });
 
