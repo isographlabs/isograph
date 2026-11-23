@@ -274,7 +274,7 @@ Each `readSource` and `readDerived` call during a computation records a dependen
 
 ## Statuses
 
-- An `Uncomputed` node has no value. Its next pull runs its computation with `previous` `undefined`.
+- An `Uncomputed` node has no value. Its next pull runs its computation with `previous` `undefined`. A computation whose value type includes `undefined` cannot tell its first run from a run after a stored `undefined`, because `previous` is `undefined` in both.
 - A `Dirty` node read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
 - A `Check` node depends through derived nodes on a source that was written or on a derived node that was disposed. Its next pull pulls its derived dependencies in the order they were read and recomputes the node after the first pull that leaves it `Dirty`. If no pull leaves the node `Dirty`, the node becomes `Clean` without running.
 - A `Clean` node holds an up-to-date value, which a pull returns without running anything.
