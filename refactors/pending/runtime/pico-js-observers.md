@@ -331,8 +331,6 @@ function markCheckDependentsDirty(
         throw new Error(
           'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
         );
-      default:
-        assertNever(node.status);
     }
   }
 }
