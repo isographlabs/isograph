@@ -172,7 +172,11 @@ export function deleteRecord(store: Store, link: StoreLink): void {
   if (containers === undefined || container === undefined) {
     return;
   }
-  container.sources.forEach((source) => writeSource(source, source.value));
+  container.sources.forEach((source) => {
+    if (source.value !== MISSING) {
+      writeSource(source, MISSING);
+    }
+  });
   container.derived.forEach((node) => disposeDerivedNode(node));
   containers.delete(link.id);
   if (containers.size === 0) {
@@ -181,7 +185,7 @@ export function deleteRecord(store: Store, link: StoreLink): void {
 }
 ```
 
-`deleteRecord` calls `writeSource(source, source.value)` on every source node, `MISSING` ones included, so every reader of the deleted record recomputes. Its `container.derived` line arrives in core change 7.
+A caller writes a source only when its value changes, so `deleteRecord` writes `MISSING` to each present source and nothing to a `MISSING` one. Its `container.derived` line arrives in core change 7.
 
 The sweep, after (`libs/isograph-runtime/src/garbageCollection.ts:32-41`):
 
