@@ -311,7 +311,7 @@ Measured: 1950.5 -> 1894.6 ms (-2.9%).
 
 The `Check` loop gets the same guard. Breaks nothing.
 
-### Change 3: keep edges linked while Dirty (POC-B; changes invariants; open decision 2)
+### Change 3: keep edges linked while Dirty (POC-B; changes invariants; decision 2)
 
 Measured: POC-A 1894.6 -> POC-B 1638.0 ms (-13.5%) with changes 1 and 2 otherwise equal; the snippets show POC-B's final numeric statuses (change 5); `bench/cases.ts` 527.5 -> 407.5 ms in the final run (POC-B with changes 4 and 5).
 
@@ -452,7 +452,7 @@ function verify<TValue>(root: DerivedNode<TValue>): TValue {
 
 Breaks nothing: the order of pulls and recomputes is the recursive version's. A pull of a 100,000-node `Check` chain no longer recurses through `verify`, though `recompute` still recurses through computations.
 
-### Change 5: numeric statuses (POC-B; open decision 3)
+### Change 5: numeric statuses (POC-B; decision 3)
 
 Measured: POC-B 1566.5 -> 1494.5 ms (-4.6%). POC-A 1913.5 -> 1985.0, rejected for POC-A.
 
@@ -479,13 +479,13 @@ Breaks the public `Status` type and every test that compares `status` to a strin
 | `track` without `try`/`finally` (adapter) | B | no change on six cases | none |
 | lazy detach (POC-C) | B | 1484.7 -> 1720.8 | slower |
 
-## Open decisions
+## Decisions
 
-1. Public node types. Changes 1-5 replace `dependents: Set` and the dependency arrays with edge-list fields. Nothing outside the tests reads them. Options: expose the fields as the POC does, or make the node types opaque and give tests a helper.
-2. Detach-on-dirty. POC-A keeps it (1905.4 ms upstream); POC-B drops it (1384.3 ms upstream, faster than alien 1580.7 and Preact 1706.8). POC-B changes the Model bullet "Marking a node Dirty removes it from every dependents set", removes one throw, and makes repeated writes to an unpulled node's sources visit it each time. The branch has POC-A.
-3. Numeric `Status`. Worth 4.6% in POC-B, nothing in POC-A. Options: numeric public `Status`; numeric internal status with string values exported for tests and callers.
+1. Public node types: decided. The node types expose the edge-list fields as POC-B does (`firstDependent`, `lastDependent`, and the dependency-list fields), and the tests walk the dependents list with a test helper.
+2. Detach-on-dirty: decided. pico-js adopts POC-B, which drops detach-on-dirty (1384.3 ms upstream, against alien 1580.7 and Preact 1706.8).
+3. Numeric `Status`: decided. The public `Status` is `0 | 1 | 2 | 3`, with no exported constants.
 4. Invariant checks cost 4.4% in POC-B. They are kept, as the brief says.
-5. pico-js.md. When a decision lands, pico-js.md's `graph.ts`, tests, and README change to match; this doc does not edit pico-js.md.
+5. pico-js.md specifies POC-B's `graph.ts`, `index.ts`, tests, and README.
 
 ## Branch
 
