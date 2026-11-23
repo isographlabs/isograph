@@ -225,8 +225,10 @@ One process per engine, one rep, while the machine was loaded (`load averages: 5
 
 In the fast2 and flag2 columns, no test got slower by more than the noise except fanOutRepeat K10 M1 (29.6 → 44.1 with fast2, 42.0 with flag2), which is not in the case matrix. Its counts cannot have risen (fast2 only removes allocations), so this is unexplained and needs the serial rerun. The onDirty column is slower than flag2 in writeThenDispose (6.1 → 17.1), createComputations (25.2 → 41.1), updateSignals (196.3 → 239.3), and the kairo effect tests.
 
-## Open decisions
+## Decisions
 
-- `dependentsDirty` is a two-state field. AGENTS.md prefers an enum whose variants name the states (`DependentsMayBeClean`, `DependentsAllDirty`) over a `bool`. The POC uses `0 | 1` for the same reason POC-B made `Status` numeric.
-- fast2's `verify` uses `node.firstDependent!` and `verifyStack!.pop()!`. The invariant is that a node verify descended into has a dependent, and that an edge was pushed when the node has more than one. The type system cannot express either. Per AGENTS.md this needs `UnexpectedError` or a panic, which is not yet chosen.
-- Whether pico-js-batch.md keeps a `Set` batch. The `Set` dedupes a callback that two nodes share; an array does not. The measured cost of the `Set` is 3 to 7 times the array's in the effect tests.
+pico-js.md adopts fast2 and flag2, with these decisions.
+
+- The source field is `dependentsStatus: DependentsStatus`. `DependentsStatus` is the union of two numbers with a named constant for each, private to `graph.ts`: `DEPENDENTS_MAY_NOT_BE_DIRTY` (`0`, a node in the dependents list may be `Check` or `Clean`, so a write marks the list) and `DEPENDENTS_ALL_DIRTY` (`1`, every node in the dependents list is `Dirty`, so a write skips the list). The constants cost nothing measurable against the literals (fanOutRepeat K1000 M100 0.69 ms against 0.93, noObservers 0.64 against 0.62, v0).
+- fast2's `verify` has no `!` assertion. A node `verify` descended into with no dependents, or with more than one and no edge on the stack, throws an error that ends "This is indicative of a bug in pico-js.", as the other invariant throws do.
+- pico-js-batch.md keeps its `Set` batch.
