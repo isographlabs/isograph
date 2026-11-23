@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 /**
  * This is a function that will render a component only after it commits.
@@ -10,7 +10,7 @@ export function RenderAfterCommit__DO_NOT_USE({
   children,
 }: {
   children: React.ReactNode;
-}) {
+}): ReactNode {
   const [show, setShow] = useState(false);
   useEffect(() => setShow(true), []);
   return show ? children : null;

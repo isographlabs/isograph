@@ -90,7 +90,7 @@ export class ParentCache<T> {
     return [cacheItem, cacheItem.getValue(), disposeTemporaryRetain];
   }
 
-  empty() {
+  empty(): void {
     this.__cacheItem = null;
   }
 

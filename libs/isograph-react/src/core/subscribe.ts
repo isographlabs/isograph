@@ -63,7 +63,7 @@ function logAnyError(
 export function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: EncounteredIds,
-) {
+): void {
   environment.subscriptions.forEach((subscription) =>
     logAnyError(environment, { situation: 'calling subscriptions' }, () => {
       switch (subscription.kind) {

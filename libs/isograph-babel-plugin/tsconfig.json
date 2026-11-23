@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.build.json",
   "compilerOptions": {
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "isolatedDeclarations": false // cannot use with allowJs
   },
   "include": ["./**/*.ts", "./**/*.js"]
 }

@@ -1,6 +1,7 @@
 import {
   createIsographEnvironmentCore,
   type BaseStoreLayerData,
+  type IsographEnvironment,
   type IsographNetworkFunction,
   type MissingFieldHandler,
 } from '../core/IsographEnvironment';
@@ -12,7 +13,7 @@ export function createIsographEnvironment(
   networkFunction: IsographNetworkFunction,
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
-) {
+): IsographEnvironment {
   return createIsographEnvironmentCore(
     baseStoreLayerData,
     networkFunction,

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext } from 'react';
 import { type IsographEnvironment } from '../core/IsographEnvironment';
 
-export const IsographEnvironmentContext =
+export const IsographEnvironmentContext: React.Context<IsographEnvironment | null> =
   createContext<IsographEnvironment | null>(null);
 
 export type IsographEnvironmentProviderProps = {

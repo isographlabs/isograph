@@ -1,6 +1,6 @@
 export type AnyError = any;
 
-export const NOT_SET = Symbol('NOT_SET');
+export const NOT_SET: unique symbol = Symbol('NOT_SET');
 export type NotSet = typeof NOT_SET;
 
 export type Result<T, E> =

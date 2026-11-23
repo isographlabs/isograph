@@ -55,14 +55,16 @@ export function unretainQuery(
 export function retainQuery(
   environment: IsographEnvironment,
   queryToRetain: RetainedQuery,
-) {
+): void {
   environment.retainedQueries.add(queryToRetain);
   // TODO can we remove this query from the buffer somehow?
   // We are relying on === equality, but we really should be comparing
   // id + variables
 }
 
-export function garbageCollectEnvironment(environment: IsographEnvironment) {
+export function garbageCollectEnvironment(
+  environment: IsographEnvironment,
+): void {
   if (environment.store.kind !== 'BaseStoreLayer') {
     return;
   }
@@ -88,7 +90,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
 export function garbageCollectBaseStoreLayer(
   retainedQueries: RetainedQueryWithNormalizationAst[],
   baseStoreLayer: BaseStoreLayer,
-) {
+): void {
   const retainedIds: RetainedIds = {};
 
   for (const query of retainedQueries) {
