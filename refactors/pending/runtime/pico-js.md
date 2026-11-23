@@ -261,7 +261,7 @@ Each `readSource` and `readDerived` call during a computation records a dependen
 
 ## Cutoff
 
-When a recompute returns a value `===` to its previous value, the node marks none of its readers `Dirty`, and a `Check` reader becomes `Clean` without running. Under `===`, a `NaN` value always counts as changed, and `0` and `-0` count as equal. A computation that returns `previous` when its new result is structurally equal to `previous` extends the cutoff to structural equality.
+When a recompute returns a value `===` to its previous value, the node marks none of its readers `Dirty`, and a `Check` reader becomes `Clean` without running. A computation that returns `previous` when its new result is structurally equal to `previous` extends the cutoff to structural equality.
 
 ## Disposal
 
