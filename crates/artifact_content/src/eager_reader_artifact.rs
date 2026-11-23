@@ -248,7 +248,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
         > => ({{\n\
         {}kind: \"EagerReaderArtifact\",\n\
         {}fieldName: \"{eager_reader_name}\",\n\
-        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.{link_field_name} : null,\n\
+        {}resolver: ({{ firstParameter }}) => firstParameter.data.__typename === \"{concrete_type}\" ? firstParameter.data.{link_field_name} : null,\n\
         {}readerAst,\n\
         {}hasUpdatable: false,\n\
         }});\n\n\

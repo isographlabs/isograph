@@ -149,7 +149,9 @@ export function useConnectionSpecPagination<
         );
       }
 
-      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
+      return readerWithRefetchQueries.readerArtifact.resolver({
+        firstParameter,
+      });
     });
 
     const items = flatten(results.map((result) => result.edges ?? []));
