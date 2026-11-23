@@ -86,9 +86,7 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
     return;
   }
   markDependentsDirty(memo.dependents);
-  if (memo.status !== 'Dirty') {
-    detach(memo);
-  }
+  detach(memo);
   node.memo = MISSING;
 }
 
