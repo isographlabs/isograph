@@ -4,12 +4,12 @@ This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The pa
 
 ## Model
 
-- A source node holds a value that the caller writes. A derived node holds a computation and, once computed, a `DerivedNodeMemo`: the value, a status, the nodes the computation read, and the memos that read the node.
+- A source node holds a value that the caller writes. A derived node holds a computation and, once computed, a `DerivedNodeMemo`: the computation, the value, a status, the source nodes and memos the computation read, and the memos that read the node.
 - A write marks the memos of the source's direct readers `Dirty` and the memos above them `Check`. It runs no computation.
 - `pull` brings a node up to date. A `Clean` memo returns its value. A `Check` memo pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` memo recomputes. A node with no memo computes for the first time.
 - A computation receives its node's memo and the previous value, which is `undefined` on the first computation, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
-- A computation pushes its reads onto its memo's dependency lists. After it returns, the memo is added to the `dependents` set of each node it read, in one synchronous step with the new value.
+- A computation pushes its reads onto its memo's dependency lists. After it returns, the memo is added to the `dependents` set of each source node and memo it read, in one synchronous step with the new value.
 - Marking a memo `Dirty` removes it from every `dependents` set it is in and empties its dependency lists. Its next computation adds it to the sets of what it reads then.
 
 Contracts the engine does not check:
@@ -44,9 +44,9 @@ export type DerivedNodeMemo<TValue> = {
   value: TValue;
   status: Status;
   sourceDependencies: Array<SourceNode<unknown>>;
-  derivedDependencies: Array<DerivedNode<unknown>>;
+  derivedDependencies: Array<DerivedNodeMemo<unknown>>;
   readonly dependents: Set<DerivedNodeMemo<unknown>>;
-  readonly node: DerivedNode<TValue>;
+  computation(consumer: DerivedNodeMemo<unknown>, previous: TValue | undefined): TValue;
 };
 
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
@@ -64,36 +64,20 @@ export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): 
   markDependentsDirty(source.dependents);
 }
 
-export function markSourceDirty(source: SourceNode<unknown>): void {
-  markDependentsDirty(source.dependents);
-}
-
 export function readSource<TValue>(consumer: DerivedNodeMemo<unknown>, source: SourceNode<TValue>): TValue {
   consumer.sourceDependencies.push(source);
   return source.value;
 }
 
 export function readDerived<TValue>(consumer: DerivedNodeMemo<unknown>, node: DerivedNode<TValue>): TValue {
-  const value = pull(node);
-  consumer.derivedDependencies.push(node);
+  const memo = memoOf(node);
+  const value = pullMemo(memo);
+  consumer.derivedDependencies.push(memo);
   return value;
 }
 
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
-  const memo = node.memo;
-  if (memo === MISSING) {
-    return computeFirst(node);
-  }
-  switch (memo.status) {
-    case 'Clean':
-      return memo.value;
-    case 'Check':
-      return verify(memo);
-    case 'Dirty':
-      return recompute(memo);
-    default:
-      return assertNever(memo.status);
-  }
+  return pullMemo(memoOf(node));
 }
 
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
@@ -106,6 +90,27 @@ export function disposeDerivedNode(node: DerivedNode<unknown>): void {
     detach(memo);
   }
   node.memo = MISSING;
+}
+
+function memoOf<TValue>(node: DerivedNode<TValue>): DerivedNodeMemo<TValue> {
+  const memo = node.memo;
+  if (memo === MISSING) {
+    return computeFirst(node);
+  }
+  return memo;
+}
+
+function pullMemo<TValue>(memo: DerivedNodeMemo<TValue>): TValue {
+  switch (memo.status) {
+    case 'Clean':
+      return memo.value;
+    case 'Check':
+      return verify(memo);
+    case 'Dirty':
+      return recompute(memo);
+    default:
+      return assertNever(memo.status);
+  }
 }
 
 function markDependentsDirty(dependents: Set<DerivedNodeMemo<unknown>>): void {
@@ -141,7 +146,7 @@ function markDependentsDirty(dependents: Set<DerivedNodeMemo<unknown>>): void {
 
 function verify<TValue>(memo: DerivedNodeMemo<TValue>): TValue {
   for (const dependency of memo.derivedDependencies) {
-    pull(dependency);
+    pullMemo(dependency);
     if (memo.status === 'Dirty') {
       return recompute(memo);
     }
@@ -150,24 +155,23 @@ function verify<TValue>(memo: DerivedNodeMemo<TValue>): TValue {
   return memo.value;
 }
 
-function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
+function computeFirst<TValue>(node: DerivedNode<TValue>): DerivedNodeMemo<TValue> {
   const memo: DerivedNodeMemo<TValue> = {
     value: undefined as unknown as TValue,
     status: 'Clean',
     sourceDependencies: [],
     derivedDependencies: [],
     dependents: new Set(),
-    node,
+    computation: node.computation,
   };
   node.memo = memo;
-  const value = node.computation(memo, undefined);
-  memo.value = value;
+  memo.value = memo.computation(memo, undefined);
   attach(memo);
-  return value;
+  return memo;
 }
 
 function recompute<TValue>(memo: DerivedNodeMemo<TValue>): TValue {
-  const value = memo.node.computation(memo, memo.value);
+  const value = memo.computation(memo, memo.value);
   attach(memo);
   memo.status = 'Clean';
   if (value === memo.value) {
@@ -183,7 +187,7 @@ function attach(memo: DerivedNodeMemo<unknown>): void {
     source.dependents.add(memo);
   }
   for (const dependency of memo.derivedDependencies) {
-    memoOf(dependency).dependents.add(memo);
+    dependency.dependents.add(memo);
   }
 }
 
@@ -192,18 +196,10 @@ function detach(memo: DerivedNodeMemo<unknown>): void {
     source.dependents.delete(memo);
   }
   for (const dependency of memo.derivedDependencies) {
-    memoOf(dependency).dependents.delete(memo);
+    dependency.dependents.delete(memo);
   }
   memo.sourceDependencies.length = 0;
   memo.derivedDependencies.length = 0;
-}
-
-function memoOf<TValue>(dependency: DerivedNode<TValue>): DerivedNodeMemo<TValue> {
-  const memo = dependency.memo;
-  if (memo === MISSING) {
-    throw new Error('A derived dependency of a memo that is not Dirty has no memo');
-  }
-  return memo;
 }
 
 function assertNever(value: never): never {
@@ -211,12 +207,13 @@ function assertNever(value: never): never {
 }
 ```
 
+- `computation` is a method signature on both types. TypeScript checks a method's parameters bivariantly, so `DerivedNodeMemo<TValue>` is assignable to `DerivedNodeMemo<unknown>`.
 - A `Dirty` memo is in no `dependents` set and has empty dependency lists. Writes to the dependencies of a `Dirty` node therefore never reach it. Deleting the memo from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
 - A memo is in no `dependents` set while its computation runs, because a recomputing memo is `Dirty` and a new memo is attached only after its first computation returns. Nothing marks the memo during its computation, so `recompute` always receives a detached memo with empty dependency lists and only the computation's own reads fill them.
 - `markDependentsDirty` pushes a memo only when it leaves `Clean`, so the marks are the visited set: each memo is pushed at most once and each `dependents` set is walked at most once per write. It allocates one stack array per call and no closure.
 - `verify` recomputes when pulling a dependency marked its memo `Dirty`. A dependency's `recompute` marks its dependents `Dirty` exactly when its new value is not `===` its previous value, so the memo's status is the dependency's verdict.
-- `computeFirst` creates the memo before computing, so the computation's reads have a memo to push onto. The memo's `value` holds `undefined` until the computation returns. No computation reads it, because the derived nodes form a directed acyclic graph.
-- Every derived dependency of a memo that is not `Dirty` has a memo, and that memo's `dependents` set holds the reader. `readDerived` pulls a node before pushing it, a computation does not dispose a node, and disposal marks every reader `Dirty` before it resets `node.memo`. A dependency read twice is one member of its set.
+- `computeFirst` creates the memo before computing, so the computation's reads have a memo to push onto. The memo's `value` holds `undefined` until the computation returns. No computation reads it, because the derived nodes form a directed acyclic graph. `computeFirst` returns the memo `Clean`, so a first computation costs one extra pass through the `Clean` case of `pullMemo`.
+- A memo's `derivedDependencies` holds the memos its computation read, and each of those memos' `dependents` sets holds the reader while the reader is not `Dirty`. No entry is a memo dropped from its node. A computation does not dispose a node, and disposal marks every reader `Dirty`, which empties the reader's dependency lists. A dependency read twice is one member of its set.
 - Disposal empties the memo's `dependents` set, because marking a reader `Dirty` detaches it. A disposed node's next pull computes it for the first time, with `previous` `undefined`.
 
 ## `src/index.ts`
@@ -227,7 +224,6 @@ export {
   createDerivedNode,
   createSourceNode,
   disposeDerivedNode,
-  markSourceDirty,
   pull,
   readDerived,
   readSource,
@@ -245,7 +241,6 @@ import {
   createDerivedNode,
   createSourceNode,
   disposeDerivedNode,
-  markSourceDirty,
   pull,
   readDerived,
   readSource,
@@ -321,14 +316,6 @@ describe('marking', () => {
   });
 
   test('a write marks readers even when the value is the same', () => {
-    const a = createSourceNode(1);
-    const double = createDerivedNode((consumer) => readSource(consumer, a) * 2);
-    pull(double);
-    writeSource(a, 1);
-    expect(statusOf(double)).toBe('Dirty');
-  });
-
-  test('markSourceDirty marks readers without changing the value', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const double = createDerivedNode((consumer) => {
@@ -336,7 +323,7 @@ describe('marking', () => {
       return readSource(consumer, a) * 2;
     });
     pull(double);
-    markSourceDirty(a);
+    writeSource(a, 1);
     expect(statusOf(double)).toBe('Dirty');
     expect(pull(double)).toBe(2);
     expect(runs).toBe(2);
