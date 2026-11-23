@@ -313,7 +313,7 @@ A resolver selected on an absent record (a parent reads a link to `Pet:9`, and `
 
 ### Equality
 
-Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equals(previous, next)` holds. The engine has no default (open decision 20): each resolver node's equality is `resolverResultsEqual`, whose output equality is `===` unless the field supplies one (open decision 7).
+The engine cuts off by `===`: a recompute whose value is `===` the previous value marks no reader, and the node keeps its previous value object (pico-js.md, Model). A resolver node's computation returns `previous` when `resolverResultsEqual` accepts the new result (Stored resolver results), so `resolverResultsEqual` decides cutoff for every resolver node (open decision 20). Its output equality is `identical` (`===`) unless the field supplies one (open decision 7).
 
 Correctness: an equality function only decides whether the dependents recompute. One that answers unequal for equal values makes them recompute from equal inputs to their old values, which costs work and never yields a wrong value. One that answers equal for unequal values yields a wrong value, so every rule other than `===` must answer equal only when every position a reader can observe is `===`.
 
@@ -1058,15 +1058,7 @@ A computation that reads one node twice records it twice (`PetDetailPage` reads 
 
 ```ts
 // from libs/isograph-runtime/src/storedResults.ts
-import {
-  type Computation,
-  createDerivedNode,
-  type DerivedNode,
-  pull,
-  readDerived,
-  readSource,
-  tripleEquals,
-} from '@isograph/pico-js';
+import { createDerivedNode, type DerivedNode, pull, readDerived, readSource } from '@isograph/pico-js';
 
 export function readStoredResult<TEntityName extends EntityName, TOutput>(
   store: Store,
@@ -1086,7 +1078,7 @@ export function resolverNodeAt(
   return getOrInsert(
     containerAt(store, root).derived,
     resolverStoreKey(artifact, variables),
-    () => createDerivedNode(resolverComputation(store, artifact, root, variables), resolverResultsEqual(artifact, tripleEquals)),
+    () => createDerivedNode(resolverComputation(store, artifact, root, variables)),
   );
 }
 
@@ -1095,17 +1087,23 @@ function resolverComputation(
   artifact: ReaderArtifact<ResolverParam, unknown, EntityName>,
   root: StoreLink,
   variables: Variables,
-): Computation<ResolverResult<unknown>> {
-  return (consumer) => {
-    const data = readData(contextHooks(store, consumer), artifact, root, variables);
-    return data.kind === 'Ok' ? callResolver(artifact, root, data.value, variables) : data;
+): (callingNode: DerivedNode<unknown>, previous: ResolverResult<unknown> | undefined) => ResolverResult<unknown> {
+  const resultsEqual = resolverResultsEqual(artifact, identical);
+  return (callingNode, previous) => {
+    const data = readData(contextHooks(store, callingNode), artifact, root, variables);
+    const result = data.kind === 'Ok' ? callResolver(artifact, root, data.value, variables) : data;
+    return previous !== undefined && resultsEqual(previous, result) ? previous : result;
   };
 }
 
-function contextHooks(store: Store, consumer: DerivedNode<unknown>): ReadHooks<ReadResolverThrew> {
+function identical(previous: unknown, next: unknown): boolean {
+  return previous === next;
+}
+
+function contextHooks(store: Store, callingNode: DerivedNode<unknown>): ReadHooks<ReadResolverThrew> {
   return {
-    readValue: (record, key) => readSource(consumer, sourceNodeAt(store, record, key)),
-    readResolver: (artifact, root, variables) => readDerived(consumer, resolverNodeAt(store, artifact, root, variables)),
+    readValue: (record, key) => readSource(callingNode, sourceNodeAt(store, record, key)),
+    readResolver: (artifact, root, variables) => readDerived(callingNode, resolverNodeAt(store, artifact, root, variables)),
   };
 }
 
@@ -1127,6 +1125,8 @@ function callResolver(
 ```
 
 The `WalkData` arm stores `data`, the `SelectionSetData` parameter, which is the same object as `value`; `value` is `unknown` and does not type-check as the `WalkData` variant's `SelectionSetData`.
+
+The engine cuts off only when a recompute returns a value `===` the previous one, and structural sharing is the computation's job (pico-js.md, Model). `callResolver` builds a new result object on every call, so a resolver node cuts off only because `resolverComputation` returns `previous` when `resolverResultsEqual` accepts the new result. `ResolverResult` has no `undefined` member, so `previous` is `undefined` only on a node's first computation, including the first after a disposal. `identical` is `resolverResultsEqual`'s output equality unless the field supplies one (open decision 7).
 
 The computation closes over `store`, the environment's `Store` (The store), which is written in place and never replaced (network-and-subscriptions.md, The environment). The cast in `readStoredResult` is the one place a stored `ResolverResult<unknown>` is returned at the caller's type. Its type parameters and `root` parameter are `read`'s. `readStoredResult` takes the store, as `read` does; every function that reads or writes the graph takes the store, because the store is the graph.
 
@@ -1476,7 +1476,7 @@ Each is one commit, in order; each is independently shippable.
 
    Tests. The store fixture gains the Example's fields (`field Query.PetDetailPage`, `field String.toUppercase`, linked-only-selections.md, Generated files for the example). New: in `test/read.test.ts`, "PetDetailPage reads n1, n2 through toUppercase, and bestFriend", "a bare bestFriend is EMPTY_DATA, or null when the link is null", "a bare __self on a scalar record is its value", and "__self with a selection set reads at the same record".
 
-8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode` with `resolverResultsEqual(artifact, tripleEquals)`), `resolverComputation`, `contextHooks` (`readSource`, `readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
+8. The graph in the Isograph runtime: `RecordContainer.derived`, `readStoredResult`, `resolverNodeAt` (`createDerivedNode`), `resolverComputation` (returns `previous` when `resolverResultsEqual(artifact, identical)` accepts the new result), `identical`, `contextHooks` (`readSource`, `readDerived`), `callResolver`, `ResolverResult` with `WalkData`, `resolverResultsEqual`, `resolverStoreKey` with the entity, `deleteRecord` disposing owned nodes with `disposeDerivedNode`. The engine is unchanged. The package index adds `readStoredResult` and the types `ResolverResult`, `ReadResolverOk`, `OkOrigin`, `ReadResolverThrew`. The pet script reads with `readStoredResult`. Observable: End-user experience above, and the Example's traces: after a write to `Pet:2.name`, a read of `PetDetailPage` does not call `toUppercase`; after a write that leaves `toUppercase`'s result equal, a reader without `n1` does not rerun.
 
    Tests, in a new `libs/isograph-runtime/test/storedResults.test.ts`, each counting resolver calls with `vi.fn` as `test/read.test.ts` does: "a second read with no write calls no resolver and returns the same object"; "after a write to Pet:2.name, PetDetailPage runs and toUppercase does not"; "a write that leaves toUppercase's result equal reruns a reader that reads n1, and not a reader without n1"; "a resolver that throws is stored as ResolverThrew and is not called again until an input changes"; "MissingData on an absent record becomes Ok after normalize writes the record"; "deleting a record disposes the nodes it owns and the next read recomputes their readers"; "a refinement node is computed once and not marked by a write to its record"; "two selections of one field with equal arguments on one record share one node"; "F____n___2 with no variables and F with { n: 2 } are two nodes" (open decision 1); and, degenerate, "a resolver with an empty reader AST on an absent record is Ok and computed once". `demos/pet-demo/src/fetchAndRead.ts`'s output is unchanged.
 
@@ -1682,7 +1682,7 @@ export function collect(store: Store, extraRoots: Iterable<ResolverNode>): void;
 
 Not part of the core. Observers, subscriptions, and effects are derived nodes that are read again as needed. A write marks; whoever needs a value pulls. No resolver runs during a write, and a retained query nobody observes stays marked until something reads it (the user's choice).
 
-- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, consumer), artifact, root, variables)` without the subscription's own resolver, and whose equality is `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`): the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `callSubscriptions` keeps core change 9's call sites. This replaces core change 9's `readSubscription`.
+- Subscriptions. A subscription is a derived node whose computation is `readData(contextHooks(store, consumer), artifact, root, variables)` without the subscription's own resolver, and which returns `previous` when `subscriptionResultsAreEqual` (`libs/isograph-runtime/src/subscribe.ts:135-155`) accepts the new result: the data is an object the walk assembled, so it compares by `selectionSetDataAreEqual`. The `Subscription` holds its node, which lives in no container; unsubscribing disposes it. `callSubscriptions` pulls each subscription's node after every write and calls the callback when the pulled value is not `===` `delivered`; a `Clean` node is one step, and a marked one verifies, so the reader AST is walked only when something it read changed. `callSubscriptions` keeps core change 9's call sites. This replaces core change 9's `readSubscription`.
 - React. `useSyncExternalStore(subscribe, getSnapshot)`: `listen(node, onChange)` adds an observer and a root hold; after a write, `notify` calls each observer whose node is not `Clean`; React then calls `getSnapshot`, which is `pull(node)`. A node whose inputs came back equal is verified without recomputing and returns the same object, so React does not render again. `getSnapshot` pulls during render; an observer whose node stays marked is called on every write until something pulls it.
 - Loaders. loaders.md's effect-set nodes are derived nodes that the runtime pulls after every write (`reconcileEffectRoots`), and its loader items are source nodes (loaders.md, An item that changes over time; After a write).
 - Callback errors. Every callback, listener, and observer runs through `reportCallbackError` (`libs/isograph-runtime/src/subscribe.ts:159-167`): a throw is rethrown in its own microtask and the loop continues (network-and-subscriptions.md, Decisions, 3).
@@ -1814,9 +1814,9 @@ Decided by the user: a computation must not throw (pico-js.md, Throws; Stored re
 
 ### 7. How a field supplies its output equality
 
-`resolverNodeAt` passes `tripleEquals` (`===`, exported by `@isograph/pico-js`) as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
+`resolverComputation` passes `identical` (`===`, `storedResults.ts`) as `outputEqual`. A user who returns a new object per call (`{ length: data.name.length }`) and wants cutoff supplies a comparator, such as a deep equality. A comparator must answer equal only for values no reader can tell apart (Equality).
 
-- (a) A second argument to the function a field literal returns: `iso(`field Pet.Shape { name }`)(resolver, { equal: deepEqual })`. The Babel plugin replaces a field literal with `x => x` (`libs/isograph-babel-plugin/compileTag.js:53`); the replacement becomes `(resolver, options) => Object.assign(resolver, options)`, so the export is still the resolver function, now carrying `equal`. The generated `IdentityWithParam` (`fixtures/store/src/__isograph/iso.ts:44-48`) gains the optional parameter and returns the resolver's type with `readonly equal?: (previous: TOutput, next: TOutput) => boolean`, and `resolverNodeAt` passes `artifact.resolver.equal ?? identical`. This option is held and not decided. Reason: it is the simplest: no directive, no new iso syntax, no compiler change beyond the generated `iso` overload, and the comparator sits next to the resolver it belongs to. Cost: a property written onto the user's function object, and an optional property on the resolver's type.
+- (a) A second argument to the function a field literal returns: `iso(`field Pet.Shape { name }`)(resolver, { equal: deepEqual })`. The Babel plugin replaces a field literal with `x => x` (`libs/isograph-babel-plugin/compileTag.js:53`); the replacement becomes `(resolver, options) => Object.assign(resolver, options)`, so the export is still the resolver function, now carrying `equal`. The generated `IdentityWithParam` (`fixtures/store/src/__isograph/iso.ts:44-48`) gains the optional parameter and returns the resolver's type with `readonly equal?: (previous: TOutput, next: TOutput) => boolean`, and `resolverComputation` passes `artifact.resolver.equal ?? identical`. This option is held and not decided. Reason: it is the simplest: no directive, no new iso syntax, no compiler change beyond the generated `iso` overload, and the comparator sits next to the resolver it belongs to. Cost: a property written onto the user's function object, and an optional property on the resolver's type.
 - (b) A declaration directive naming a built-in comparator (`field Pet.Shape @equality(kind: Deep) { name }`), from which the compiler writes `outputEqual: deepEqual` imported from the runtime. Cost: i2 accepts no declaration directive yet (`DeclarationDirectiveName` is empty, `crates/isograph_parser/src/directives.rs:38-41`); only built-in comparators.
 - (c) A map from selectable to comparator passed to `createIsographEnvironment`. Cost: the comparator is far from its field and keyed by a string the compiler does not check.
 - (d) No API: a resolver that wants cutoff returns a stable value itself. Cost: no cutoff for object outputs without user memoization.
@@ -1906,7 +1906,7 @@ A standalone engine holds nodes of different value types in one graph (a `Derive
 
 ### 20. The engine's identity equality (decided)
 
-Decided by the user: the engine has no default equality and exports two comparisons, `tripleEquals` (`===`) and `objectIs` (`Object.is`), which a caller passes explicitly; `equals` is a required argument of `createDerivedNode` and of `createSourceNode` (`refactors/pending/runtime/pico-js.md` open decision 6). The Isograph layer does not depend on an engine default: every resolver node passes `resolverResultsEqual(artifact, outputEqual)`, whose `outputEqual` is `===` (`tripleEquals`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source node passes `isUnchanged(key)` (The store).
+Decided by the user: the engine compares a recomputed value with the previous one by `===` only, takes no equality argument, and exports no comparison; a computation that wants a structurally equal result to count as unchanged returns `previous` (pico-js.md, Model). The Isograph layer keeps its comparisons: every resolver node's computation returns `previous` when `resolverResultsEqual(artifact, outputEqual)` accepts, whose `outputEqual` is `identical` (`===`, upstream's comparison of resolver values, `areEqualWithDeepComparison.ts:84-95`) unless the field supplies one, beside the structural rule for walk-assembled data (Equality); every store source write is compared by `isUnchanged(key)` before `writeSource` (The store).
 
 ### 21. Whether a caller can write a node's fields (decided)
 
