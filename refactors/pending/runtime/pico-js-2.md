@@ -9,7 +9,7 @@ This doc is the complete source of `@isograph/pico-js` in `libs/pico-js`. The pa
 - `pull` brings a node up to date. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes. A new node is `Dirty`.
 - A computation receives its node and the previous value, which is `undefined` on the first computation and on the first computation after a disposal, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
-- Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read, in one synchronous step with the new value.
+- Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read.
 - Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays. Its next computation adds it to the sets of what it reads then.
 - Disposing a node marks its readers `Dirty` and returns the node to the state of a new node.
 
