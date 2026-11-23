@@ -4,15 +4,15 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 
 ## Model
 
-- A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it.
+- A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it. Each dependency is an edge object that sits in the reader's dependency list, in read order, and in the dependents list of the node it read.
 - A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation.
-- A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. A new node is `Uncomputed`.
+- A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. The `status` field holds a number: `0` is `Uncomputed`, `1` is `Dirty`, `2` is `Check`, and `3` is `Clean`. A new node is `Uncomputed`.
 - `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes after the first pull that leaves it `Dirty`. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, it becomes `Clean` without running. A `Dirty` node recomputes.
 - A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
-- Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read.
+- Each read during a computation records the node it read in the calling node's dependency list and links the calling node into the dependents list of the node it read. A recompute reuses the edges of the previous computation in read order and drops the edges past its last read.
 - Code outside a computation reads a source's current value as `source.value`. An untracked read inside a computation, `source.value` or `pull(node)`, records no dependency and is allowed. A later change to a node read that way does not mark the computing node.
-- Marking a node `Dirty` removes it from every `dependents` set it is in and empties its dependency arrays. Its next computation adds it to the sets of what it reads then.
+- Marking a node `Dirty` keeps its edges. A `Dirty` node stays in the dependents lists of the nodes it read, and marking that reaches it again changes nothing. Its next computation keeps each edge whose dependency it reads at the same position.
 - Disposing a node marks its readers `Dirty` and returns the node to `Uncomputed`, the state of a new node.
 
 The engine does not check these contracts:
@@ -153,7 +153,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is `readonly` except `SourceNode.value`, `DerivedNode.value`, and `DerivedNode.status`, and the two dependency arrays are `Array`, because reads append to them and `detach` empties them. The engine has no class, so the ES private field rule does not apply. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is writable except `Edge.dependent`: `value`, `status`, and the edge-list fields change on every write, read, and recompute, and a reused edge changes its `dependency`. The engine has no class, so the ES private field rule does not apply. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body, and no `switch` has a `default` arm.
 
 ### Pre-commit hooks
 
@@ -205,9 +205,9 @@ pico-js is a push-pull memoization engine. A write to a source node eagerly mark
 
 ## Model
 
-The graph has two kinds of node. A source node holds a value that code outside the graph writes. A derived node holds a computation and the value that computation last returned. A computation reads other nodes through `readSource` and `readDerived`, and each read records the node it read as a dependency. A node depends on exactly the nodes its latest computation read, so a computation that reads different nodes on different runs has different dependencies after each run.
+The graph has two kinds of node. A source node holds a value that code outside the graph writes. A derived node holds a computation and the value that computation last returned. A computation reads other nodes through `readSource` and `readDerived`, and each read records the node it read as a dependency. A node depends on exactly the nodes its latest computation read, so a computation that reads different nodes on different runs has different dependencies after each run. A node keeps its dependencies while it is `Dirty`, and its next computation reuses them in read order, so a recompute that reads the same nodes as the previous one allocates nothing.
 
-A write runs no computation. It marks the derived nodes that read the source `Dirty`, because one of their inputs is known to have changed, and it marks every node that depends on those through derived nodes `Check`, because one of their inputs might have changed. Nothing is recomputed until a node is pulled.
+A write runs no computation. It marks the derived nodes that read the source `Dirty`, because one of their inputs is known to have changed, and it marks every node that depends on those through derived nodes `Check`, because one of their inputs might have changed. A write that reaches a node that is already `Dirty` changes nothing. Nothing is recomputed until a node is pulled.
 
 A pull brings one node up to date and runs only the computations that requires. A `Dirty` node recomputes. A `Check` node pulls its derived dependencies in the order its computation read them. As soon as a pull leaves the node `Dirty`, the node recomputes, without pulling the rest. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, the node becomes `Clean` and returns its value without running. Because the pulls follow read order, a computation such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)` recomputes as soon as `flag` comes back changed, before it pulls `b`, which the new run may not read.
 
@@ -266,16 +266,16 @@ After the first `writeSource`, `name` recomputes and returns `previous`, so `gre
 - `disposeDerivedNode(node)` marks the readers of `node` `Dirty` and returns `node` to `Uncomputed`.
 - `SourceNode<TValue>` is the type of a source node whose value has type `TValue`.
 - `DerivedNode<TValue>` is the type of a derived node whose value has type `TValue`.
-- `Status` is the type of a derived node's `status` field.
+- `Status` is the type of a derived node's `status` field: `0` is `Uncomputed`, `1` is `Dirty`, `2` is `Check`, and `3` is `Clean`. The package exports no constants for these numbers, so a caller compares `node.status` with the number, for example `node.status === 3` for `Clean`.
 
 Each `readSource` and `readDerived` call during a computation records a dependency. A node's dependencies are the nodes its latest computation read. Code outside a computation reads a source's current value as `source.value`. An untracked read inside a computation, `source.value` or `pull(node)`, records no dependency and is allowed. A later change to a node read that way does not mark the computing node.
 
 ## Statuses
 
-- An `Uncomputed` node has no value. Its next pull runs its computation with `previous` `undefined`. A computation whose value type includes `undefined` cannot tell its first run from a run after a stored `undefined`, because `previous` is `undefined` in both.
-- A `Dirty` node read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
-- A `Check` node depends through derived nodes on a source that was written or on a derived node that was disposed. Its next pull pulls its derived dependencies in the order they were read and recomputes the node after the first pull that leaves it `Dirty`. If no pull leaves the node `Dirty`, the node becomes `Clean` without running.
-- A `Clean` node holds an up-to-date value, which a pull returns without running anything.
+- An `Uncomputed` node (`status` `0`) has no value. Its next pull runs its computation with `previous` `undefined`. A computation whose value type includes `undefined` cannot tell its first run from a run after a stored `undefined`, because `previous` is `undefined` in both.
+- A `Dirty` node (`status` `1`) read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
+- A `Check` node (`status` `2`) depends through derived nodes on a source that was written or on a derived node that was disposed. Its next pull pulls its derived dependencies in the order they were read and recomputes the node after the first pull that leaves it `Dirty`. If no pull leaves the node `Dirty`, the node becomes `Clean` without running.
+- A `Clean` node (`status` `3`) holds an up-to-date value, which a pull returns without running anything.
 
 ## Cutoff
 
@@ -315,29 +315,53 @@ const NOT_SET: unique symbol = Symbol('NOT_SET');
 
 type Option<TValue> = TValue | typeof NOT_SET;
 
-export type Status = 'Uncomputed' | 'Dirty' | 'Check' | 'Clean';
+/** 0 Uncomputed, 1 Dirty, 2 Check, 3 Clean. */
+export type Status = 0 | 1 | 2 | 3;
+
+/**
+ * An edge from `dependent` to `dependency`. It sits in two lists: the dependent's dependency list (`nextDependency`), in read order, and the dependency's dependents list (`previousDependent`, `nextDependent`). The read that creates it links it into the dependents list, and it stays there until a recompute of `dependent` reads another node at its position or reads fewer nodes, or `dependent` is disposed.
+ */
+type Edge<TDependency> = {
+  dependency: TDependency;
+  readonly dependent: DerivedNode<unknown>;
+  nextDependency: Edge<TDependency> | undefined;
+  previousDependent: Edge<TDependency> | undefined;
+  nextDependent: Edge<TDependency> | undefined;
+};
+
+type SourceEdge = Edge<SourceNode<unknown>>;
+type DerivedEdge = Edge<DerivedNode<unknown>>;
+
+type Producer<TDependency> = {
+  firstDependent: Edge<TDependency> | undefined;
+  lastDependent: Edge<TDependency> | undefined;
+};
 
 export type SourceNode<TValue> = {
   value: TValue;
-  readonly dependents: Set<DerivedNode<unknown>>;
+  firstDependent: SourceEdge | undefined;
+  lastDependent: SourceEdge | undefined;
 };
 
 /**
- * A derived node satisfies these invariants for each status.
- * - When `status` is `Uncomputed`, `value` is `NOT_SET`, both dependency arrays are empty, and `dependents` is empty.
- * - When `status` is `Dirty`, `value` is the value the last computation returned, both dependency arrays are empty, the node is in no `dependents` set, and every node in `dependents` is `Check`.
- * - When `status` is `Check`, `value` is the value the last computation returned, the node is in the `dependents` set of every node in its dependency arrays, and every node in `dependents` is `Check`.
- * - When `status` is `Clean`, `value` is the up-to-date value, and the node is in the `dependents` set of every node in its dependency arrays.
- * - Every node in a `dependents` set is `Clean` or `Check`.
+ * A derived node whose computation is not running satisfies these invariants for each status.
+ * - When `status` is `Uncomputed`, `value` is `NOT_SET`, both dependency lists are empty, and every node in its dependents list is `Dirty`.
+ * - When `status` is `Dirty`, `value` is the value the last computation returned, each edge of its dependency lists is in its dependency's dependents list, and every node in its dependents list is `Check` or `Dirty`.
+ * - When `status` is `Check`, `value` is the value the last computation returned, each edge of its dependency lists is in its dependency's dependents list, and every node in its dependents list is `Check` or `Dirty`.
+ * - When `status` is `Clean`, `value` is the up-to-date value, and each edge of its dependency lists is in its dependency's dependents list.
+ * - No dependents list holds an `Uncomputed` node.
  *
- * These invariants form a discriminated union on `status`, but `DerivedNode` is a single object type. A node keeps its identity for its whole life, because callers and `dependents` sets hold it, so a status change assigns fields of the same object. TypeScript does not narrow an object to a different variant of a union when one of its fields is assigned, so a union type would need a cast at every status change. The other way to type it holds the current variant in a field of the node and replaces that variant object on each status change. That allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`. So `computedValue` and the throws in marking check these invariants at run time.
+ * These invariants form a discriminated union on `status`, but `DerivedNode` is a single object type. A node keeps its identity for its whole life, because callers and edges hold it, so a status change assigns fields of the same object. TypeScript does not narrow an object to a different variant of a union when one of its fields is assigned, so a union type would need a cast at every status change. The other way to type it holds the current variant in a field of the node and replaces that variant object on each status change. That allocates an object on every status change and adds a pointer dereference to every read of `status` or `value`. So `computedValue` and the throws in marking check these invariants at run time.
  */
 export type DerivedNode<TValue> = {
   value: Option<TValue>;
   status: Status;
-  readonly sourceDependencies: Array<SourceNode<unknown>>;
-  readonly derivedDependencies: Array<DerivedNode<unknown>>;
-  readonly dependents: Set<DerivedNode<unknown>>;
+  firstSourceDependency: SourceEdge | undefined;
+  lastSourceDependency: SourceEdge | undefined;
+  firstDerivedDependency: DerivedEdge | undefined;
+  lastDerivedDependency: DerivedEdge | undefined;
+  firstDependent: DerivedEdge | undefined;
+  lastDependent: DerivedEdge | undefined;
   computation(
     callingNode: DerivedNode<unknown>,
     previous: TValue | undefined,
@@ -345,7 +369,7 @@ export type DerivedNode<TValue> = {
 };
 
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
-  return { value, dependents: new Set() };
+  return { value, firstDependent: undefined, lastDependent: undefined };
 }
 
 export function createDerivedNode<TValue>(
@@ -356,10 +380,13 @@ export function createDerivedNode<TValue>(
 ): DerivedNode<TValue> {
   return {
     value: NOT_SET,
-    status: 'Uncomputed',
-    sourceDependencies: [],
-    derivedDependencies: [],
-    dependents: new Set(),
+    status: 0,
+    firstSourceDependency: undefined,
+    lastSourceDependency: undefined,
+    firstDerivedDependency: undefined,
+    lastDerivedDependency: undefined,
+    firstDependent: undefined,
+    lastDependent: undefined,
     computation,
   };
 }
@@ -369,14 +396,77 @@ export function writeSource<TValue>(
   value: TValue,
 ): void {
   source.value = value;
-  markDependentsDirty(source.dependents);
+  const first = source.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
+}
+
+function linkEdge<TDependency extends Producer<TDependency>>(
+  edge: Edge<TDependency>,
+  dependency: Producer<TDependency>,
+): void {
+  const tail = dependency.lastDependent;
+  edge.previousDependent = tail;
+  edge.nextDependent = undefined;
+  if (tail === undefined) {
+    dependency.firstDependent = edge;
+  } else {
+    tail.nextDependent = edge;
+  }
+  dependency.lastDependent = edge;
+}
+
+function unlinkEdge<TDependency>(
+  edge: Edge<TDependency>,
+  dependency: Producer<TDependency>,
+): void {
+  const previous = edge.previousDependent;
+  const next = edge.nextDependent;
+  if (previous === undefined) {
+    dependency.firstDependent = next;
+  } else {
+    previous.nextDependent = next;
+  }
+  if (next === undefined) {
+    dependency.lastDependent = previous;
+  } else {
+    next.previousDependent = previous;
+  }
 }
 
 export function readSource<TValue>(
   callingNode: DerivedNode<unknown>,
   source: SourceNode<TValue>,
 ): TValue {
-  callingNode.sourceDependencies.push(source);
+  const last = callingNode.lastSourceDependency;
+  const next =
+    last === undefined
+      ? callingNode.firstSourceDependency
+      : last.nextDependency;
+  if (next !== undefined) {
+    if (next.dependency !== source) {
+      unlinkEdge(next, next.dependency);
+      next.dependency = source as SourceNode<unknown>;
+      linkEdge(next, source as SourceNode<unknown>);
+    }
+    callingNode.lastSourceDependency = next;
+  } else if (last === undefined || last.dependency !== source) {
+    const edge: SourceEdge = {
+      dependency: source as SourceNode<unknown>,
+      dependent: callingNode,
+      nextDependency: undefined,
+      previousDependent: undefined,
+      nextDependent: undefined,
+    };
+    linkEdge(edge, source as SourceNode<unknown>);
+    if (last === undefined) {
+      callingNode.firstSourceDependency = edge;
+    } else {
+      last.nextDependency = edge;
+    }
+    callingNode.lastSourceDependency = edge;
+  }
   return source.value;
 }
 
@@ -385,105 +475,178 @@ export function readDerived<TValue>(
   node: DerivedNode<TValue>,
 ): TValue {
   const value = pull(node);
-  callingNode.derivedDependencies.push(node);
+  const last = callingNode.lastDerivedDependency;
+  const next =
+    last === undefined
+      ? callingNode.firstDerivedDependency
+      : last.nextDependency;
+  if (next !== undefined) {
+    if (next.dependency !== node) {
+      unlinkEdge(next, next.dependency);
+      next.dependency = node as DerivedNode<unknown>;
+      linkEdge(next, node as DerivedNode<unknown>);
+    }
+    callingNode.lastDerivedDependency = next;
+  } else if (last === undefined || last.dependency !== node) {
+    const edge: DerivedEdge = {
+      dependency: node as DerivedNode<unknown>,
+      dependent: callingNode,
+      nextDependency: undefined,
+      previousDependent: undefined,
+      nextDependent: undefined,
+    };
+    linkEdge(edge, node as DerivedNode<unknown>);
+    if (last === undefined) {
+      callingNode.firstDerivedDependency = edge;
+    } else {
+      last.nextDependency = edge;
+    }
+    callingNode.lastDerivedDependency = edge;
+  }
   return value;
 }
 
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   switch (node.status) {
-    case 'Uncomputed':
-      return computeFirst(node);
-    case 'Clean':
+    case 3:
       return computedValue(node);
-    case 'Check':
-      return verify(node);
-    case 'Dirty':
+    case 1:
       return recompute(node);
+    case 2:
+      return verify(node);
+    case 0:
+      return computeFirst(node);
   }
 }
 
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
-  markDependentsDirty(node.dependents);
-  detach(node);
-  node.status = 'Uncomputed';
+  const first = node.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
+  unlinkAll(node.firstSourceDependency);
+  unlinkAll(node.firstDerivedDependency);
+  node.firstSourceDependency = undefined;
+  node.lastSourceDependency = undefined;
+  node.firstDerivedDependency = undefined;
+  node.lastDerivedDependency = undefined;
+  node.status = 0;
   node.value = NOT_SET;
 }
 
-function markDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
+function markDirty<TDependency>(first: Edge<TDependency>): void {
   const stack: Array<DerivedNode<unknown>> = [];
-  for (const node of dependents) {
+  let edge: Edge<TDependency> | undefined = first;
+  while (edge !== undefined) {
+    const node = edge.dependent;
+    edge = edge.nextDependent;
     switch (node.status) {
-      case 'Clean':
-        detach(node);
-        node.status = 'Dirty';
-        stack.push(node);
+      case 3:
+        node.status = 1;
+        if (node.firstDependent !== undefined) {
+          stack.push(node);
+        }
         break;
-      case 'Check':
-        detach(node);
-        node.status = 'Dirty';
+      case 2:
+        node.status = 1;
         break;
-      case 'Dirty':
+      case 1:
+        break;
+      case 0:
         throw new Error(
-          'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
-        );
-      case 'Uncomputed':
-        throw new Error(
-          'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+          'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
         );
     }
   }
   let marked: DerivedNode<unknown> | undefined;
   while ((marked = stack.pop()) !== undefined) {
-    for (const dependent of marked.dependents) {
+    let dependentEdge = marked.firstDependent;
+    while (dependentEdge !== undefined) {
+      const dependent = dependentEdge.dependent;
+      dependentEdge = dependentEdge.nextDependent;
       switch (dependent.status) {
-        case 'Clean':
-          dependent.status = 'Check';
-          stack.push(dependent);
+        case 3:
+          dependent.status = 2;
+          if (dependent.firstDependent !== undefined) {
+            stack.push(dependent);
+          }
           break;
-        case 'Check':
+        case 2:
+        case 1:
           break;
-        case 'Dirty':
+        case 0:
           throw new Error(
-            'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
-          );
-        case 'Uncomputed':
-          throw new Error(
-            'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+            'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
           );
       }
     }
   }
 }
 
-function verify<TValue>(node: DerivedNode<TValue>): TValue {
-  for (const dependency of node.derivedDependencies) {
-    pull(dependency);
-    if (node.status === 'Dirty') {
-      return recompute(node);
+/**
+ * Pulls the derived dependencies of `root` in read order, and recomputes a node after the first pull that leaves it `Dirty`. A `Check` dependency is verified the same way before its reader continues, with an explicit stack in place of recursion.
+ */
+function verify<TValue>(root: DerivedNode<TValue>): TValue {
+  const verifyStack: Array<DerivedEdge> = [];
+  let node: DerivedNode<unknown> = root;
+  let edge = node.firstDerivedDependency;
+  for (;;) {
+    if (edge !== undefined) {
+      const dependency = edge.dependency;
+      if (dependency.status === 2) {
+        verifyStack.push(edge);
+        node = dependency;
+        edge = dependency.firstDerivedDependency;
+        continue;
+      }
+      pull(dependency);
+      if (node.status !== 1) {
+        edge = edge.nextDependency;
+        continue;
+      }
+      recompute(node);
+    } else {
+      node.status = 3;
     }
+    for (;;) {
+      const popped = verifyStack.pop();
+      if (popped === undefined) {
+        return computedValue(root);
+      }
+      edge = popped;
+      node = edge.dependent;
+      if (node.status !== 1) {
+        break;
+      }
+      recompute(node);
+    }
+    edge = edge.nextDependency;
   }
-  node.status = 'Clean';
-  return computedValue(node);
 }
 
 function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
   const value = node.computation(node, undefined);
-  attach(node);
-  node.status = 'Clean';
+  trim(node);
+  node.status = 3;
   node.value = value;
   return value;
 }
 
 function recompute<TValue>(node: DerivedNode<TValue>): TValue {
   const previous = computedValue(node);
+  node.lastSourceDependency = undefined;
+  node.lastDerivedDependency = undefined;
   const value = node.computation(node, previous);
-  attach(node);
-  node.status = 'Clean';
+  trim(node);
+  node.status = 3;
   if (value === previous) {
     return previous;
   }
   node.value = value;
-  markDependentsDirty(node.dependents);
+  const first = node.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
   return value;
 }
 
@@ -496,37 +659,52 @@ function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
   return node.value;
 }
 
-function attach(node: DerivedNode<unknown>): void {
-  for (const source of node.sourceDependencies) {
-    source.dependents.add(node);
+/** Unlinks and drops the edges after the last one the computation read. */
+function trim(node: DerivedNode<unknown>): void {
+  const lastSource = node.lastSourceDependency;
+  if (lastSource === undefined) {
+    unlinkAll(node.firstSourceDependency);
+    node.firstSourceDependency = undefined;
+  } else if (lastSource.nextDependency !== undefined) {
+    unlinkAll(lastSource.nextDependency);
+    lastSource.nextDependency = undefined;
   }
-  for (const dependency of node.derivedDependencies) {
-    dependency.dependents.add(node);
+  const lastDerived = node.lastDerivedDependency;
+  if (lastDerived === undefined) {
+    unlinkAll(node.firstDerivedDependency);
+    node.firstDerivedDependency = undefined;
+  } else if (lastDerived.nextDependency !== undefined) {
+    unlinkAll(lastDerived.nextDependency);
+    lastDerived.nextDependency = undefined;
   }
 }
 
-function detach(node: DerivedNode<unknown>): void {
-  for (const source of node.sourceDependencies) {
-    source.dependents.delete(node);
+function unlinkAll<TDependency extends Producer<TDependency>>(
+  first: Edge<TDependency> | undefined,
+): void {
+  let edge = first;
+  while (edge !== undefined) {
+    unlinkEdge(edge, edge.dependency);
+    edge = edge.nextDependency;
   }
-  for (const dependency of node.derivedDependencies) {
-    dependency.dependents.delete(node);
-  }
-  node.sourceDependencies.length = 0;
-  node.derivedDependencies.length = 0;
 }
 ```
 
 - `computation` is a method signature. TypeScript checks a method's parameters bivariantly, so `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`.
-- A new node is in no `dependents` set and has empty dependency arrays, and marking and disposal detach a node before they set it `Dirty` or `Uncomputed`, so an `Uncomputed` or `Dirty` node is in no `dependents` set and writes to its dependencies never reach it. Deleting a node from the set being iterated is safe, because a `Set` iterator continues past a deleted current element.
-- Only an `Uncomputed` or `Dirty` node runs its computation, and the node is attached after its computation returns, so a node is in no `dependents` set while its computation runs. Nothing marks the node during its computation, so its dependency arrays hold exactly the computation's reads when it is attached.
-- Marking pushes a node onto its stack only when the node leaves `Clean`, so a write visits each node's dependents at most once. The stack is an array local to the write, so the depth of the marked chain does not reach the call stack.
+- `Status` is numeric because a `switch` and a comparison on small integers cost less than on strings: numeric statuses cut the upstream benchmark total by 4.6% (pico-js-performance.md, change 5). `graph.ts` exports no constants for the numbers. A caller compares `status` with the number, and the README states the mapping.
+- A read links its edge into the dependency's dependents list at the time of the read, and `readDerived` pulls the dependency before it links the edge, so a node is linked only to a source or to a `Clean` derived node.
+- `recompute` resets `lastSourceDependency` and `lastDerivedDependency`, and each read takes the next edge of the list. An edge whose dependency is the node read stays linked. An edge whose dependency differs is unlinked from the old dependency and linked to the node read. A read past the end of the list allocates an edge, unless the previous edge already points at the node read. `trim` unlinks and drops the edges past the last read. So a recompute that reads the same nodes in the same order allocates, links, and unlinks nothing, and after a computation the dependency lists hold exactly its reads, with adjacent reads of one node sharing one edge.
+- A node that reads a dependency at two non-adjacent positions (`a, b, a`) has two edges in `a`'s dependents list. Marking visits it twice, and the second visit finds it `Dirty` and changes nothing.
+- Marking unlinks no edge. A `Dirty` node stays in the dependents lists of its dependencies, and marking skips it, because its dependents are already `Check` or `Dirty`. A `Check` node that marking sets `Dirty` is not pushed, for the same reason. So repeated writes to the sources of a node that is not pulled visit that node on each write and stop there.
+- Marking pushes a node onto its stack only when the node leaves `Clean` and its dependents list is not empty, so a write visits each node's dependents at most once. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack, and the engine holds no module state.
+- A node becomes `Clean` only after its computation returns or after `verify` has pulled every derived dependency it is linked to. Each dependency a computation links is `Clean` when it is read, so every derived dependency of a `Clean` node is `Clean`, and every dependent of a node that is not `Clean` is `Check` or `Dirty`. A recompute therefore marks only `Check` and `Dirty` nodes and takes no node out of `Clean`.
+- While a computation runs, its node is `Uncomputed` or `Dirty` and is linked to what it has read so far. Every node it read is `Clean` and has only `Clean` derived dependencies, so nothing marks those nodes before the computation returns, and marking never reaches the running node while it is `Uncomputed`.
+- `verify` walks the derived dependency lists in read order with an explicit stack of edges. It descends into a `Check` dependency before its reader continues and pulls any other dependency. After a pull that leaves the current node `Dirty`, it recomputes that node and returns to the node's reader. The order of pulls and recomputes is that of a recursive `verify`. A first computation still recurses through `readDerived` and `pull`.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a dependency it read changed value.
 - A node's `status` is `Uncomputed` exactly when its `value` is `NOT_SET`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `NOT_SET` and `Option` are private to `graph.ts`, so no `TValue` contains `NOT_SET`. `computedValue` throws if a node that is not `Uncomputed` holds `NOT_SET`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
-- A first computation has no cutoff and marks nothing, because an `Uncomputed` node has an empty `dependents` set: a new node has no readers, and disposal marked every reader `Dirty`, which detached them.
+- A first computation has no cutoff and marks nothing, because every node in an `Uncomputed` node's dependents list is already `Dirty`: a new node has no readers, and disposal marked every reader `Dirty`.
 - On cutoff the node keeps its stored value, so a recompute that returns `-0` where the stored value is `0` leaves `0` stored and returned, and every reader of the node reads the same value.
-- A node read twice appears twice in the reader's dependency array and once in its `dependents` set.
-- Disposal marks every reader `Dirty`, which detaches each reader and empties the node's `dependents` set, and discards the node's value, so its next computation receives `previous` `undefined`. An `Uncomputed` node has an empty `dependents` set and empty dependency arrays, because a reader adds itself to a node's set only after pulling it, so its disposal changes nothing. A `Dirty` node has empty dependency arrays, and its `dependents` set holds its `Check` readers, which its disposal marks `Dirty`.
+- Disposal marks every reader `Dirty`, unlinks the node's own edges, and discards its value, so its next computation receives `previous` `undefined`. The readers stay in the node's dependents list, and each reader's next recompute either reads the node again, which computes it first, or drops the edge. An `Uncomputed` node has empty dependency lists and only `Dirty` dependents, so its disposal changes nothing. A `Dirty` node's dependents are `Check` or `Dirty`, and its disposal marks them `Dirty`.
 
 ## `src/index.ts`
 
@@ -558,6 +736,7 @@ import {
   readSource,
   writeSource,
   type DerivedNode,
+  type SourceNode,
 } from '../src/index';
 
 describe('pull', () => {
@@ -569,9 +748,9 @@ describe('pull', () => {
       return readSource(callingNode, a) * 2;
     });
     expect(runs).toBe(0);
-    expect(double.status).toBe('Uncomputed');
+    expect(double.status).toBe(0);
     expect(pull(double)).toBe(2);
-    expect(double.status).toBe('Clean');
+    expect(double.status).toBe(3);
     expect(pull(double)).toBe(2);
     expect(runs).toBe(1);
   });
@@ -587,7 +766,7 @@ describe('pull', () => {
     });
     expect(pull(outer)).toBe(10);
     writeSource(source, 2);
-    expect(outer.status).toBe('Check');
+    expect(outer.status).toBe(2);
     expect(pull(outer)).toBe(20);
   });
 
@@ -620,8 +799,8 @@ describe('marking', () => {
     });
     expect(pull(label)).toBe('big');
     writeSource(a, 5);
-    expect(sum.status).toBe('Dirty');
-    expect(label.status).toBe('Check');
+    expect(sum.status).toBe(1);
+    expect(label.status).toBe(2);
     expect(runs).toEqual({ sum: 1, label: 1 });
   });
 
@@ -643,10 +822,7 @@ describe('marking', () => {
     pull(top);
     writeSource(source, 2);
     expect([shared.status, left.status, right.status, top.status]).toEqual([
-      'Dirty',
-      'Check',
-      'Check',
-      'Check',
+      1, 2, 2, 2,
     ]);
   });
 
@@ -667,8 +843,8 @@ describe('marking', () => {
       bottom,
     );
     writeSource(source, 1);
-    expect(bottom.status).toBe('Dirty');
-    expect(top.status).toBe('Check');
+    expect(bottom.status).toBe(1);
+    expect(top.status).toBe(2);
   });
 });
 
@@ -689,7 +865,7 @@ describe('cutoff', () => {
     writeSource(a, 0);
     writeSource(b, 3);
     expect(pull(label)).toBe('big');
-    expect(label.status).toBe('Clean');
+    expect(label.status).toBe(3);
     expect(runs).toEqual({ sum: 2, label: 1 });
   });
 
@@ -712,7 +888,7 @@ describe('cutoff', () => {
     pull(reader);
     writeSource(a, 3);
     expect(pull(reader)).toBe(false);
-    expect(reader.status).toBe('Clean');
+    expect(reader.status).toBe(3);
     expect(pull(parity)).toBe(first);
     expect(readerRuns).toBe(1);
   });
@@ -732,13 +908,13 @@ describe('cutoff', () => {
       return readDerived(callingNode, node) === undefined;
     });
     expect(pull(reader)).toBe(true);
-    expect(node.status).toBe('Clean');
+    expect(node.status).toBe(3);
     expect(pull(node)).toBeUndefined();
     expect(runs).toEqual({ node: 1, reader: 1 });
     writeSource(a, 2);
-    expect(node.status).toBe('Dirty');
+    expect(node.status).toBe(1);
     expect(pull(reader)).toBe(true);
-    expect(reader.status).toBe('Clean');
+    expect(reader.status).toBe(3);
     expect(runs).toEqual({ node: 2, reader: 1 });
     expect(previousValues).toEqual([undefined, undefined]);
   });
@@ -839,7 +1015,7 @@ describe('source writes and verification', () => {
     expect(pull(foo)).toBe(1);
     writeSource(bInput, 2);
     writeSource(a, false);
-    expect(foo.status).toBe('Dirty');
+    expect(foo.status).toBe(1);
     expect(pull(foo)).toBe(0);
     expect(runs).toEqual({ b: 1, c: 1 });
   });
@@ -861,7 +1037,7 @@ describe('dependencies', () => {
     writeSource(useA, false);
     expect(pull(pick)).toBe(2);
     writeSource(a, 10);
-    expect(pick.status).toBe('Clean');
+    expect(pick.status).toBe(3);
     expect(pull(pick)).toBe(2);
     expect(runs).toBe(2);
   });
@@ -876,14 +1052,14 @@ describe('dependencies', () => {
     writeSource(a, 3);
     expect(pull(sum)).toBe(5);
     writeSource(b, 4);
-    expect(sum.status).toBe('Dirty');
+    expect(sum.status).toBe(1);
     expect(pull(sum)).toBe(7);
     writeSource(a, 5);
-    expect(sum.status).toBe('Dirty');
+    expect(sum.status).toBe(1);
     expect(pull(sum)).toBe(9);
   });
 
-  test('a Dirty node is not in the dependents set of its other sources, so a second write does not reach it', () => {
+  test('a Dirty node stays in the dependents list of its other sources, and a second write leaves it Dirty', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const b = createSourceNode(2);
@@ -896,12 +1072,61 @@ describe('dependencies', () => {
     );
     pull(label);
     writeSource(a, 3);
-    expect(b.dependents.has(sum)).toBe(false);
+    expect(hasDependent(b, sum)).toBe(true);
     writeSource(b, 4);
-    expect(sum.status).toBe('Dirty');
-    expect(label.status).toBe('Check');
+    expect(sum.status).toBe(1);
+    expect(label.status).toBe(2);
     expect(pull(label)).toBe('7');
     expect(runs).toBe(2);
+  });
+
+  test('a computation that reads a, b, a recomputes once per write of a and of b', () => {
+    let runs = 0;
+    const a = createSourceNode(1);
+    const b = createSourceNode(10);
+    const node = createDerivedNode((callingNode) => {
+      runs += 1;
+      return (
+        readSource(callingNode, a) +
+        readSource(callingNode, b) +
+        readSource(callingNode, a)
+      );
+    });
+    expect(pull(node)).toBe(12);
+    writeSource(a, 2);
+    expect(pull(node)).toBe(14);
+    writeSource(b, 20);
+    expect(pull(node)).toBe(24);
+    writeSource(a, 3);
+    writeSource(b, 30);
+    expect(pull(node)).toBe(36);
+    expect(runs).toBe(4);
+  });
+
+  test('a recompute that reads fewer and then more sources is marked by exactly the sources it read last', () => {
+    let runs = 0;
+    const count = createSourceNode(3);
+    const first = createSourceNode(0);
+    const second = createSourceNode(1);
+    const third = createSourceNode(2);
+    const sources = [first, second, third];
+    const node = createDerivedNode((callingNode) => {
+      runs += 1;
+      return sources
+        .slice(0, readSource(callingNode, count))
+        .reduce((sum, source) => sum + readSource(callingNode, source), 0);
+    });
+    expect(pull(node)).toBe(3);
+    writeSource(count, 1);
+    expect(pull(node)).toBe(0);
+    writeSource(third, 100);
+    expect(node.status).toBe(3);
+    writeSource(count, 3);
+    expect(pull(node)).toBe(101);
+    writeSource(third, 200);
+    expect(node.status).toBe(1);
+    expect(pull(node)).toBe(201);
+    expect(runs).toBe(4);
   });
 
   test('a computation that reads a source twice recomputes once per change', () => {
@@ -934,25 +1159,25 @@ describe('disposal', () => {
     });
     expect(pull(outer)).toBe(2);
     disposeDerivedNode(inner);
-    expect(inner.status).toBe('Uncomputed');
-    expect(outer.status).toBe('Dirty');
+    expect(inner.status).toBe(0);
+    expect(outer.status).toBe(1);
     expect(pull(outer)).toBe(2);
     expect(runs).toEqual({ inner: 2, outer: 2 });
     writeSource(source, 2);
-    expect(outer.status).toBe('Check');
+    expect(outer.status).toBe(2);
     expect(pull(outer)).toBe(3);
     expect(innerPreviousValues).toEqual([undefined, undefined, 1]);
   });
 
-  test('a disposed node is in no dependents set of the sources it read', () => {
+  test('a disposed node is in no dependents list of the sources it read', () => {
     const source = createSourceNode(1);
     const inner = createDerivedNode((callingNode) =>
       readSource(callingNode, source),
     );
     pull(inner);
     disposeDerivedNode(inner);
-    expect(inner.status).toBe('Uncomputed');
-    expect(source.dependents.has(inner)).toBe(false);
+    expect(inner.status).toBe(0);
+    expect(hasDependent(source, inner)).toBe(false);
     writeSource(source, 2);
     expect(pull(inner)).toBe(2);
   });
@@ -969,11 +1194,11 @@ describe('disposal', () => {
     );
     pull(outer);
     writeSource(source, 2);
-    expect(inner.status).toBe('Dirty');
-    expect(outer.status).toBe('Check');
+    expect(inner.status).toBe(1);
+    expect(outer.status).toBe(2);
     disposeDerivedNode(inner);
-    expect(inner.status).toBe('Uncomputed');
-    expect(outer.status).toBe('Dirty');
+    expect(inner.status).toBe(0);
+    expect(outer.status).toBe(1);
     expect(pull(outer)).toBe(3);
     expect(innerPreviousValues).toEqual([undefined, undefined]);
   });
@@ -985,13 +1210,27 @@ describe('disposal', () => {
       previousValues.push(previous);
       return readSource(callingNode, source);
     });
-    expect(node.status).toBe('Uncomputed');
+    expect(node.status).toBe(0);
     disposeDerivedNode(node);
-    expect(node.status).toBe('Uncomputed');
+    expect(node.status).toBe(0);
     expect(pull(node)).toBe(1);
     expect(previousValues).toEqual([undefined]);
   });
 });
+
+function hasDependent(
+  dependency: SourceNode<unknown> | DerivedNode<unknown>,
+  node: DerivedNode<unknown>,
+): boolean {
+  let edge = dependency.firstDependent;
+  while (edge !== undefined) {
+    if (edge.dependent === node) {
+      return true;
+    }
+    edge = edge.nextDependent;
+  }
+  return false;
+}
 ```
 
 ```ts
