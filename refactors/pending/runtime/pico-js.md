@@ -33,6 +33,7 @@ The engine is a workspace library at `libs/pico-js`, covered by `pnpm-workspace.
 ```text
 libs/pico-js/
   package.json
+  README.md
   tsconfig.json             references tsconfig.package.json and tsconfig.test.json
   tsconfig.package.json     extends ../../tsconfig.build.json, includes src/**/*.ts
   tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts
@@ -190,9 +191,92 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type fi
         run: pnpm --filter @isograph/pico-js test
 ```
 
+### `README.md`
+
+````markdown
+<!-- from libs/pico-js/README.md -->
+# @isograph/pico-js
+
+`@isograph/pico-js` is a push-pull memoization engine. A write to a source node eagerly marks the derived nodes that depend on it, and a derived node lazily recomputes when it is pulled.
+
+## Example
+
+```ts
+import { createDerivedNode, createSourceNode, pull, readDerived, readSource, writeSource } from '@isograph/pico-js';
+
+const person = createSourceNode({ first: 'Ada', last: 'Lovelace', age: 36 });
+
+const name = createDerivedNode<{ readonly first: string; readonly last: string }>((callingNode, previous) => {
+  const { first, last } = readSource(callingNode, person);
+  return previous !== undefined && previous.first === first && previous.last === last ? previous : { first, last };
+});
+
+let greetingRuns = 0;
+const greeting = createDerivedNode((callingNode) => {
+  greetingRuns += 1;
+  const { first, last } = readDerived(callingNode, name);
+  return `Hello, ${first} ${last}`;
+});
+
+pull(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
+
+writeSource(person, { first: 'Ada', last: 'Lovelace', age: 37 });
+pull(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
+
+writeSource(person, { first: 'Ada', last: 'King', age: 37 });
+pull(greeting); // 'Hello, Ada King', greetingRuns === 2
+```
+
+After the second write, `name` recomputes and returns `previous`, so `greeting` becomes `Clean` without running.
+
+## API
+
+- `createSourceNode(value)` returns a source node that holds `value`.
+- `writeSource(source, value)` stores `value` in `source` and marks the derived nodes that read it. It runs no computation.
+- `createDerivedNode(computation)` returns an `Uncomputed` derived node whose value `computation(callingNode, previous)` computes.
+- `readSource(callingNode, source)` returns the value of `source` and records `source` as a dependency of `callingNode`.
+- `readDerived(callingNode, node)` pulls `node`, returns its value, and records `node` as a dependency of `callingNode`.
+- `pull(node)` brings `node` up to date and returns its value.
+- `disposeDerivedNode(node)` marks the readers of `node` `Dirty` and returns `node` to `Uncomputed`.
+- `SourceNode<TValue>` is the type of a source node whose value has type `TValue`.
+- `DerivedNode<TValue>` is the type of a derived node whose value has type `TValue`.
+- `Status` is the type of a derived node's `status` field.
+
+Each `readSource` and `readDerived` call during a computation records a dependency. A node's dependencies are the nodes its latest computation read.
+
+## Statuses
+
+- An `Uncomputed` node has no value. Its next pull runs its computation with `previous` `undefined`.
+- A `Dirty` node read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
+- A `Check` node depends through derived nodes on a source that was written. Its next pull pulls its derived dependencies in the order they were read and recomputes the node at the first whose value changed; if none changed, the node becomes `Clean` without running.
+- A `Clean` node holds an up-to-date value, which a pull returns without running anything.
+
+## Cutoff
+
+When a recompute returns a value `===` to its previous value, the node marks none of its readers `Dirty`, and a `Check` reader becomes `Clean` without running. Under `===`, a `NaN` value always counts as changed, and `0` and `-0` count as equal. A computation that returns `previous` when its new result is structurally equal to `previous` extends the cutoff to structural equality.
+
+## Disposal
+
+`disposeDerivedNode(node)` marks the readers of `node` `Dirty`, removes `node` from the dependents of every node it read, and discards its value. The node is `Uncomputed`, and its next pull computes it with `previous` `undefined`. Disposing an `Uncomputed` node changes nothing.
+
+## Contracts
+
+The engine does not check these contracts:
+
+- The caller writes a source only when its value changed.
+- A computation, and any function it calls, does not throw.
+- A computation does not write a source and does not dispose a node.
+- A computation is synchronous and reads only through the node it receives.
+- A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns.
+- The derived nodes form a directed acyclic graph.
+- The chains of derived nodes that a pull descends and that a write marks stay well below the call stack limit. In Node 24 with its default stack, a pull of a chain of about 3,000 derived nodes with one-line computations overflows.
+````
+
+The contract list copies the Model section's list word for word, and the API, statuses, cutoff, and disposal sections describe `src/graph.ts` above.
+
 ### Readers before the Isograph runtime depends on it
 
-AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal). pico-runtime.md core change 4 ships the package before its first workspace caller on that ground; core change 5 is the first caller of the source functions and core change 8 of the derived-node functions. The package ships alone, as its own change.
+AGENTS.md says we do not have anything we do not use, and tests-only is not a reader. Until the Isograph runtime calls it, the package's reader is the user's stated goal that the engine is usable by projects outside Isograph (pico-runtime.md, Goal), and `README.md` documents the package for those projects. pico-runtime.md core change 4 ships the package before its first workspace caller on that ground; core change 5 is the first caller of the source functions and core change 8 of the derived-node functions. The package ships alone, as its own change.
 
 ## `src/graph.ts`
 
