@@ -227,7 +227,7 @@ writeSource(person, { first: 'Ada', last: 'King', age: 37 });
 pull(greeting); // 'Hello, Ada King', greetingRuns === 2
 ```
 
-After the second write, `name` recomputes and returns `previous`, so `greeting` becomes `Clean` without running.
+After the first `writeSource`, `name` recomputes and returns `previous`, so `greeting` becomes `Clean` without running.
 
 ## API
 
