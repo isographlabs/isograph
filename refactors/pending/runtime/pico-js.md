@@ -5,7 +5,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 ## Model
 
 - A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it.
-- A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation.
+- A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation. `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes.
 - A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. A new node is `Uncomputed`.
 - `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes.
 - A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
@@ -16,7 +16,6 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 
 The engine does not check these contracts:
 
-- The caller writes a source only when its value changed.
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
 - A computation is synchronous and reads only through the node it receives.
@@ -257,7 +256,7 @@ After the first `writeSource`, `name` recomputes and returns `previous`, so `gre
 ## API
 
 - `createSourceNode(value)` returns a source node that holds `value`.
-- `writeSource(source, value)` stores `value` in `source` and marks the derived nodes that read it. It runs no computation.
+- `writeSource(source, value)` stores `value` in `source` and marks the derived nodes that read it. It runs no computation. `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes.
 - `createDerivedNode(computation)` returns an `Uncomputed` derived node whose value `computation(callingNode, previous)` computes.
 - `readSource(callingNode, source)` returns the value of `source` and records `source` as a dependency of `callingNode`.
 - `readDerived(callingNode, node)` pulls `node`, returns its value, and records `node` as a dependency of `callingNode`.
@@ -288,7 +287,6 @@ When a recompute returns a value `===` to its previous value, the node marks non
 
 The engine does not check these contracts:
 
-- The caller writes a source only when its value changed.
 - A computation, and any function it calls, does not throw.
 - A computation does not write a source and does not dispose a node.
 - A computation is synchronous and reads only through the node it receives.
