@@ -36,7 +36,7 @@ export type SourceNode<TValue> = {
 };
 
 export type DerivedNode<TValue> = {
-  computation(consumer: DerivedNodeMemo<unknown>, previous: TValue | undefined): TValue;
+  computation(callingNode: DerivedNodeMemo<unknown>, previous: TValue | undefined): TValue;
   memo: Option<DerivedNodeMemo<TValue>>;
 };
 
@@ -46,7 +46,7 @@ export type DerivedNodeMemo<TValue> = {
   sourceDependencies: Array<SourceNode<unknown>>;
   derivedDependencies: Array<DerivedNodeMemo<unknown>>;
   readonly dependents: Set<DerivedNodeMemo<unknown>>;
-  computation(consumer: DerivedNodeMemo<unknown>, previous: TValue | undefined): TValue;
+  computation(callingNode: DerivedNodeMemo<unknown>, previous: TValue | undefined): TValue;
 };
 
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
@@ -54,7 +54,7 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
 }
 
 export function createDerivedNode<TValue>(
-  computation: (consumer: DerivedNodeMemo<unknown>, previous: TValue | undefined) => TValue,
+  computation: (callingNode: DerivedNodeMemo<unknown>, previous: TValue | undefined) => TValue,
 ): DerivedNode<TValue> {
   return { computation, memo: MISSING };
 }
@@ -64,15 +64,15 @@ export function writeSource<TValue>(source: SourceNode<TValue>, value: TValue): 
   markDependentsDirty(source.dependents);
 }
 
-export function readSource<TValue>(consumer: DerivedNodeMemo<unknown>, source: SourceNode<TValue>): TValue {
-  consumer.sourceDependencies.push(source);
+export function readSource<TValue>(callingNode: DerivedNodeMemo<unknown>, source: SourceNode<TValue>): TValue {
+  callingNode.sourceDependencies.push(source);
   return source.value;
 }
 
-export function readDerived<TValue>(consumer: DerivedNodeMemo<unknown>, node: DerivedNode<TValue>): TValue {
+export function readDerived<TValue>(callingNode: DerivedNodeMemo<unknown>, node: DerivedNode<TValue>): TValue {
   const memo = memoOf(node);
   const value = pullMemo(memo);
-  consumer.derivedDependencies.push(memo);
+  callingNode.derivedDependencies.push(memo);
   return value;
 }
 
@@ -255,9 +255,9 @@ describe('pull', () => {
   test('creating a derived node runs nothing until it is pulled', () => {
     let runs = 0;
     const a = createSourceNode(1);
-    const double = createDerivedNode((consumer) => {
+    const double = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(consumer, a) * 2;
+      return readSource(callingNode, a) * 2;
     });
     expect(runs).toBe(0);
     expect(statusOf(double)).toBe('NotComputed');
@@ -269,9 +269,9 @@ describe('pull', () => {
   test('a node created inside a computation and read through readDerived is a dependency of its reader', () => {
     const source = createSourceNode(1);
     let inner: DerivedNode<number> | undefined;
-    const outer = createDerivedNode((consumer) => {
-      inner ??= createDerivedNode((innerConsumer) => readSource(innerConsumer, source) * 10);
-      return readDerived(consumer, inner);
+    const outer = createDerivedNode((callingNode) => {
+      inner ??= createDerivedNode((innerCallingNode) => readSource(innerCallingNode, source) * 10);
+      return readDerived(callingNode, inner);
     });
     expect(pull(outer)).toBe(10);
     writeSource(source, 2);
@@ -282,9 +282,9 @@ describe('pull', () => {
   test('the first computation receives undefined as previous and a recompute receives the previous value', () => {
     const previousValues: Array<number | undefined> = [];
     const a = createSourceNode(1);
-    const double = createDerivedNode<number>((consumer, previous) => {
+    const double = createDerivedNode<number>((callingNode, previous) => {
       previousValues.push(previous);
-      return readSource(consumer, a) * 2;
+      return readSource(callingNode, a) * 2;
     });
     pull(double);
     writeSource(a, 2);
@@ -298,13 +298,13 @@ describe('marking', () => {
     const runs = { sum: 0, label: 0 };
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode((consumer) => {
+    const sum = createDerivedNode((callingNode) => {
       runs.sum += 1;
-      return readSource(consumer, a) + readSource(consumer, b);
+      return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    const label = createDerivedNode((consumer) => {
+    const label = createDerivedNode((callingNode) => {
       runs.label += 1;
-      return readDerived(consumer, sum) > 2 ? 'big' : 'small';
+      return readDerived(callingNode, sum) > 2 ? 'big' : 'small';
     });
     expect(pull(label)).toBe('big');
     writeSource(a, 5);
@@ -316,9 +316,9 @@ describe('marking', () => {
   test('a write marks readers even when the value is the same', () => {
     let runs = 0;
     const a = createSourceNode(1);
-    const double = createDerivedNode((consumer) => {
+    const double = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(consumer, a) * 2;
+      return readSource(callingNode, a) * 2;
     });
     pull(double);
     writeSource(a, 1);
@@ -329,10 +329,10 @@ describe('marking', () => {
 
   test('in a diamond, a write marks the shared node Dirty and every node above it Check', () => {
     const source = createSourceNode(1);
-    const shared = createDerivedNode((consumer) => readSource(consumer, source) + 1);
-    const left = createDerivedNode((consumer) => readDerived(consumer, shared) * 2);
-    const right = createDerivedNode((consumer) => readDerived(consumer, shared) * 3);
-    const top = createDerivedNode((consumer) => readDerived(consumer, left) + readDerived(consumer, right));
+    const shared = createDerivedNode((callingNode) => readSource(callingNode, source) + 1);
+    const left = createDerivedNode((callingNode) => readDerived(callingNode, shared) * 2);
+    const right = createDerivedNode((callingNode) => readDerived(callingNode, shared) * 3);
+    const top = createDerivedNode((callingNode) => readDerived(callingNode, left) + readDerived(callingNode, right));
     pull(top);
     writeSource(source, 2);
     expect([statusOf(shared), statusOf(left), statusOf(right), statusOf(top)]).toEqual([
@@ -345,12 +345,12 @@ describe('marking', () => {
 
   test('marking a chain of 100,000 nodes completes', () => {
     const source = createSourceNode(0);
-    const bottom = createDerivedNode((consumer) => readSource(consumer, source));
+    const bottom = createDerivedNode((callingNode) => readSource(callingNode, source));
     pull(bottom);
     let top = bottom;
     for (let index = 1; index < 100_000; index += 1) {
       const below = top;
-      top = createDerivedNode((consumer) => readDerived(consumer, below));
+      top = createDerivedNode((callingNode) => readDerived(callingNode, below));
       pull(top);
     }
     writeSource(source, 1);
@@ -364,13 +364,13 @@ describe('cutoff', () => {
     const runs = { sum: 0, label: 0 };
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode((consumer) => {
+    const sum = createDerivedNode((callingNode) => {
       runs.sum += 1;
-      return readSource(consumer, a) + readSource(consumer, b);
+      return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    const label = createDerivedNode((consumer) => {
+    const label = createDerivedNode((callingNode) => {
       runs.label += 1;
-      return readDerived(consumer, sum) > 2 ? 'big' : 'small';
+      return readDerived(callingNode, sum) > 2 ? 'big' : 'small';
     });
     pull(label);
     writeSource(a, 0);
@@ -383,13 +383,13 @@ describe('cutoff', () => {
   test('a computation that returns previous leaves its readers Clean without running them', () => {
     let readerRuns = 0;
     const a = createSourceNode(1);
-    const parity = createDerivedNode<{ readonly even: boolean }>((consumer, previous) => {
-      const even = readSource(consumer, a) % 2 === 0;
+    const parity = createDerivedNode<{ readonly even: boolean }>((callingNode, previous) => {
+      const even = readSource(callingNode, a) % 2 === 0;
       return previous !== undefined && previous.even === even ? previous : { even };
     });
-    const reader = createDerivedNode((consumer) => {
+    const reader = createDerivedNode((callingNode) => {
       readerRuns += 1;
-      return readDerived(consumer, parity).even;
+      return readDerived(callingNode, parity).even;
     });
     const first = pull(parity);
     pull(reader);
@@ -404,17 +404,17 @@ describe('cutoff', () => {
     const runs = { d1: 0, d2: 0, d3: 0 };
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const d1 = createDerivedNode((consumer) => {
+    const d1 = createDerivedNode((callingNode) => {
       runs.d1 += 1;
-      return { a: readSource(consumer, a), b: readSource(consumer, b) };
+      return { a: readSource(callingNode, a), b: readSource(callingNode, b) };
     });
-    const d2 = createDerivedNode((consumer) => {
+    const d2 = createDerivedNode((callingNode) => {
       runs.d2 += 1;
-      return readDerived(consumer, d1).b;
+      return readDerived(callingNode, d1).b;
     });
-    const d3 = createDerivedNode((consumer) => {
+    const d3 = createDerivedNode((callingNode) => {
       runs.d3 += 1;
-      return readDerived(consumer, d2) * 2;
+      return readDerived(callingNode, d2) * 2;
     });
     expect(pull(d3)).toBe(4);
     writeSource(a, 10);
@@ -427,21 +427,21 @@ describe('verification', () => {
   test('in a diamond each node runs once per change', () => {
     const source = createSourceNode(1);
     const runs = { shared: 0, left: 0, right: 0, top: 0 };
-    const shared = createDerivedNode((consumer) => {
+    const shared = createDerivedNode((callingNode) => {
       runs.shared += 1;
-      return readSource(consumer, source) + 1;
+      return readSource(callingNode, source) + 1;
     });
-    const left = createDerivedNode((consumer) => {
+    const left = createDerivedNode((callingNode) => {
       runs.left += 1;
-      return readDerived(consumer, shared) * 2;
+      return readDerived(callingNode, shared) * 2;
     });
-    const right = createDerivedNode((consumer) => {
+    const right = createDerivedNode((callingNode) => {
       runs.right += 1;
-      return readDerived(consumer, shared) * 3;
+      return readDerived(callingNode, shared) * 3;
     });
-    const top = createDerivedNode((consumer) => {
+    const top = createDerivedNode((callingNode) => {
       runs.top += 1;
-      return readDerived(consumer, left) + readDerived(consumer, right);
+      return readDerived(callingNode, left) + readDerived(callingNode, right);
     });
     expect(pull(top)).toBe(10);
     writeSource(source, 2);
@@ -453,17 +453,17 @@ describe('verification', () => {
     const gateSource = createSourceNode(1);
     const otherSource = createSourceNode(1);
     const runs = { gate: 0, other: 0, node: 0 };
-    const gate = createDerivedNode((consumer) => {
+    const gate = createDerivedNode((callingNode) => {
       runs.gate += 1;
-      return readSource(consumer, gateSource);
+      return readSource(callingNode, gateSource);
     });
-    const other = createDerivedNode((consumer) => {
+    const other = createDerivedNode((callingNode) => {
       runs.other += 1;
-      return readSource(consumer, otherSource);
+      return readSource(callingNode, otherSource);
     });
-    const node = createDerivedNode((consumer) => {
+    const node = createDerivedNode((callingNode) => {
       runs.node += 1;
-      return readDerived(consumer, gate) === 1 ? readDerived(consumer, other) : 0;
+      return readDerived(callingNode, gate) === 1 ? readDerived(callingNode, other) : 0;
     });
     expect(pull(node)).toBe(1);
     writeSource(gateSource, 2);
@@ -478,16 +478,16 @@ describe('source writes and verification', () => {
     const runs = { b: 0, c: 0 };
     const a = createSourceNode(true);
     const bInput = createSourceNode(1);
-    const b = createDerivedNode((consumer) => {
+    const b = createDerivedNode((callingNode) => {
       runs.b += 1;
-      return readSource(consumer, bInput);
+      return readSource(callingNode, bInput);
     });
     const c = createDerivedNode(() => {
       runs.c += 1;
       return 0;
     });
-    const foo = createDerivedNode((consumer) =>
-      readSource(consumer, a) ? readDerived(consumer, b) : readDerived(consumer, c),
+    const foo = createDerivedNode((callingNode) =>
+      readSource(callingNode, a) ? readDerived(callingNode, b) : readDerived(callingNode, c),
     );
     expect(pull(foo)).toBe(1);
     writeSource(bInput, 2);
@@ -504,9 +504,9 @@ describe('dependencies', () => {
     const useA = createSourceNode(true);
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const pick = createDerivedNode((consumer) => {
+    const pick = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(consumer, useA) ? readSource(consumer, a) : readSource(consumer, b);
+      return readSource(callingNode, useA) ? readSource(callingNode, a) : readSource(callingNode, b);
     });
     expect(pull(pick)).toBe(1);
     writeSource(useA, false);
@@ -520,7 +520,7 @@ describe('dependencies', () => {
   test('a recompute that reads the same nodes stays marked by each of them', () => {
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode((consumer) => readSource(consumer, a) + readSource(consumer, b));
+    const sum = createDerivedNode((callingNode) => readSource(callingNode, a) + readSource(callingNode, b));
     pull(sum);
     writeSource(a, 3);
     expect(pull(sum)).toBe(5);
@@ -533,11 +533,11 @@ describe('dependencies', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode((consumer) => {
+    const sum = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(consumer, a) + readSource(consumer, b);
+      return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    const label = createDerivedNode((consumer) => `${readDerived(consumer, sum)}`);
+    const label = createDerivedNode((callingNode) => `${readDerived(callingNode, sum)}`);
     pull(label);
     writeSource(a, 3);
     writeSource(b, 4);
@@ -553,9 +553,9 @@ describe('dependencies', () => {
   test('a node read twice is marked once and computes once per change', () => {
     let runs = 0;
     const a = createSourceNode(1);
-    const twice = createDerivedNode((consumer) => {
+    const twice = createDerivedNode((callingNode) => {
       runs += 1;
-      return readSource(consumer, a) + readSource(consumer, a);
+      return readSource(callingNode, a) + readSource(callingNode, a);
     });
     expect(pull(twice)).toBe(2);
     writeSource(a, 2);
@@ -569,14 +569,14 @@ describe('disposal', () => {
     const runs = { inner: 0, outer: 0 };
     const innerPreviousValues: Array<number | undefined> = [];
     const source = createSourceNode(1);
-    const inner = createDerivedNode<number>((consumer, previous) => {
+    const inner = createDerivedNode<number>((callingNode, previous) => {
       runs.inner += 1;
       innerPreviousValues.push(previous);
-      return readSource(consumer, source);
+      return readSource(callingNode, source);
     });
-    const outer = createDerivedNode((consumer) => {
+    const outer = createDerivedNode((callingNode) => {
       runs.outer += 1;
-      return readDerived(consumer, inner) + 1;
+      return readDerived(callingNode, inner) + 1;
     });
     expect(pull(outer)).toBe(2);
     disposeDerivedNode(inner);
@@ -592,7 +592,7 @@ describe('disposal', () => {
 
   test('a disposed node is not marked by the sources it read', () => {
     const source = createSourceNode(1);
-    const inner = createDerivedNode((consumer) => readSource(consumer, source));
+    const inner = createDerivedNode((callingNode) => readSource(callingNode, source));
     pull(inner);
     disposeDerivedNode(inner);
     writeSource(source, 2);
@@ -602,7 +602,7 @@ describe('disposal', () => {
 
   test('disposing a node that was never computed changes nothing', () => {
     const source = createSourceNode(1);
-    const node = createDerivedNode((consumer) => readSource(consumer, source));
+    const node = createDerivedNode((callingNode) => readSource(callingNode, source));
     disposeDerivedNode(node);
     expect(statusOf(node)).toBe('NotComputed');
     expect(pull(node)).toBe(1);
@@ -615,9 +615,9 @@ describe('disposal', () => {
 import { expectTypeOf, test } from 'vitest';
 import { createDerivedNode, readDerived, type DerivedNode } from '../src/index';
 
-test('a derived node of any value type can be read by any consumer', () => {
+test('a derived node of any value type can be read by any calling node', () => {
   const count = createDerivedNode(() => 1);
-  const label = createDerivedNode((consumer) => `${readDerived(consumer, count)}`);
+  const label = createDerivedNode((callingNode) => `${readDerived(callingNode, count)}`);
   expectTypeOf(label).toEqualTypeOf<DerivedNode<string>>();
 });
 ```
