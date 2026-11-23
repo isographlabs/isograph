@@ -55,14 +55,7 @@ The package index exports none of `MISSING`, `Missing`, and `isMissing`. `create
   },
 ```
 
-The runtime's three pre-commit hooks match `libs/pico-js` as well. Every `switch` over a union ends in `default: return assertNever(..)`:
-
-```ts
-// from libs/isograph-runtime/src/util.ts
-export function assertNever(value: never): never {
-  throw new Error(`Unhandled variant: ${String(value)}`);
-}
-```
+The runtime's three pre-commit hooks match `libs/pico-js` as well. `switch-exhaustiveness-check` checks every `switch` for exhaustiveness, and no `switch` has a `default` arm, as upstream does since #866.
 
 ### Accessors
 
@@ -251,8 +244,6 @@ export function resolverResultsEqual(
         return next.kind === 'MissingData' && missingDataAreEqual(previous, next);
       case 'ResolverThrew':
         return next.kind === 'ResolverThrew' && previous.error === next.error;
-      default:
-        return assertNever(previous.kind);
     }
   };
 }
@@ -271,8 +262,6 @@ function okResultsEqual(
       );
     case 'ResolverValue':
       return next.origin === 'ResolverValue' && outputEqual(previous.value, next.value);
-    default:
-      return assertNever(previous.origin);
   }
 }
 
@@ -321,8 +310,6 @@ function selectionValuesAreEqual(
         ? delivered === read
         : valuesAreEqual(delivered, read, (a, b) => targetValuesAreEqual(tables, target, selection.selections, a, b));
     }
-    default:
-      return assertNever(field.kind);
   }
 }
 
@@ -571,8 +558,6 @@ function readSelection<TFailure>(
           : readAt(hooks, tables, selection.selections, derivedLink(derived.value, record, selection.fieldName), target, variables),
       );
     }
-    default:
-      return assertNever(field.kind);
   }
 }
 
@@ -593,8 +578,6 @@ function readAt<TFailure>(
       return readStoreValue(hooks, link, VALUE_KEY);
     case 'Composite':
       return ok(EMPTY_DATA);
-    default:
-      return assertNever(shape);
   }
 }
 
@@ -1135,8 +1118,6 @@ Each is one commit, in order, and each is independently shippable.
          return result.kind === 'ResolverThrew' && delivered.error === result.error;
        case 'Err':
          return result.kind === 'Err' && delivered.error === result.error;
-       default:
-         return assertNever(delivered.kind);
      }
    }
    ```
