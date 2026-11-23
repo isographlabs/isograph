@@ -157,8 +157,6 @@ function markDependentsDirty(
         throw new Error(
           'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
         );
-      default:
-        assertNever(node.status);
     }
   }
   let marked: DerivedNode<unknown> | undefined;
@@ -182,8 +180,6 @@ function markDependentsDirty(
           throw new Error(
             'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
           );
-        default:
-          assertNever(dependent.status);
       }
     }
   }
@@ -236,8 +232,6 @@ function markCheckDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
         throw new Error(
           'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
         );
-      default:
-        assertNever(node.status);
     }
   }
 }
