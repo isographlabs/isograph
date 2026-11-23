@@ -11,7 +11,7 @@ A caller that observes a derived node needs to learn when the node stops being u
 - A `Batch` is a `Set<() => void>`. The set keeps insertion order, which is the order in which marking found the nodes, and it holds each callback once, so two nodes that share one callback function call it once per flush.
 - `flushBatch(batch)` deletes each callback from the set and then calls it, in insertion order. A callback that writes through the same batch adds callbacks to the end of the set, and the same flush calls them. A callback that pulls its node and is then marked again in the same flush is added again and called again, because it was deleted before it ran. After `flushBatch` returns, the batch is empty and can be reused.
 - A callback that is in the batch is called even when an earlier callback in the same flush disposes its node. Removing it would need a lookup from node to batch, and nothing needs that behavior.
-- A pull collects no callbacks. A recompute whose value changed marks its node's dependents `Dirty`, and every dependent of a `Dirty` node is `Check` (the `DerivedNode` invariants), so no node leaves `Clean` during a pull. `pull`, `readSource`, and `readDerived` therefore take no batch. `recompute` marks through `markCheckDependentsDirty`, which throws on any dependent that is not `Check`.
+- A pull collects no callbacks. A recompute whose value changed marks its node's dependents `Dirty`, and every dependent of a `Dirty` node is `Check` or `Dirty` (the `DerivedNode` invariants), so no node leaves `Clean` during a pull. `pull`, `readSource`, and `readDerived` therefore take no batch. `recompute` marks through `markCheckDependentsDirty`, which sets a `Check` dependent `Dirty`, leaves a `Dirty` dependent `Dirty`, and throws on a `Clean` or `Uncomputed` dependent.
 - Setting `onDirty` on a node that is not `Clean` collects nothing until the node is pulled and marked again. An observer that starts observing pulls its node to make it `Clean`.
 
 Contracts, added to pico-js.md's list:
@@ -53,12 +53,15 @@ export function createDerivedNode<TValue>(
 ): DerivedNode<TValue> {
   return {
     value: NOT_SET,
-    status: 'Uncomputed',
-    sourceDependencies: [],
-    derivedDependencies: [],
-    dependents: new Set(),
-    computation,
     onDirty: undefined,
+    status: 0,
+    firstSourceDependency: undefined,
+    lastSourceDependency: undefined,
+    firstDerivedDependency: undefined,
+    lastDerivedDependency: undefined,
+    firstDependent: undefined,
+    lastDependent: undefined,
+    computation,
   };
 }
 ```
@@ -72,7 +75,10 @@ export function writeSource<TValue>(
   value: TValue,
 ): void {
   source.value = value;
-  markDependentsDirty(source.dependents);
+  const first = source.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
 }
 ```
 
@@ -99,7 +105,10 @@ export function writeSource<TValue>(
   value: TValue,
 ): void {
   source.value = value;
-  markDependentsDirty(batch, source.dependents);
+  const first = source.firstDependent;
+  if (first !== undefined) {
+    markDirty(batch, first);
+  }
 }
 ```
 
@@ -108,7 +117,10 @@ export function writeSource<TValue>(
 ```ts
 // from libs/pico-js/src/graph.ts
 export function disposeDerivedNode(node: DerivedNode<unknown>): void {
-  markDependentsDirty(node.dependents);
+  const first = node.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
 ```
 
 After:
@@ -119,66 +131,74 @@ export function disposeDerivedNode(
   batch: Batch,
   node: DerivedNode<unknown>,
 ): void {
-  markDependentsDirty(batch, node.dependents);
-  detach(node);
-  node.status = 'Uncomputed';
+  const first = node.firstDependent;
+  if (first !== undefined) {
+    markDirty(batch, first);
+  }
+  unlinkAll(node.firstSourceDependency);
+  unlinkAll(node.firstDerivedDependency);
+  node.firstSourceDependency = undefined;
+  node.lastSourceDependency = undefined;
+  node.firstDerivedDependency = undefined;
+  node.lastDerivedDependency = undefined;
+  node.status = 0;
   node.value = NOT_SET;
 }
 ```
 
-`markDependentsDirty` takes the batch and adds `onDirty` in both arms where a node leaves `Clean`. After, in full:
+`markDirty` takes the batch and adds `onDirty` in both arms where a node leaves `Clean`. After, in full:
 
 ```ts
 // from libs/pico-js/src/graph.ts
-function markDependentsDirty(
-  batch: Batch,
-  dependents: Set<DerivedNode<unknown>>,
-): void {
+function markDirty<TDependency>(batch: Batch, first: Edge<TDependency>): void {
   const stack: Array<DerivedNode<unknown>> = [];
-  for (const node of dependents) {
+  let edge: Edge<TDependency> | undefined = first;
+  while (edge !== undefined) {
+    const node = edge.dependent;
+    edge = edge.nextDependent;
     switch (node.status) {
-      case 'Clean':
-        detach(node);
-        node.status = 'Dirty';
+      case 3:
+        node.status = 1;
         if (node.onDirty !== undefined) {
           batch.add(node.onDirty);
         }
-        stack.push(node);
+        if (node.firstDependent !== undefined) {
+          stack.push(node);
+        }
         break;
-      case 'Check':
-        detach(node);
-        node.status = 'Dirty';
+      case 2:
+        node.status = 1;
         break;
-      case 'Dirty':
+      case 1:
+        break;
+      case 0:
         throw new Error(
-          'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
-        );
-      case 'Uncomputed':
-        throw new Error(
-          'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+          'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
         );
     }
   }
   let marked: DerivedNode<unknown> | undefined;
   while ((marked = stack.pop()) !== undefined) {
-    for (const dependent of marked.dependents) {
+    let dependentEdge = marked.firstDependent;
+    while (dependentEdge !== undefined) {
+      const dependent = dependentEdge.dependent;
+      dependentEdge = dependentEdge.nextDependent;
       switch (dependent.status) {
-        case 'Clean':
-          dependent.status = 'Check';
+        case 3:
+          dependent.status = 2;
           if (dependent.onDirty !== undefined) {
             batch.add(dependent.onDirty);
           }
-          stack.push(dependent);
+          if (dependent.firstDependent !== undefined) {
+            stack.push(dependent);
+          }
           break;
-        case 'Check':
+        case 2:
+        case 1:
           break;
-        case 'Dirty':
+        case 0:
           throw new Error(
-            'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
-          );
-        case 'Uncomputed':
-          throw new Error(
-            'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+            'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
           );
       }
     }
@@ -186,12 +206,15 @@ function markDependentsDirty(
 }
 ```
 
-`recompute` marks its dependents through a new function that accepts only `Check` dependents. Before:
+`recompute` marks its dependents through a new function that accepts only `Check` and `Dirty` dependents. Before:
 
 ```ts
 // from libs/pico-js/src/graph.ts
   node.value = value;
-  markDependentsDirty(node.dependents);
+  const first = node.firstDependent;
+  if (first !== undefined) {
+    markDirty(first);
+  }
   return value;
 }
 ```
@@ -202,42 +225,44 @@ After:
 // from libs/pico-js/src/graph.ts
 function recompute<TValue>(node: DerivedNode<TValue>): TValue {
   const previous = computedValue(node);
+  node.lastSourceDependency = undefined;
+  node.lastDerivedDependency = undefined;
   const value = node.computation(node, previous);
-  attach(node);
-  node.status = 'Clean';
+  trim(node);
+  node.status = 3;
   if (value === previous) {
     return previous;
   }
   node.value = value;
-  markCheckDependentsDirty(node.dependents);
+  markCheckDependentsDirty(node.firstDependent);
   return value;
 }
 
-function markCheckDependentsDirty(dependents: Set<DerivedNode<unknown>>): void {
-  for (const node of dependents) {
+function markCheckDependentsDirty(first: DerivedEdge | undefined): void {
+  let edge = first;
+  while (edge !== undefined) {
+    const node = edge.dependent;
+    edge = edge.nextDependent;
     switch (node.status) {
-      case 'Check':
-        detach(node);
-        node.status = 'Dirty';
+      case 2:
+        node.status = 1;
         break;
-      case 'Clean':
+      case 1:
+        break;
+      case 3:
         throw new Error(
           'A Clean node depends on a Dirty node. This is indicative of a bug in pico-js.',
         );
-      case 'Dirty':
+      case 0:
         throw new Error(
-          'A Dirty node is in a dependents set. This is indicative of a bug in pico-js.',
-        );
-      case 'Uncomputed':
-        throw new Error(
-          'An Uncomputed node is in a dependents set. This is indicative of a bug in pico-js.',
+          'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
         );
     }
   }
 }
 ```
 
-`markCheckDependentsDirty` needs no stack, because a `Check` node's dependents are already `Check`.
+`markCheckDependentsDirty` needs no stack, because the dependents of a `Check` or `Dirty` node are already `Check` or `Dirty`. A `Dirty` dependent is a node that earlier marking set `Dirty` and that kept its edge to `node`. It stays `Dirty`.
 
 ## `src/index.ts`
 
@@ -408,7 +433,7 @@ describe('batches and onDirty', () => {
       calls += 1;
     };
     write(a, 2);
-    expect(outer.status).toBe('Check');
+    expect(outer.status).toBe(2);
     expect(calls).toBe(1);
   });
 
@@ -526,7 +551,7 @@ describe('batches and onDirty', () => {
       calls += 1;
     };
     dispose(inner);
-    expect(outer.status).toBe('Dirty');
+    expect(outer.status).toBe(1);
     expect(calls).toBe(1);
   });
 
