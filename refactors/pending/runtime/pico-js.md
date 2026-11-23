@@ -293,6 +293,14 @@ export type SourceNode<TValue> = {
   readonly dependents: Set<DerivedNode<unknown>>;
 };
 
+/**
+ * A derived node satisfies these invariants for each status.
+ * - When `status` is `Uncomputed`, `value` is `NOT_SET`, both dependency arrays are empty, and `dependents` is empty.
+ * - When `status` is `Dirty`, `value` is the value the last computation returned, both dependency arrays are empty, the node is in no `dependents` set, and every node in `dependents` is `Check`.
+ * - When `status` is `Check`, `value` is the value the last computation returned, the node is in the `dependents` set of every node in its dependency arrays, and every node in `dependents` is `Check`.
+ * - When `status` is `Clean`, `value` is the up-to-date value, and the node is in the `dependents` set of every node in its dependency arrays.
+ * - Every node in a `dependents` set is `Clean` or `Check`.
+ */
 export type DerivedNode<TValue> = {
   value: Option<TValue>;
   status: Status;
