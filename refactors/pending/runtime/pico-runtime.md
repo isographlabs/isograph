@@ -37,7 +37,7 @@ The engine has no graph object and no write-during-computation check (pico-js.md
 
 ### The engine and the Isograph runtime
 
-The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `memo`, `sourceReads`, or `derivedReads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`markDependentsDirty`, `verify`, `update`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
+The Isograph runtime imports the engine's package index and nothing else from it. No Isograph function writes a node's `value` or reads or writes its `dependents`, `memo`, `sourceReads`, or `derivedReads`; `storeValue` and `presentValues` read a source's `value` (The store), and no Isograph function calls an engine function the index does not export (`markDependentsDirty`, `verify`, `recompute`, `compute`, `setDependencies`). The engine's public behavior is pico's: which values a read returns, which computations run again on a write, cutoff by equality, and dependencies recorded per computation. A write during a computation breaks the engine's contract, and the engine does not check it (open decision 2). Reverse edges and marks are internal, as pico's epochs are.
 
 The calls the Isograph runtime makes, by export of the engine's index (pico-js.md, The public API):
 
@@ -61,7 +61,7 @@ Engine (`libs/pico-js/src/graph.ts` and `libs/pico-js/src/equality.ts`), as pico
 - The marks `Clean`, `Check`, and `Dirty`.
 - Construction: `createSourceNode`, `createDerivedNode`.
 - Mark: `writeSource`, `markSourceDirty`, `markDependentsDirty`.
-- Pull: `pull`, `verify`, `update`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The consumer).
+- Pull: `pull`, `computeFirst`, `verify`, `recompute`, `commitReads`, `compute`, and the dependency recording: `readSource`, `readDerived` (pico-js.md, The consumer).
 - Dependencies: `setDependencies`.
 - Disposal: `disposeDerivedNode`.
 - Equality (`equality.ts`): `tripleEquals`, `objectIs`.
@@ -314,7 +314,7 @@ A resolver selected on an absent record (a parent reads a link to `Pet:9`, and `
 
 ### Equality
 
-Each derived node has an equality function, used for cutoff: `update` keeps the previous value object and marks no dependent when `equals(previous, next)` holds. The engine has no default (open decision 20): each resolver node's equality is `resolverResultsEqual`, whose output equality is `===` unless the field supplies one (open decision 7).
+Each derived node has an equality function, used for cutoff: `recompute` keeps the previous value object and marks no dependent when `equals(previous, next)` holds. The engine has no default (open decision 20): each resolver node's equality is `resolverResultsEqual`, whose output equality is `===` unless the field supplies one (open decision 7).
 
 Correctness: an equality function only decides whether the dependents recompute. One that answers unequal for equal values makes them recompute from equal inputs to their old values, which costs work and never yields a wrong value. One that answers equal for unequal values yields a wrong value, so every rule other than `===` must answer equal only when every position a reader can observe is `===`.
 
