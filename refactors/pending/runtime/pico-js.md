@@ -7,7 +7,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 - A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it.
 - A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation. `writeSource` marks the source's readers whether or not the value changed, and a caller that wants no recompute for an equal value compares before it writes.
 - A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. A new node is `Uncomputed`.
-- `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes at the first whose value changed; if none changed it becomes `Clean` without running. A `Dirty` node recomputes.
+- `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes after the first pull that leaves it `Dirty`. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, it becomes `Clean` without running. A `Dirty` node recomputes.
 - A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
 - Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
 - Each read during a computation records the node it read in the calling node's dependency arrays. After the computation returns, the node is added to the `dependents` set of each source and derived node it read.
@@ -221,7 +221,7 @@ The graph has two kinds of node. A source node holds a value that code outside t
 
 A write runs no computation. It marks the derived nodes that read the source `Dirty`, because one of their inputs is known to have changed, and it marks every node that depends on those through derived nodes `Check`, because one of their inputs might have changed. Nothing is recomputed until a node is pulled.
 
-A pull brings one node up to date and runs only the computations that requires. A `Dirty` node recomputes. A `Check` node pulls its derived dependencies in the order its computation read them. If one of them comes back with a changed value, the node recomputes at that point, without pulling the rest. If none changed, the node becomes `Clean` and returns its value without running. Because the pulls follow read order, a computation such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)` recomputes as soon as `flag` comes back changed, before it pulls `b`, which the new run may not read.
+A pull brings one node up to date and runs only the computations that requires. A `Dirty` node recomputes. A `Check` node pulls its derived dependencies in the order its computation read them. As soon as a pull leaves the node `Dirty`, the node recomputes, without pulling the rest. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, the node becomes `Clean` and returns its value without running. Because the pulls follow read order, a computation such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)` recomputes as soon as `flag` comes back changed, before it pulls `b`, which the new run may not read.
 
 ## Example
 
@@ -272,7 +272,7 @@ Each `readSource` and `readDerived` call during a computation records a dependen
 
 - An `Uncomputed` node has no value. Its next pull runs its computation with `previous` `undefined`.
 - A `Dirty` node read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
-- A `Check` node depends through derived nodes on a source that was written. Its next pull pulls its derived dependencies in the order they were read and recomputes the node at the first whose value changed; if none changed, the node becomes `Clean` without running.
+- A `Check` node depends through derived nodes on a source that was written or on a derived node that was disposed. Its next pull pulls its derived dependencies in the order they were read and recomputes the node after the first pull that leaves it `Dirty`. If no pull leaves the node `Dirty`, the node becomes `Clean` without running.
 - A `Clean` node holds an up-to-date value, which a pull returns without running anything.
 
 ## Cutoff
