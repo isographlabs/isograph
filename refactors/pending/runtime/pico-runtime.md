@@ -4,13 +4,16 @@ Status: under discussion. Not approved for implementation. It changes the landed
 
 Upstream paths are under `../isograph/libs/isograph-react/src/core` unless they name another directory.
 
-A server value is a source node in the store. A resolver result is a derived node in the record container of the record it was computed on. A write calls `writeSource` and runs no resolver. A read calls `pull`. Upstream stores no resolver value and calls every eager resolver it reaches on each read (`read.ts:600`); the user chose to store results so that a resolver reruns only when an input changed.
+A server value is a source node in the store. A resolver result is a derived node in the record container of the record it was computed on. Every write is inside one `startBatch` and runs no resolver. A read calls `pull`. Upstream stores no resolver value and calls every eager resolver it reaches on each read (`read.ts:600`); the user chose to store results so that a resolver reruns only when an input changed.
 
 ## The store
 
 ```ts
 // from libs/isograph-runtime/src/store.ts
-import { createSourceNode, disposeDerivedNode, writeSource, type DerivedNode, type SourceNode } from '@isograph/pico-js';
+import { createSourceNode, startBatch, type DerivedNode, type SourceNode } from '@isograph/pico-js';
+
+/** The parameter of a `startBatch` body. The engine does not export its class. */
+export type Mutators = Parameters<Parameters<typeof startBatch>[0]>[0];
 
 export type Store = Map<EntityName, Map<RecordId, RecordContainer>>;
 
@@ -159,7 +162,7 @@ function presentValues(container: RecordContainer): Map<StoreKey, StoreValue> {
 
 export type PlainStore = Map<EntityName, Map<RecordId, Map<StoreKey, StoreValue>>>;
 
-export function deleteRecord(store: Store, link: StoreLink): void {
+export function deleteRecord(mutators: Mutators, store: Store, link: StoreLink): void {
   const containers = store.get(link.entityName);
   const container = containers?.get(link.id);
   if (containers === undefined || container === undefined) {
@@ -167,10 +170,10 @@ export function deleteRecord(store: Store, link: StoreLink): void {
   }
   container.sources.forEach((source) => {
     if (source.value !== MISSING) {
-      writeSource(source, MISSING);
+      mutators.writeSource(source, MISSING);
     }
   });
-  container.derived.forEach((node) => disposeDerivedNode(node));
+  container.derived.forEach((node) => mutators.disposeDerivedNode(node));
   containers.delete(link.id);
   if (containers.size === 0) {
     store.delete(link.entityName);
@@ -178,18 +181,23 @@ export function deleteRecord(store: Store, link: StoreLink): void {
 }
 ```
 
-A caller writes a source only when its value changes, so `deleteRecord` writes `MISSING` to each present source and nothing to a `MISSING` one. Its `container.derived` line arrives in core change 7.
+- The engine's contract is a write only of a changed value, so `deleteRecord` writes `MISSING` to each present source and nothing to a `MISSING` one, and `writeValue` checks `isUnchanged` first.
+- The store creates the resolver nodes, so `deleteRecord` disposes them. A caller that creates a derived node disposes it.
+- `deleteRecord`'s `container.derived` line arrives in core change 7.
+- Unresolved: `deleteRecord` removes source nodes that still have dependents (`refactors/pending/future-improvements.md`, "`deleteRecord` drops source nodes that still have dependents").
 
 The sweep, after (`libs/isograph-runtime/src/garbageCollection.ts:32-41`):
 
 ```ts
 // from libs/isograph-runtime/src/garbageCollection.ts
-  store.forEach((containers, entityName) => {
-    const kept = reachable.get(entityName);
-    containers.forEach((_container, id) => {
-      if (kept?.has(id) !== true) {
-        deleteRecord(store, { entityName, id });
-      }
+  startBatch((mutators) => {
+    store.forEach((containers, entityName) => {
+      const kept = reachable.get(entityName);
+      containers.forEach((_container, id) => {
+        if (kept?.has(id) !== true) {
+          deleteRecord(mutators, store, { entityName, id });
+        }
+      });
     });
   });
 ```
@@ -199,7 +207,7 @@ Call sites:
 - `check`: `storeRecord(store, link) === undefined` becomes `recordPresence(store, link) === 'Absent'` (`libs/isograph-runtime/src/check.ts:30`, `:54`), and `record.get(key)` becomes `storeValue(store, link, key)` with `isMissing(..)` for `=== undefined` (`:49-50`).
 - The garbage collector's mark makes the same two replacements (`garbageCollection.ts:51`, `:70-73`). A link that reaches an `Absent` container keeps that container, and the mark does not recurse into it. The root of a retained query keeps its container whatever its presence.
 - `readDataForOnComplete` (`libs/isograph-runtime/src/network.ts:196-218`) still calls `read`.
-- Test fixtures: `storeOf` returns a `PlainStore`, and a test compares `storeSnapshot(store)` with it. `test/fixtures.ts` gains `storeFrom(plain: PlainStore): Store`, which calls `presentContainerAt` and `writeSource(sourceNodeAt(..), value)` for each value. A test that set a stored value calls `writeSource(sourceNodeAt(store, pet('1'), 'bestFriend'), 'x')`, a test that deleted a record calls `deleteRecord`, and a test that deleted a key builds its store with `storeFrom` without that key.
+- Test fixtures: `storeOf` returns a `PlainStore`, and a test compares `storeSnapshot(store)` with it. `test/fixtures.ts` gains `storeFrom(plain: PlainStore): Store`, which calls `presentContainerAt` and `mutators.writeSource(sourceNodeAt(..), value)` for each value in one `startBatch`. A test that set one stored value calls `writeSource(sourceNodeAt(store, pet('1'), 'bestFriend'), 'x')`, a test that deleted a record calls `startBatch((mutators) => deleteRecord(mutators, store, link))`, and a test that deleted a key builds its store with `storeFrom` without that key.
 
 ### Absent records
 
@@ -678,13 +686,14 @@ export function storageOf(normalization: Normalization, entityName: EntityName, 
 // from libs/isograph-runtime/src/normalize.ts
 type Normalization = {
   readonly store: Store;
+  readonly mutators: Mutators;
   readonly discriminatorResponseKey: string;
   readonly variables: Variables;
   readonly tables: EntityTables;
 };
 ```
 
-`omittedRecordId` is `recordId`'s `Omit` branch extracted verbatim (`recordId.ts:109-114`). `recordId`'s `FromParent` arm calls it, its `OwnId` arm is the `Select` branch (`:95-108`), and its `Fixed` arm is the `Fixed` branch (`:93-94`). `normalize` sets `tables: ast.tables` (`normalize.ts:37-41`).
+`omittedRecordId` is `recordId`'s `Omit` branch extracted verbatim (`recordId.ts:109-114`). `recordId`'s `FromParent` arm calls it, its `OwnId` arm is the `Select` branch (`:95-108`), and its `Fixed` arm is the `Fixed` branch (`:93-94`). `normalize` sets `mutators` and `tables: ast.tables` (`normalize.ts:37-41`).
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
@@ -843,15 +852,38 @@ export type ReaderArtifact<TParam extends ResolverParam<TEntityName>, TOutput, T
 
 ```ts
 // from libs/isograph-runtime/src/normalize.ts
-import { writeSource } from '@isograph/pico-js';
+import { startBatch } from '@isograph/pico-js';
+
+export function normalize(store: Store, ast: NormalizationAst, response: JsonObject, variables: Variables): void {
+  let thrown: { readonly error: unknown } | undefined;
+  startBatch((mutators) => {
+    const normalization: Normalization = {
+      store,
+      mutators,
+      discriminatorResponseKey: ast.discriminatorResponseKey,
+      variables,
+      tables: ast.tables,
+    };
+    try {
+      writeSelections(normalization, ast.selections, response, presentContainerAt(store, ast.root), ast.root, []);
+    } catch (error: unknown) {
+      thrown = { error };
+    }
+  });
+  if (thrown !== undefined) {
+    throw thrown.error;
+  }
+}
 
 function writeValue(normalization: Normalization, link: StoreLink, key: StoreKey, value: StoreValue): void {
   const source = sourceNodeAt(normalization.store, link, key);
   if (!isUnchanged(key)(source.value, value)) {
-    writeSource(source, value);
+    normalization.mutators.writeSource(source, value);
   }
 }
 ```
+
+A `startBatch` body must not throw, so `normalize` catches inside the body, lets the batch flush the writes before the throw, and rethrows after `startBatch` returns (Open decision 2). Callers read after `normalize` returns, so they read after the flush.
 
 `writeSelections` and `compositeValue` pass the record's link where they passed its `StoreRecord`, and `recordAt` becomes `presentContainerAt` (`normalize.ts:163-169`). Upstream compares a scalar with `!==` only (`cache.ts:248-249`); `leafUnchanged` compares a leaf list by length and item, so a response that repeats a list marks nothing.
 
@@ -976,9 +1008,9 @@ Each is one commit, in order, and each is independently shippable.
 
    Tests. Every `storeOf(..)` that holds a leaf lists the link under the parent's key and the scalar record with its `__value`: `test/normalize.test.ts` (`:46`, `:79`, `:162`, `:200`, `:228`, `:259`, `:285`, `:302`, `:359`), `test/check.test.ts` (`:220`, `:226`), `test/garbageCollection.test.ts` (`:118`, `:149`, `:161`). The generated artifacts under `libs/isograph-runtime/fixtures/store/src/__isograph` and `demos/pet-demo/src/__isograph` are regenerated. New, in `test/normalize.test.ts`: "a leaf is written to the __value of its scalar record, and its key holds the link", "a rewrite that changes only a leaf writes only its __value", "a leaf list writes one scalar record per item, at its index", "a null leaf writes no scalar record", "a custom scalar's JSON array below its list depth is one __value". In `test/check.test.ts`: "a missing __value is missing its scalar record". In `test/garbageCollection.test.ts`: "a scalar record no retained query reaches is deleted".
 
-4. Prefactor: record containers. This change adds the engine dependency, `RecordContainer` without `derived`, the accessors, `storeSnapshot`, `deleteRecord` without its `derived` line, `storeFrom`, and `writeValue` over source nodes. `isUnchanged`, `leafUnchanged`, and `compositeUnchanged` move to `store.ts`. The exported type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: no change in behavior; `storeSnapshot(environment.store)` equals v1's nested map.
+4. Prefactor: record containers. This change adds the engine dependency, `RecordContainer` without `derived`, the accessors, `Mutators`, `storeSnapshot`, `deleteRecord` without its `derived` line, `storeFrom`, `normalize`'s `startBatch`, the sweep's `startBatch`, and `writeValue` over source nodes. `isUnchanged`, `leafUnchanged`, and `compositeUnchanged` move to `store.ts`. The exported type `StoreRecord` becomes `RecordContainer` (`libs/isograph-runtime/src/index.ts:38`). Observable: no change in behavior; `storeSnapshot(environment.store)` equals v1's nested map.
 
-   Tests. `storeSnapshot(store)` replaces `store` in every comparison: `test/normalize.test.ts`, `test/garbageCollection.test.ts` (including `:42`, `:46`), `test/check.test.ts:236-242` (`before = storeSnapshot(store)` in place of `structuredClone(store)`), `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), and `test/environment.test.ts:95`. A deleted key (`test/check.test.ts:114`, `:179`, `:187`, `:193`) uses `storeFrom` without that key. A deleted record (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) uses `deleteRecord`. A set value (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) uses `writeSource(sourceNodeAt(..), 'x')`. New, in `test/store.test.ts`: "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", "storeFrom then storeSnapshot is the identity on a PlainStore".
+   Tests. `storeSnapshot(store)` replaces `store` in every comparison: `test/normalize.test.ts`, `test/garbageCollection.test.ts` (including `:42`, `:46`), `test/check.test.ts:236-242` (`before = storeSnapshot(store)` in place of `structuredClone(store)`), `test/network.test.ts` (`:114`, `:181`, `:209`, `:230`, `:295`, `:423`), and `test/environment.test.ts:95`. A deleted key (`test/check.test.ts:114`, `:179`, `:187`, `:193`) uses `storeFrom` without that key. A deleted record (`test/check.test.ts:122`, `:137`, `:164`, `:188`, `:213`; `test/garbageCollection.test.ts:135`; `test/read.test.ts:570`) uses `startBatch((mutators) => deleteRecord(mutators, store, link))`. A set value (`test/read.test.ts:328`, `test/subscribe.test.ts:492`) uses `writeSource(sourceNodeAt(..), 'x')`. New, in `test/store.test.ts`: "deleteRecord of an absent record changes nothing", "deleteRecord of the last record of an entity removes the entity from storeSnapshot", "storeSnapshot omits Absent containers and MISSING source nodes", "storeFrom then storeSnapshot is the identity on a PlainStore".
 
 5. Prefactor: entity tables and the minimal reader AST (linked-only-selections.md, change 2). The compiler emits `ReaderSelection`, one `entity_table.ts` per imported entity, `ReaderArtifact.parentEntityName`, `selectableName`, and `tables`, `NormalizationAst.tables`, and a generated refinement field for every refinement of each entity whose table is generated. The runtime gains `EntityTable`, the walk, `recordId` over `RecordStorage`, `storageOf`, `storeKey(name, args, variables)`, and `selectionSetDataAreEqual` over tables. The four v1 selection kinds and `NormalizationIdentity` go. Observable: every read returns what it returned before, and `node(id:) { asPet { name } }` on a `Checkin` record is `null`.
 
@@ -1135,7 +1167,8 @@ Each is one commit, in order, and each is independently shippable.
 
 - Retention and the fetch decision (`retainEntrypoint`, root holds, `IfNecessary` pulls the root node)
 - `collect`: disposing derived nodes no root reaches
-- Subscriptions and React observers as derived nodes
+- Subscriptions and React observers as derived nodes whose `onDirty` schedules the re-read, in place of `callSubscriptions` re-reading every subscription after each write. A subscription disposes its node when it stops.
+- A selector that many components read is created with `createEagerDerivedNode`. A React binding calls `setDerivedNodeEvaluation(node, LAZY)` when its screen is retained and `setDerivedNodeEvaluation(node, EAGER)` when it mounts (`refactors/pending/runtime/pico-js-where-it-wins.md`).
 - Values with lifecycles
 - Optimistic layers
 - Request state, browser state, and client roots as source nodes
@@ -1154,7 +1187,7 @@ Held: (a), because it is upstream's encoding (`FragmentReference.ts:75-79`) and 
 
 ### 2. A response that throws part-way
 
-- (a) Writes before the throw and their marks stand, and `makeNetworkRequest` re-reads subscriptions in a `finally`.
+- (a) Writes before the throw and their marks stand: `normalize` catches inside its `startBatch` body, the batch flushes, and `normalize` rethrows. `makeNetworkRequest` re-reads subscriptions in a `finally`.
 - (b) `normalize` validates the whole response before it writes.
 - (c) `normalize` writes into a layer that is discarded on a throw.
 
