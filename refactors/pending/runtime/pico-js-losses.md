@@ -229,6 +229,6 @@ In the fast2 and flag2 columns, no test got slower by more than the noise except
 
 pico-js.md adopts fast2 and flag2, with these decisions.
 
-- The source field is `dependentsStatus: DependentsStatus`. `DependentsStatus` is the union of two numbers with a named constant for each, private to `graph.ts`: `DEPENDENTS_MAY_NOT_BE_DIRTY` (`0`, a node in the dependents list may be `Check` or `Clean`, so a write marks the list) and `DEPENDENTS_ALL_DIRTY` (`1`, every node in the dependents list is `Dirty`, so a write skips the list). The constants cost nothing measurable against the literals (fanOutRepeat K1000 M100 0.69 ms against 0.93, noObservers 0.64 against 0.62, v0).
+- The source field is `dependentsStatus: DependentsStatus`. `DependentsStatus` is the union of two numbers with a named constant for each, private to `graph.ts`: `DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY` (`0`, a node in the dependents list may be `Check` or `Clean`, so a write marks the list) and `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY` (`1`, every node in the dependents list is `Dirty`, so a write skips the list). The constants cost nothing measurable against the literals (fanOutRepeat K1000 M100 0.69 ms against 0.93, noObservers 0.64 against 0.62, v0).
 - fast2's `verify` has no `!` assertion. A node `verify` descended into with no dependents, or with more than one and no edge on the stack, throws an error that ends "This is indicative of a bug in pico-js.", as the other invariant throws do.
 - pico-js-batch.md keeps its `Set` batch.
