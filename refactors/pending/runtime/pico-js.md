@@ -546,9 +546,13 @@ class Mutators {
       case CHECK:
         switch (evaluation) {
           case EAGER:
+            // Its dependents are already Check or Dirty. The flush brings it
+            // up to date.
             this.#eagerNodes.push(node);
             break;
           case LAZY:
+            // As an eager node it left Clean without queuing its callback, so
+            // the callback is queued now.
             if (node.onDirty !== undefined) {
               this.#callbacks.push(node.onDirty);
             }
@@ -556,6 +560,8 @@ class Mutators {
             break;
         }
         break;
+      // A Clean node is up to date under either evaluation, and an Uncomputed
+      // node has only Dirty dependents.
       case CLEAN:
       case UNCOMPUTED:
         break;
@@ -580,9 +586,13 @@ function flush(
   eagerNodes: Array<DerivedNode<unknown>>,
   callbacks: Array<() => void>,
 ): void {
+  // Indices walk both arrays, because a refresh appends to them during the
+  // walk.
   let eagerIndex = 0;
   let callbackIndex = 0;
   while (true) {
+    // Every queued eager node is refreshed before the next callback runs. A
+    // refresh whose value changed can queue more of both.
     const eager = eagerNodes[eagerIndex];
     if (eager !== undefined) {
       eagerIndex += 1;
@@ -602,9 +612,12 @@ function linkEdge<TDependency extends Producer<TDependency>>(
   edge: Edge<TDependency>,
   dependency: Producer<TDependency>,
 ): void {
+  // The edge becomes the tail. It may be an unlinked edge, so its
+  // previousDependent and nextDependent are overwritten.
   const tail = dependency.lastDependent;
   edge.previousDependent = tail;
   edge.nextDependent = undefined;
+  // An empty list has no tail, and the edge becomes its head as well.
   if (tail === undefined) {
     dependency.firstDependent = edge;
   } else {
@@ -617,8 +630,12 @@ function unlinkEdge<TDependency>(
   edge: Edge<TDependency>,
   dependency: Producer<TDependency>,
 ): void {
+  // The edge's own pointers stay. unlinkAll still follows its nextDependency,
+  // and linkEdge overwrites its dependents pointers when the edge is reused.
   const previous = edge.previousDependent;
   const next = edge.nextDependent;
+  // An edge with no previous edge is the head, and one with no next edge is
+  // the tail.
   if (previous === undefined) {
     dependency.firstDependent = next;
   } else {
@@ -638,12 +655,17 @@ export function readSource<TValue>(
   // The calling node will be Clean in this source's dependents list, so the
   // list is no longer known to be all Dirty.
   source.dependentsStatus = DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY;
+  // `lastSourceDependency` is the last edge this run has read. The edges
+  // after it are left from the previous run, and `next` is the one at this
+  // read's position.
   const last = callingNode.lastSourceDependency;
   const next =
     last === undefined
       ? callingNode.firstSourceDependency
       : last.nextDependency;
   if (next !== undefined) {
+    // An edge from the previous run to a different source moves to this
+    // source's dependents list. An edge to the same source is reused as is.
     if (next.dependency !== source) {
       unlinkEdge(next, next.dependency);
       next.dependency = source as SourceNode<unknown>;
@@ -651,6 +673,8 @@ export function readSource<TValue>(
     }
     callingNode.lastSourceDependency = next;
   } else if (last === undefined || last.dependency !== source) {
+    // No edge is left from the previous run, so this read appends one, unless
+    // it repeats the read just before it.
     const edge: SourceEdge = {
       dependency: source as SourceNode<unknown>,
       dependent: callingNode,
@@ -674,12 +698,17 @@ export function readDerived<TValue>(
   node: DerivedNode<TValue>,
 ): TValue {
   const value = pull(node);
+  // `lastDerivedDependency` is the last edge this run has read. The edges
+  // after it are left from the previous run, and `next` is the one at this
+  // read's position.
   const last = callingNode.lastDerivedDependency;
   const next =
     last === undefined
       ? callingNode.firstDerivedDependency
       : last.nextDependency;
   if (next !== undefined) {
+    // An edge from the previous run to a different node moves to this
+    // node's dependents list. An edge to the same node is reused as is.
     if (next.dependency !== node) {
       unlinkEdge(next, next.dependency);
       next.dependency = node as DerivedNode<unknown>;
@@ -687,6 +716,8 @@ export function readDerived<TValue>(
     }
     callingNode.lastDerivedDependency = next;
   } else if (last === undefined || last.dependency !== node) {
+    // No edge is left from the previous run, so this read appends one, unless
+    // it repeats the read just before it.
     const edge: DerivedEdge = {
       dependency: node as DerivedNode<unknown>,
       dependent: callingNode,
@@ -716,6 +747,8 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
       if (node.evaluation === EAGER) {
         return node.value;
       }
+      // A Check node recomputes only if a derived dependency changed. When
+      // none did, verify leaves it Clean and its value is current.
       return verify(node) === DIRTY ? recompute(node) : node.value;
     case UNCOMPUTED:
       return computeFirst(node);
@@ -743,6 +776,8 @@ function refreshEager(
         recomputeEager(eagerNodes, callbacks, node);
       }
       break;
+    // A Clean node was disposed and then pulled, or is in the list twice. An
+    // Uncomputed node was disposed, and computing it would relink its sources.
     case CLEAN:
     case UNCOMPUTED:
       break;
@@ -754,6 +789,8 @@ function markDirty<TDependency>(
   callbacks: Array<() => void>,
   first: Edge<TDependency>,
 ): void {
+  // `held` is the latest marked lazy node with dependents, and the stack holds
+  // the earlier ones, so a write that reaches only one allocates no array.
   let stack: Array<DerivedNode<unknown>> | undefined;
   let held: DerivedNode<unknown> | undefined;
   let edge: Edge<TDependency> | undefined = first;
@@ -763,6 +800,8 @@ function markDirty<TDependency>(
     switch (node.status) {
       case CLEAN:
         node.status = DIRTY;
+        // Marking stops at an eager node. The flush refreshes it, and marks
+        // its dependents only if its value changed.
         if (node.evaluation === EAGER) {
           eagerNodes.push(node);
           break;
@@ -777,14 +816,20 @@ function markDirty<TDependency>(
           held = node;
         }
         break;
+      // A Check node marked its dependents, and queued its callback or
+      // itself, when it left Clean.
       case CHECK:
         node.status = DIRTY;
         break;
+      // A Dirty node was marked earlier. No dependents list holds an
+      // Uncomputed node.
       case DIRTY:
       case UNCOMPUTED:
         break;
     }
   }
+  // The dependents of the nodes marked Dirty might keep their values, so they
+  // become Check.
   if (held !== undefined) {
     markCheck(eagerNodes, callbacks, held, stack);
   }
@@ -800,6 +845,8 @@ function markCheck(
   held: DerivedNode<unknown>,
   initialStack: Array<DerivedNode<unknown>> | undefined,
 ): void {
+  // `marked` is the node whose dependents list is walked. The stack holds the
+  // marked lazy nodes whose dependents are not walked yet.
   let stack = initialStack;
   let marked: DerivedNode<unknown> | undefined = held;
   while (marked !== undefined) {
@@ -818,6 +865,8 @@ function markCheck(
             callbacks.push(dependent.onDirty);
           }
           if (dependent.firstDependent !== undefined) {
+            // After the last dependent of the list, the walk continues into
+            // that dependent's list without a push.
             if (dependentEdge === undefined) {
               dependentEdge = dependent.firstDependent;
             } else {
@@ -825,6 +874,8 @@ function markCheck(
             }
           }
           break;
+        // A lazy node out of Clean has no Clean dependents, and marking stops
+        // at an eager one.
         case CHECK:
         case DIRTY:
         case UNCOMPUTED:
@@ -841,13 +892,19 @@ function markCheck(
  * when the caller must recompute `root`.
  */
 function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
+  // `node` is the lazy Check node being verified, and `edge` is its next
+  // derived dependency to pull. The stack holds the edges the descent took.
   let verifyStack: Array<DerivedEdge> | undefined;
   let node: DerivedNode<unknown> = root;
   let edge = node.firstDerivedDependency;
   while (true) {
     if (edge !== undefined) {
       const dependency = edge.dependency;
+      // A lazy Check dependency is verified by descending into it, in place of
+      // a recursive pull.
       if (dependency.status === CHECK && dependency.evaluation === LAZY) {
+        // A dependency with one dependent leads back up through that edge, so
+        // only an edge into a dependency with several dependents is pushed.
         if (
           edge.previousDependent !== undefined ||
           edge.nextDependent !== undefined
@@ -858,6 +915,8 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
         edge = dependency.firstDerivedDependency;
         continue;
       }
+      // A pull that recomputes the dependency to a new value marks `node`
+      // Dirty.
       pull(dependency);
       if (node.status !== DIRTY) {
         edge = edge.nextDependency;
@@ -866,10 +925,16 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
       if (node === root) {
         return DIRTY;
       }
+      // A Dirty node below the root recomputes without pulling the rest of its
+      // dependencies. A changed value marks its Check dependents Dirty.
       recompute(node);
     } else {
+      // A write to a source of a Check node would have made it Dirty, so it is
+      // Clean once every derived dependency came back unchanged.
       node.status = CLEAN;
     }
+    // `node` is up to date. The ascent returns to the node that descended into
+    // it, and recomputes each node on the way that came back Dirty.
     while (true) {
       if (node === root) {
         return CLEAN;
@@ -877,6 +942,7 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
       const only = node.firstDependent!;
       edge = only.nextDependent === undefined ? only : verifyStack!.pop()!;
       node = edge.dependent;
+      // A node that is still Check continues with its next dependency.
       if (node.status !== DIRTY) {
         break;
       }
@@ -900,10 +966,14 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
 function recompute<TValue>(node: DerivedNode<TValue>): TValue {
   const previous = node.value;
   const value = rerun(node, previous);
+  // On cutoff the stored value stays and nothing is marked, so every reader
+  // reads the same value.
   if (value === previous) {
     return previous;
   }
   node.value = value;
+  // A lazy node's dependents are already Check or Dirty. A Check dependent
+  // now has a changed dependency.
   markCheckDependentsDirty(node.firstDependent);
   return value;
 }
@@ -919,13 +989,16 @@ function recomputeEager(
 ): void {
   const previous = node.value;
   const value = rerun(node, previous);
+  // On cutoff the dependents stay Clean and no callback runs.
   if (value === previous) {
     return;
   }
   node.value = value;
+  // Marking the node queued no callback, so its callback is queued now.
   if (node.onDirty !== undefined) {
     callbacks.push(node.onDirty);
   }
+  // Eager dependents that this marks join the list the flush is walking.
   const first = node.firstDependent;
   if (first !== undefined) {
     markDirty(eagerNodes, callbacks, first);
@@ -960,6 +1033,8 @@ function markCheckDependentsDirty(first: DerivedEdge | undefined): void {
 
 /** Unlinks and drops the edges after the last one the computation read. */
 function trim(node: DerivedNode<unknown>): void {
+  // The edges after the cursor are left from the previous run, which read more
+  // than this one. A run that read nothing of a kind drops the whole list.
   const lastSource = node.lastSourceDependency;
   if (lastSource === undefined) {
     unlinkAll(node.firstSourceDependency);
