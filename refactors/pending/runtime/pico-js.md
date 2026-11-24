@@ -582,7 +582,7 @@ function flush(
 ): void {
   let eagerIndex = 0;
   let callbackIndex = 0;
-  for (;;) {
+  while (true) {
     const eager = eagerNodes[eagerIndex];
     if (eager !== undefined) {
       eagerIndex += 1;
@@ -844,7 +844,7 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
   let verifyStack: Array<DerivedEdge> | undefined;
   let node: DerivedNode<unknown> = root;
   let edge = node.firstDerivedDependency;
-  for (;;) {
+  while (true) {
     if (edge !== undefined) {
       const dependency = edge.dependency;
       if (dependency.status === CHECK && dependency.evaluation === LAZY) {
@@ -870,7 +870,7 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
     } else {
       node.status = CLEAN;
     }
-    for (;;) {
+    while (true) {
       if (node === root) {
         return CLEAN;
       }
