@@ -77,9 +77,11 @@ libs/pico-js/
   tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts
   tsdown.config.ts          merges ../../tsdown.config.ts, dts.build true
   vitest.config.ts          typecheck enabled with tsconfig.test.json
+  vitest.random.config.ts   runs test-random/random.ts only
   src/graph.ts
   src/index.ts
   test/graph.test.ts, test/graph.test-d.ts   Tests
+  test-random/random.ts     Random differential test, run by `pnpm test:random`
 ```
 
 Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm install`), which the same commit includes.
@@ -100,6 +102,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
     "watch-libs": "tsdown --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
+    "test:random": "vitest run --config vitest.random.config.ts",
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile-libs",
     "tsc": "tsc -b",
@@ -127,7 +130,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
 }
 ```
 
-Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned. The one export is `.`, built from `src/index.ts` by the root `tsdown.config.ts` (`entry: ['src/index.ts']`, `format: ['commonjs', 'esm']`).
+Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`; `scripts` adds `test:random`, which runs the random differential test (Tests, Random differential test). `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned. The one export is `.`, built from `src/index.ts` by the root `tsdown.config.ts` (`entry: ['src/index.ts']`, `format: ['commonjs', 'esm']`).
 
 ### TypeScript, tsdown, vitest
 
@@ -171,7 +174,7 @@ export default mergeConfig(baseConfig, {
   "compilerOptions": {
     "noUnusedLocals": false
   },
-  "include": ["test/**/*.ts"],
+  "include": ["test/**/*.ts", "test-random/**/*.ts"],
   "exclude": ["**/node_modules", "**/dist"]
 }
 ```
@@ -184,6 +187,17 @@ export default defineConfig({
   test: { typecheck: { enabled: true, tsconfig: './tsconfig.test.json' } },
 });
 ```
+
+```ts
+// from libs/pico-js/vitest.random.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: { include: ['test-random/random.ts'], testTimeout: 3_600_000 },
+});
+```
+
+`vitest.config.ts` keeps vitest's default `include`, which matches `*.test.ts` and `*.spec.ts`, so `pnpm test` and the `pico-js-test` hook do not run `test-random/random.ts`. `vitest.random.config.ts` includes only that file, with a one-hour timeout, because a run of 20,000 seeds takes about 30 seconds and a failure shrinks its case before it reports. `tsconfig.test.json` includes `test-random/**/*.ts`, so `tsc -b` and the `pico-js-typecheck` hook type-check the random test without running it. The random test reads `process.env`, whose type comes from `@types/node` through vitest's types.
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
@@ -227,7 +241,13 @@ TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type fi
 # from .github/workflows/js.yml
       - name: Test @isograph/pico-js
         run: pnpm --filter @isograph/pico-js test
+      - name: Random differential test of @isograph/pico-js
+        run: pnpm --filter @isograph/pico-js test:random
+        env:
+          PICO_JS_RANDOM_SEEDS: 2000
 ```
+
+The second step runs the random differential test on seeds 1 to 2,000, which took 3.1 seconds in a local run. A failure prints the seed, the first failed check, and the shrunk case.
 
 ### `README.md`
 
@@ -4251,3 +4271,1540 @@ test('a caller cannot write a node field except onDirty', () => {
 ```
 
 All 59 tests and the type test pass under vitest 2.1.9, and `tsc -b` reports no errors.
+
+### Random differential test
+
+`test-random/random.ts` generates a random case for each seed and runs it through pico-js three times. `pnpm test:random` reads the seed count from `PICO_JS_RANDOM_SEEDS` (default 2,000) and the first seed from `PICO_JS_RANDOM_BASE_SEED` (default 1). Environment variables carry them because vitest reads positional arguments as file filters.
+
+A case is a graph and a list of operations, generated from the seed by mulberry32. The graph has 2 to 5 sources with values 0 to 3 and 3 to 14 derived nodes, 30% of them eager. Each derived node reads a selector, then one of three branches of up to three reads that the selector's value picks, so its reads change from run to run. A derived node reads only sources and derived nodes of a lower index, so the graph is acyclic. It returns the sum of its reads modulo 2, 3, or 1000, as a number, as an object it reuses from `previous` when the number is unchanged, or as a fresh object, so that cutoff applies to the first two and never to the third. An operation is a write, a disposal, an evaluation change, a pull, an `onDirty` assignment, or a batch. A batch holds mutations, pulls, nested batches, and single calls. An `onDirty` callback runs its steps, which are mutations and pulls, on each of its first one or two calls, so callbacks write, dispose, and pull inside flushes and stop writing. A write of the value a source already holds is skipped, because the contract allows only changing writes.
+
+The three runs are:
+
+- `single`: every mutation, at top level, in a batch, or in a callback, is a single call (`writeSource`, `disposeDerivedNode`, `setDerivedNodeEvaluation`).
+- `one-op-batch`: every mutation is a `startBatch` whose body makes that one mutator call.
+- `grouped`: each batch is one `startBatch`, its nested batches are nested `startBatch` calls, its single items are single calls inside the body, and each callback runs its steps in one `startBatch`.
+
+The `single` and `one-op-batch` runs log every computation run, callback call, pulled value, and, after each operation, every node's status and value. The two logs must be equal entry for entry, which compares the single-call marking code (`markDirtyQueue`, `markCheckQueue`) with the batched code (`markDirty`, `markCheck`) on order and count of `onDirty` calls and of computation runs.
+
+Each run also checks itself against `Model`, a model that keeps statuses, values, and read lists in arrays and follows the README's Model section and Guarantees step by step:
+
+- After every mutator call, every status, value, and read list equals the model's. A mutator call runs no computation and calls no callback, and a disposed node is `Uncomputed`.
+- Each pull returns the model's value and runs exactly the computations the model runs, in the same order, and leaves every status equal to the model's. A pull made while no eager node is `Dirty` or `Check` returns the value recomputed from the sources alone and runs each computation at most once. A second pull runs nothing.
+- The first callbacks a flush calls are the callbacks its batch's mutator calls collected, mutation by mutation, in any order within one mutation. A flush that refreshes no eager node calls no other callback. A flush that refreshes calls the `onDirty` of each eager node it recomputed to a changed value, and its other callbacks belong to nodes that read one of those eager nodes.
+- Every recompute has a reason: a source its latest computation read was written, or a derived node it read was disposed or recomputed to a value that is not `===` its previous one.
+- A callback called while no `startBatch` body is running finds every eager node `Clean` or `Uncomputed`.
+- After each operation, every eager node is `Clean` or `Uncomputed`, every `Clean` node holds the value recomputed from the sources, each node that is not `Uncomputed` is in the dependents list of exactly the nodes its latest computation read, an `Uncomputed` node is in no dependents list, and a source whose `dependentsStatus` is 1 has only `Dirty` readers.
+
+A flush that refreshes an eager node recomputes in the order of its eager queue, which the guarantees leave open, so the model stops predicting statuses at that flush. At the end of the operation, after the checks above pass, the model adopts the engine's statuses and the observed values and read lists. Over seeds 1 to 2,000, 87% of pulls run while the model predicts.
+
+A failing case shrinks by removing runs of operations (halves, then quarters, down to single operations), then single batch items and callback steps, while any check still fails. The thrown error names the seed, the first failed check, the shrunk case's failed check, and the shrunk case as JSON.
+
+Each of these changes to `graph.ts` makes seeds 1 to 300 fail, and each shrinks to a case of 1 to 4 operations: dropping the lazy `onDirty` collection in `markDirtyQueue`; marking `Check` dependents `Dirty` in `markCheckQueue`; dropping `markCheckDependentsDirty` from `recompute`; dropping the node's own `onDirty` from `setDerivedNodeEvaluation(node, LAZY)`; dropping the `onDirty` collection from `recomputeEager`; leaving a `Check` reader of a written source `Check` in `markDirty`; disabling cutoff in `recompute`; and recomputing a `Check` eager node in `refreshEager` without verifying it. Seeds 1 to 20,000 pass.
+
+```ts
+// from libs/pico-js/test-random/random.ts
+import { test } from 'vitest';
+import {
+  CHECK,
+  CLEAN,
+  createDerivedNode,
+  createEagerDerivedNode,
+  createSourceNode,
+  DIRTY,
+  disposeDerivedNode,
+  EAGER,
+  LAZY,
+  pull,
+  readDerived,
+  readSource,
+  setDerivedNodeEvaluation,
+  startBatch,
+  UNCOMPUTED,
+  writeSource,
+  type DerivedNode,
+  type DerivedNodeEvaluation,
+  type SourceNode,
+  type Status,
+} from '../src/index';
+
+type Mutators = Parameters<Parameters<typeof startBatch>[0]>[0];
+
+type Read =
+  | { readonly kind: 'source'; readonly source: number }
+  | { readonly kind: 'derived'; readonly node: number };
+
+/** How a computation turns its number into the value it returns. */
+type ResultShape = 'number' | 'reused-object' | 'fresh-object';
+
+type NodeSpec = {
+  readonly selector: Read;
+  readonly branches: ReadonlyArray<ReadonlyArray<Read>>;
+  readonly modulus: number;
+  readonly shape: ResultShape;
+  readonly evaluation: DerivedNodeEvaluation;
+};
+
+/** A derived node reads only sources and derived nodes of a lower index. */
+type GraphSpec = {
+  readonly sourceValues: ReadonlyArray<number>;
+  readonly nodes: ReadonlyArray<NodeSpec>;
+};
+
+type Mutation =
+  | { readonly kind: 'write'; readonly source: number; readonly value: number }
+  | { readonly kind: 'dispose'; readonly node: number }
+  | {
+      readonly kind: 'setEvaluation';
+      readonly node: number;
+      readonly evaluation: DerivedNodeEvaluation;
+    };
+
+type PullStep = { readonly kind: 'pull'; readonly node: number };
+
+type Step = Mutation | PullStep;
+
+/** A callback runs its steps on each of its first `budget` calls. */
+type CallbackSpec = {
+  readonly id: number;
+  readonly budget: number;
+  readonly steps: ReadonlyArray<Step>;
+};
+
+type Batch = {
+  readonly kind: 'batch';
+  readonly items: ReadonlyArray<BatchItem>;
+};
+
+type BatchItem =
+  | Step
+  | Batch
+  | { readonly kind: 'single'; readonly mutation: Mutation };
+
+type SetOnDirty = {
+  readonly kind: 'setOnDirty';
+  readonly node: number;
+  readonly callback: CallbackSpec | undefined;
+};
+
+type Op = Step | Batch | SetOnDirty;
+
+type Case = { readonly graph: GraphSpec; readonly ops: ReadonlyArray<Op> };
+
+/**
+ * `single` makes every mutation a single call, and `one-op-batch` makes every
+ * mutation a `startBatch` of one mutator call, so the two runs must log the
+ * same events. `grouped` runs each `Batch` as one `startBatch`, its `single`
+ * items as single calls inside the body, and each callback's steps as one
+ * `startBatch`.
+ */
+type Mode = 'single' | 'one-op-batch' | 'grouped';
+
+type Value = number | { readonly n: number };
+
+type Synchronization = 'in-sync' | 'out-of-sync';
+
+/** A read of a node's latest computation, with the counters at that read. */
+type ReadRecord =
+  | {
+      readonly kind: 'source';
+      readonly source: number;
+      readonly writes: number;
+    }
+  | {
+      readonly kind: 'derived';
+      readonly node: number;
+      readonly changes: number;
+      readonly disposals: number;
+    };
+
+/**
+ * `complete` when the model predicted the callbacks of every mutator call of
+ * the batch.
+ */
+type Collection = 'complete' | 'incomplete';
+
+/** Whether the flush refreshes an eager node, as the model predicts. */
+type Refresh = 'none' | 'some' | 'unknown';
+
+type Frame = {
+  readonly segments: Array<ReadonlyArray<number>>;
+  readonly queue: Array<number>;
+  readonly invoked: Array<number>;
+  readonly eagerChangeCallbacks: Array<number>;
+  readonly changedEagerNodes: Array<number>;
+  collection: Collection;
+  refresh: Refresh;
+};
+
+type LinkedEdge = {
+  readonly dependency: unknown;
+  readonly dependent: unknown;
+  readonly nextDependent: LinkedEdge | undefined;
+};
+
+type DependentsHolder = { readonly firstDependent: LinkedEdge | undefined };
+
+const MAXIMUM_RUNS = 1_000_000;
+
+function at<T>(array: ReadonlyArray<T>, index: number): T {
+  const element = array[index];
+  if (element === undefined) {
+    throw new Error(`index ${index} is out of bounds`);
+  }
+  return element;
+}
+
+function valueNumber(value: Value): number {
+  return typeof value === 'number' ? value : value.n;
+}
+
+function sameRead(left: Read, right: Read): boolean {
+  switch (left.kind) {
+    case 'source':
+      return right.kind === 'source' && right.source === left.source;
+    case 'derived':
+      return right.kind === 'derived' && right.node === left.node;
+  }
+}
+
+function sameMultiset(
+  left: ReadonlyArray<number>,
+  right: ReadonlyArray<number>,
+): boolean {
+  const sortedLeft = [...left].sort((a, b) => a - b);
+  const sortedRight = [...right].sort((a, b) => a - b);
+  return (
+    sortedLeft.length === sortedRight.length &&
+    sortedLeft.every((element, index) => element === sortedRight[index])
+  );
+}
+
+/** Each element of `part` occurs in `whole` at least as often. */
+function containsMultiset(
+  whole: ReadonlyArray<number>,
+  part: ReadonlyArray<number>,
+): boolean {
+  const counts = new Map<number, number>();
+  whole.forEach((element) =>
+    counts.set(element, (counts.get(element) ?? 0) + 1),
+  );
+  return part.every((element) => {
+    const count = counts.get(element) ?? 0;
+    counts.set(element, count - 1);
+    return count > 0;
+  });
+}
+
+function evaluate(spec: NodeSpec, read: (read: Read) => number): number {
+  const selected = read(spec.selector);
+  const sum = at(spec.branches, selected % spec.branches.length).reduce(
+    (total, branchRead) => total + read(branchRead),
+    selected,
+  );
+  return sum % spec.modulus;
+}
+
+function shapeResult(
+  shape: ResultShape,
+  n: number,
+  previous: Value | undefined,
+): Value {
+  switch (shape) {
+    case 'number':
+      return n;
+    case 'reused-object':
+      return typeof previous === 'object' && previous.n === n
+        ? previous
+        : { n };
+    case 'fresh-object':
+      return { n };
+  }
+}
+
+/** The value of every derived node, computed from the source values alone. */
+function scratchValues(
+  graph: GraphSpec,
+  sourceValues: ReadonlyArray<number>,
+): ReadonlyArray<number> {
+  return graph.nodes.reduce<ReadonlyArray<number>>(
+    (values, spec) => [
+      ...values,
+      evaluate(spec, (read) =>
+        read.kind === 'source'
+          ? at(sourceValues, read.source)
+          : at(values, read.node),
+      ),
+    ],
+    [],
+  );
+}
+
+/**
+ * A naive model of the README's model and guarantees. Marking and pulls follow
+ * the README step by step over arrays. A flush that refreshes an eager node
+ * depends on the order of the eager queue, which the guarantees leave open, so
+ * the model goes out of sync there and the run adopts the engine's statuses at
+ * the end of the operation, after checking them against the guarantees.
+ */
+class Model {
+  readonly #graph: GraphSpec;
+  #synchronization: Synchronization = 'in-sync';
+  readonly #sourceValues: Array<number>;
+  readonly #status: Array<Status>;
+  readonly #evaluation: Array<DerivedNodeEvaluation>;
+  readonly #value: Array<number | undefined>;
+  readonly #reads: Array<ReadonlyArray<Read>>;
+  readonly #callbackOf: Array<number | undefined>;
+  readonly predictedRuns: Array<number> = [];
+
+  constructor(graph: GraphSpec) {
+    this.#graph = graph;
+    this.#sourceValues = [...graph.sourceValues];
+    this.#status = graph.nodes.map(() => UNCOMPUTED);
+    this.#evaluation = graph.nodes.map((spec) => spec.evaluation);
+    this.#value = graph.nodes.map(() => undefined);
+    this.#reads = graph.nodes.map(() => []);
+    this.#callbackOf = graph.nodes.map(() => undefined);
+  }
+
+  get synchronization(): Synchronization {
+    return this.#synchronization;
+  }
+
+  get sourceValues(): ReadonlyArray<number> {
+    return this.#sourceValues;
+  }
+
+  status(node: number): Status {
+    return at(this.#status, node);
+  }
+
+  value(node: number): number | undefined {
+    return this.#value[node];
+  }
+
+  reads(node: number): ReadonlyArray<Read> {
+    return at(this.#reads, node);
+  }
+
+  desynchronize(): void {
+    this.#synchronization = 'out-of-sync';
+  }
+
+  resynchronize(
+    status: ReadonlyArray<Status>,
+    value: ReadonlyArray<number | undefined>,
+    reads: ReadonlyArray<ReadonlyArray<Read>>,
+  ): void {
+    status.forEach((nodeStatus, node) => {
+      this.#status[node] = nodeStatus;
+      this.#value[node] = value[node];
+      this.#reads[node] = at(reads, node);
+    });
+    this.#synchronization = 'in-sync';
+  }
+
+  setCallback(node: number, callback: number | undefined): void {
+    this.#callbackOf[node] = callback;
+  }
+
+  /**
+   * Applies `mutation` and returns the callbacks it collects, in no
+   * particular order. Out of sync, it records only the source value and the
+   * evaluation.
+   */
+  mutate(mutation: Mutation, queue: Array<number>): ReadonlyArray<number> {
+    switch (mutation.kind) {
+      case 'write':
+        this.#sourceValues[mutation.source] = mutation.value;
+        return this.#synchronization === 'in-sync'
+          ? this.#markDirty(
+              this.#readers({ kind: 'source', source: mutation.source }),
+              queue,
+            )
+          : [];
+      case 'dispose': {
+        const readers = this.#readers({ kind: 'derived', node: mutation.node });
+        this.#status[mutation.node] = UNCOMPUTED;
+        this.#value[mutation.node] = undefined;
+        this.#reads[mutation.node] = [];
+        return this.#synchronization === 'in-sync'
+          ? this.#markDirty(readers, queue)
+          : [];
+      }
+      case 'setEvaluation':
+        return this.#setEvaluation(mutation.node, mutation.evaluation, queue);
+    }
+  }
+
+  /** Whether the flush of a batch with `queue` refreshes an eager node. */
+  refreshes(queue: ReadonlyArray<number>): boolean {
+    return queue.some(
+      (node) =>
+        at(this.#evaluation, node) === EAGER &&
+        (at(this.#status, node) === DIRTY || at(this.#status, node) === CHECK),
+    );
+  }
+
+  pull(node: number): number {
+    switch (at(this.#status, node)) {
+      case CLEAN:
+        return this.#stored(node);
+      case DIRTY:
+        return at(this.#evaluation, node) === LAZY
+          ? this.#recompute(node)
+          : this.#stored(node);
+      case CHECK:
+        if (at(this.#evaluation, node) === EAGER) {
+          return this.#stored(node);
+        }
+        return this.#verify(node) === DIRTY
+          ? this.#recompute(node)
+          : this.#stored(node);
+      case UNCOMPUTED:
+        return this.#computeFirst(node);
+    }
+  }
+
+  #setEvaluation(
+    node: number,
+    evaluation: DerivedNodeEvaluation,
+    queue: Array<number>,
+  ): ReadonlyArray<number> {
+    if (at(this.#evaluation, node) === evaluation) {
+      return [];
+    }
+    this.#evaluation[node] = evaluation;
+    if (this.#synchronization === 'out-of-sync') {
+      return [];
+    }
+    switch (at(this.#status, node)) {
+      case DIRTY:
+      case CHECK:
+        return this.#setEvaluationOutOfClean(node, evaluation, queue);
+      case CLEAN:
+      case UNCOMPUTED:
+        return [];
+    }
+  }
+
+  #setEvaluationOutOfClean(
+    node: number,
+    evaluation: DerivedNodeEvaluation,
+    queue: Array<number>,
+  ): ReadonlyArray<number> {
+    switch (evaluation) {
+      case EAGER:
+        queue.push(node);
+        return [];
+      case LAZY: {
+        const collected: Array<number> = [];
+        this.#collect(node, collected);
+        this.#markCheck([node], queue, collected);
+        return collected;
+      }
+    }
+  }
+
+  #readers(target: Read): ReadonlyArray<number> {
+    return this.#reads.flatMap((reads, node) =>
+      at(this.#status, node) !== UNCOMPUTED &&
+      reads.some((read) => sameRead(read, target))
+        ? [node]
+        : [],
+    );
+  }
+
+  #collect(node: number, collected: Array<number>): void {
+    const callback = this.#callbackOf[node];
+    if (callback !== undefined) {
+      collected.push(callback);
+    }
+  }
+
+  #markDirty(
+    readers: ReadonlyArray<number>,
+    queue: Array<number>,
+  ): ReadonlyArray<number> {
+    const collected: Array<number> = [];
+    const takenOut: Array<number> = [];
+    readers.forEach((node) => {
+      switch (at(this.#status, node)) {
+        case CLEAN:
+          this.#status[node] = DIRTY;
+          if (at(this.#evaluation, node) === EAGER) {
+            queue.push(node);
+          } else {
+            this.#collect(node, collected);
+            takenOut.push(node);
+          }
+          break;
+        case CHECK:
+          this.#status[node] = DIRTY;
+          break;
+        case DIRTY:
+        case UNCOMPUTED:
+          break;
+      }
+    });
+    this.#markCheck(takenOut, queue, collected);
+    return collected;
+  }
+
+  #markCheck(
+    stack: Array<number>,
+    queue: Array<number>,
+    collected: Array<number>,
+  ): void {
+    let marked = stack.pop();
+    while (marked !== undefined) {
+      this.#readers({ kind: 'derived', node: marked }).forEach((reader) => {
+        if (at(this.#status, reader) !== CLEAN) {
+          return;
+        }
+        this.#status[reader] = CHECK;
+        if (at(this.#evaluation, reader) === EAGER) {
+          queue.push(reader);
+        } else {
+          this.#collect(reader, collected);
+          stack.push(reader);
+        }
+      });
+      marked = stack.pop();
+    }
+  }
+
+  #stored(node: number): number {
+    const value = this.#value[node];
+    if (value === undefined) {
+      throw new Error(`the model holds no value for node ${node}`);
+    }
+    return value;
+  }
+
+  #verify(node: number): typeof DIRTY | typeof CLEAN {
+    for (const read of at(this.#reads, node)) {
+      if (read.kind === 'derived') {
+        this.pull(read.node);
+        if (at(this.#status, node) === DIRTY) {
+          return DIRTY;
+        }
+      }
+    }
+    this.#status[node] = CLEAN;
+    return CLEAN;
+  }
+
+  #run(node: number): number {
+    this.predictedRuns.push(node);
+    const reads: Array<Read> = [];
+    const value = evaluate(at(this.#graph.nodes, node), (read) => {
+      reads.push(read);
+      return read.kind === 'source'
+        ? at(this.#sourceValues, read.source)
+        : this.pull(read.node);
+    });
+    this.#reads[node] = reads;
+    this.#status[node] = CLEAN;
+    return value;
+  }
+
+  #computeFirst(node: number): number {
+    const value = this.#run(node);
+    this.#value[node] = value;
+    return value;
+  }
+
+  #recompute(node: number): number {
+    const previous = this.#stored(node);
+    const value = this.#run(node);
+    const changed =
+      at(this.#graph.nodes, node).shape === 'fresh-object' ||
+      value !== previous;
+    if (!changed) {
+      return previous;
+    }
+    this.#value[node] = value;
+    this.#readers({ kind: 'derived', node }).forEach((reader) => {
+      if (at(this.#status, reader) === CHECK) {
+        this.#status[reader] = DIRTY;
+      }
+    });
+    return value;
+  }
+}
+
+/** One run of a case through pico-js in one mode, checked against the model. */
+class Run {
+  readonly #mode: Mode;
+  readonly #graph: GraphSpec;
+  readonly #model: Model;
+  readonly #sources: ReadonlyArray<SourceNode<number>>;
+  readonly #nodes: ReadonlyArray<DerivedNode<Value>>;
+  readonly #indexOf = new Map<unknown, Read>();
+  readonly log: Array<string> = [];
+  readonly #frames: Array<Frame> = [];
+  readonly #observedReads: Array<ReadonlyArray<Read>>;
+  readonly #observedValue: Array<number | undefined>;
+  readonly #everRead: Array<Set<number>>;
+  readonly #lastReads: Array<ReadonlyArray<ReadRecord> | undefined>;
+  readonly #writeCount: Array<number>;
+  readonly #changeCount: Array<number>;
+  readonly #disposeCount: Array<number>;
+  readonly #callbackOf: Array<number | undefined>;
+  readonly #ownerOf = new Map<number, number>();
+  readonly #budget = new Map<number, number>();
+  readonly #actualRuns: Array<number> = [];
+  #totalRuns = 0;
+  #bodyDepth = 0;
+  #where = 'setup';
+
+  constructor(graph: GraphSpec, mode: Mode) {
+    this.#mode = mode;
+    this.#graph = graph;
+    this.#model = new Model(graph);
+    this.#sources = graph.sourceValues.map((value) => createSourceNode(value));
+    this.#nodes = graph.nodes.map((spec, index) => {
+      const computation = (
+        callingNode: DerivedNode<unknown>,
+        previous: Value | undefined,
+      ): Value => this.#compute(index, callingNode, previous);
+      return spec.evaluation === EAGER
+        ? createEagerDerivedNode<Value>(computation)
+        : createDerivedNode<Value>(computation);
+    });
+    this.#sources.forEach((source, index) =>
+      this.#indexOf.set(source, { kind: 'source', source: index }),
+    );
+    this.#nodes.forEach((node, index) =>
+      this.#indexOf.set(node, { kind: 'derived', node: index }),
+    );
+    this.#observedReads = graph.nodes.map(() => []);
+    this.#observedValue = graph.nodes.map(() => undefined);
+    this.#everRead = graph.nodes.map(() => new Set());
+    this.#lastReads = graph.nodes.map(() => undefined);
+    this.#writeCount = graph.sourceValues.map(() => 0);
+    this.#changeCount = graph.nodes.map(() => 0);
+    this.#disposeCount = graph.nodes.map(() => 0);
+    this.#callbackOf = graph.nodes.map(() => undefined);
+  }
+
+  execute(op: Op, index: number): void {
+    this.#where = `op ${index} (${JSON.stringify(op)})`;
+    this.log.push(`op ${index}`);
+    switch (op.kind) {
+      case 'write':
+      case 'dispose':
+      case 'setEvaluation':
+        this.#topLevelMutation(op);
+        break;
+      case 'pull':
+        this.#pull(op.node);
+        break;
+      case 'setOnDirty':
+        this.#setOnDirty(op);
+        break;
+      case 'batch':
+        switch (this.#mode) {
+          case 'single':
+          case 'one-op-batch':
+            this.#flattened(op.items);
+            break;
+          case 'grouped':
+            this.#batch(op.items);
+            break;
+        }
+        break;
+    }
+    this.#endOp();
+  }
+
+  #fail(message: string): never {
+    throw new Error(`${this.#mode} mode, ${this.#where}: ${message}`);
+  }
+
+  #flattened(items: ReadonlyArray<BatchItem>): void {
+    items.forEach((item) => {
+      switch (item.kind) {
+        case 'write':
+        case 'dispose':
+        case 'setEvaluation':
+          this.#topLevelMutation(item);
+          break;
+        case 'pull':
+          this.#pull(item.node);
+          break;
+        case 'batch':
+          this.#flattened(item.items);
+          break;
+        case 'single':
+          this.#topLevelMutation(item.mutation);
+          break;
+      }
+    });
+  }
+
+  #topLevelMutation(mutation: Mutation): void {
+    switch (this.#mode) {
+      case 'single':
+      case 'grouped':
+        this.#single(mutation);
+        break;
+      case 'one-op-batch':
+        this.#batch([mutation]);
+        break;
+    }
+  }
+
+  #setOnDirty(op: SetOnDirty): void {
+    const node = at(this.#nodes, op.node);
+    const callback = op.callback;
+    if (callback === undefined) {
+      node.onDirty = undefined;
+      this.#callbackOf[op.node] = undefined;
+      this.#model.setCallback(op.node, undefined);
+      return;
+    }
+    node.onDirty = () => this.#invoke(callback);
+    this.#callbackOf[op.node] = callback.id;
+    this.#ownerOf.set(callback.id, op.node);
+    this.#model.setCallback(op.node, callback.id);
+  }
+
+  #invoke(callback: CallbackSpec): void {
+    const frame = this.#frames.at(-1);
+    if (frame === undefined) {
+      this.#fail(`callback ${callback.id} ran outside a flush`);
+    }
+    frame.invoked.push(callback.id);
+    this.log.push(`callback ${callback.id}`);
+    if (this.#bodyDepth === 0) {
+      this.#checkEagerSettled(`in callback ${callback.id}`);
+    }
+    const budget = this.#budget.get(callback.id) ?? callback.budget;
+    if (budget === 0 || callback.steps.length === 0) {
+      return;
+    }
+    this.#budget.set(callback.id, budget - 1);
+    switch (this.#mode) {
+      case 'single':
+      case 'one-op-batch':
+        callback.steps.forEach((step) => {
+          switch (step.kind) {
+            case 'pull':
+              this.#pull(step.node);
+              break;
+            case 'write':
+            case 'dispose':
+            case 'setEvaluation':
+              this.#topLevelMutation(step);
+              break;
+          }
+        });
+        break;
+      case 'grouped':
+        this.#batch(callback.steps);
+        break;
+    }
+  }
+
+  #skips(mutation: Mutation): boolean {
+    const skips =
+      mutation.kind === 'write' &&
+      at(this.#sources, mutation.source).value === mutation.value;
+    if (skips) {
+      this.log.push('skip');
+    }
+    return skips;
+  }
+
+  #pushFrame(): Frame {
+    const frame: Frame = {
+      segments: [],
+      queue: [],
+      invoked: [],
+      eagerChangeCallbacks: [],
+      changedEagerNodes: [],
+      collection: 'complete',
+      refresh: 'unknown',
+    };
+    this.#frames.push(frame);
+    return frame;
+  }
+
+  /** Records the mutation in the model and in the run's counters. */
+  #predictMutation(frame: Frame, mutation: Mutation): Synchronization {
+    const synchronization = this.#model.synchronization;
+    const collected = this.#model.mutate(mutation, frame.queue);
+    switch (synchronization) {
+      case 'in-sync':
+        frame.segments.push(collected);
+        break;
+      case 'out-of-sync':
+        frame.collection = 'incomplete';
+        break;
+    }
+    switch (mutation.kind) {
+      case 'write':
+        this.#writeCount[mutation.source] =
+          at(this.#writeCount, mutation.source) + 1;
+        break;
+      case 'dispose':
+        this.#disposeCount[mutation.node] =
+          at(this.#disposeCount, mutation.node) + 1;
+        this.#observedReads[mutation.node] = [];
+        this.#observedValue[mutation.node] = undefined;
+        this.#lastReads[mutation.node] = undefined;
+        break;
+      case 'setEvaluation':
+        break;
+    }
+    return synchronization;
+  }
+
+  /** Called when the batch acted and before its flush starts. */
+  #predictFlush(frame: Frame): void {
+    if (
+      frame.collection === 'incomplete' ||
+      this.#model.synchronization === 'out-of-sync'
+    ) {
+      frame.collection = 'incomplete';
+      return;
+    }
+    if (this.#model.refreshes(frame.queue)) {
+      frame.refresh = 'some';
+      this.#model.desynchronize();
+    } else {
+      frame.refresh = 'none';
+    }
+  }
+
+  #single(mutation: Mutation): void {
+    if (this.#skips(mutation)) {
+      return;
+    }
+    const frame = this.#pushFrame();
+    this.#predictMutation(frame, mutation);
+    this.#predictFlush(frame);
+    switch (mutation.kind) {
+      case 'write':
+        writeSource(at(this.#sources, mutation.source), mutation.value);
+        break;
+      case 'dispose':
+        disposeDerivedNode(at(this.#nodes, mutation.node));
+        break;
+      case 'setEvaluation':
+        setDerivedNodeEvaluation(
+          at(this.#nodes, mutation.node),
+          mutation.evaluation,
+        );
+        break;
+    }
+    this.#popFrame(frame);
+  }
+
+  #batch(items: ReadonlyArray<BatchItem>): void {
+    const frame = this.#pushFrame();
+    startBatch((mutators) => {
+      this.#bodyDepth += 1;
+      items.forEach((item) => this.#bodyItem(mutators, frame, item));
+      this.#predictFlush(frame);
+      this.#bodyDepth -= 1;
+    });
+    this.#popFrame(frame);
+  }
+
+  #bodyItem(mutators: Mutators, frame: Frame, item: BatchItem): void {
+    switch (item.kind) {
+      case 'write':
+      case 'dispose':
+      case 'setEvaluation':
+        this.#mutator(mutators, frame, item);
+        break;
+      case 'pull':
+        this.#pull(item.node);
+        break;
+      case 'batch':
+        this.#batch(item.items);
+        break;
+      case 'single':
+        this.#single(item.mutation);
+        break;
+    }
+  }
+
+  #mutator(mutators: Mutators, frame: Frame, mutation: Mutation): void {
+    if (this.#skips(mutation)) {
+      return;
+    }
+    const runs = this.#actualRuns.length;
+    const invoked = frame.invoked.length;
+    const synchronization = this.#predictMutation(frame, mutation);
+    switch (mutation.kind) {
+      case 'write':
+        mutators.writeSource(
+          at(this.#sources, mutation.source),
+          mutation.value,
+        );
+        break;
+      case 'dispose':
+        mutators.disposeDerivedNode(at(this.#nodes, mutation.node));
+        if (at(this.#nodes, mutation.node).status !== UNCOMPUTED) {
+          this.#fail(`node ${mutation.node} is not Uncomputed after disposal`);
+        }
+        break;
+      case 'setEvaluation':
+        mutators.setDerivedNodeEvaluation(
+          at(this.#nodes, mutation.node),
+          mutation.evaluation,
+        );
+        break;
+    }
+    if (this.#actualRuns.length !== runs || frame.invoked.length !== invoked) {
+      this.#fail(`mutators.${mutation.kind} ran a computation or a callback`);
+    }
+    if (synchronization === 'in-sync') {
+      this.#compareModel(`after mutators.${mutation.kind}`);
+    }
+  }
+
+  #popFrame(frame: Frame): void {
+    if (this.#frames.pop() !== frame) {
+      this.#fail('the batch frames are unbalanced');
+    }
+    if (!containsMultiset(frame.invoked, frame.eagerChangeCallbacks)) {
+      this.#fail(
+        `an eager node changed with callbacks [${frame.eagerChangeCallbacks.join(', ')}], and the flush called [${frame.invoked.join(', ')}]`,
+      );
+    }
+    if (frame.collection === 'incomplete') {
+      return;
+    }
+    let offset = 0;
+    frame.segments.forEach((segment) => {
+      const slice = frame.invoked.slice(offset, offset + segment.length);
+      if (!sameMultiset(slice, segment)) {
+        this.#fail(
+          `the mutation collected callbacks [${segment.join(', ')}], and the flush called [${slice.join(', ')}] for them (all calls: [${frame.invoked.join(', ')}])`,
+        );
+      }
+      offset += segment.length;
+    });
+    const remainder = frame.invoked.slice(offset);
+    switch (frame.refresh) {
+      case 'none':
+        if (remainder.length !== 0) {
+          this.#fail(
+            `a flush that refreshes no eager node called the extra callbacks [${remainder.join(', ')}]`,
+          );
+        }
+        break;
+      case 'some':
+      case 'unknown':
+        this.#checkRefreshCallbacks(frame, remainder);
+        break;
+    }
+  }
+
+  /**
+   * The callbacks a flush collects while it refreshes eager nodes belong to
+   * the eager nodes whose value changed and to lazy nodes that read one of
+   * them.
+   */
+  #checkRefreshCallbacks(frame: Frame, remainder: ReadonlyArray<number>): void {
+    if (!containsMultiset(remainder, frame.eagerChangeCallbacks)) {
+      this.#fail(
+        `the refresh changed eager nodes with callbacks [${frame.eagerChangeCallbacks.join(', ')}], and the flush called [${remainder.join(', ')}] after the collected ones`,
+      );
+    }
+    const reached = new Set(frame.changedEagerNodes);
+    this.#everRead.forEach((reads, node) => {
+      if ([...reads].some((read) => reached.has(read))) {
+        reached.add(node);
+      }
+    });
+    remainder.forEach((callback) => {
+      const owner = this.#ownerOf.get(callback);
+      if (owner === undefined || !reached.has(owner)) {
+        this.#fail(
+          `the flush called callback ${callback} of node ${owner}, which reads no eager node the refresh changed`,
+        );
+      }
+    });
+  }
+
+  #pull(node: number): void {
+    const settled = this.#eagerSettled();
+    const synchronization = this.#model.synchronization;
+    const predictedStart = this.#model.predictedRuns.length;
+    const actualStart = this.#actualRuns.length;
+    const predicted =
+      synchronization === 'in-sync' ? this.#model.pull(node) : undefined;
+    const value = valueNumber(pull(at(this.#nodes, node)));
+    this.log.push(`pull ${node} ${value}`);
+    const runs = this.#actualRuns.slice(actualStart);
+    if (synchronization === 'in-sync') {
+      const predictedRuns = this.#model.predictedRuns.slice(predictedStart);
+      if (value !== predicted) {
+        this.#fail(`pull(${node}) returned ${value}, the model ${predicted}`);
+      }
+      if (runs.join(',') !== predictedRuns.join(',')) {
+        this.#fail(
+          `pull(${node}) ran [${runs.join(', ')}], the model [${predictedRuns.join(', ')}]`,
+        );
+      }
+      this.#compareModel(`after pull(${node})`);
+    }
+    if (settled) {
+      const expected = at(
+        scratchValues(this.#graph, this.#model.sourceValues),
+        node,
+      );
+      if (value !== expected) {
+        this.#fail(
+          `pull(${node}) returned ${value} with no eager node queued, and recomputing from the sources gives ${expected}`,
+        );
+      }
+      if (new Set(runs).size !== runs.length) {
+        this.#fail(`pull(${node}) ran a node twice: [${runs.join(', ')}]`);
+      }
+    }
+    const runsBefore = this.#actualRuns.length;
+    const again = valueNumber(pull(at(this.#nodes, node)));
+    if (again !== value || this.#actualRuns.length !== runsBefore) {
+      this.#fail(`a second pull(${node}) ran a computation or changed value`);
+    }
+  }
+
+  #compute(
+    index: number,
+    callingNode: DerivedNode<unknown>,
+    previous: Value | undefined,
+  ): Value {
+    this.#totalRuns += 1;
+    if (this.#totalRuns > MAXIMUM_RUNS) {
+      this.#fail(`more than ${MAXIMUM_RUNS} computations ran`);
+    }
+    const status = callingNode.status;
+    this.#actualRuns.push(index);
+    this.log.push(`run ${index}`);
+    if (status !== UNCOMPUTED) {
+      this.#checkJustified(index);
+    }
+    const spec = at(this.#graph.nodes, index);
+    const reads: Array<Read> = [];
+    const records: Array<ReadRecord> = [];
+    const n = evaluate(spec, (read) => {
+      reads.push(read);
+      switch (read.kind) {
+        case 'source':
+          records.push({
+            kind: 'source',
+            source: read.source,
+            writes: at(this.#writeCount, read.source),
+          });
+          return readSource(callingNode, at(this.#sources, read.source));
+        case 'derived': {
+          const value = valueNumber(
+            readDerived(callingNode, at(this.#nodes, read.node)),
+          );
+          records.push({
+            kind: 'derived',
+            node: read.node,
+            changes: at(this.#changeCount, read.node),
+            disposals: at(this.#disposeCount, read.node),
+          });
+          this.#everRead[index]?.add(read.node);
+          return value;
+        }
+      }
+    });
+    const result = shapeResult(spec.shape, n, previous);
+    const changed = result !== previous;
+    if (changed) {
+      this.#changeCount[index] = at(this.#changeCount, index) + 1;
+    }
+    // Only the flush recomputes an eager node that is not Uncomputed.
+    if (callingNode.evaluation === EAGER && status !== UNCOMPUTED) {
+      const frame = this.#frames.at(-1);
+      if (frame === undefined) {
+        this.#fail(`eager node ${index} recomputed outside a flush`);
+      }
+      const callback = this.#callbackOf[index];
+      if (changed) {
+        frame.changedEagerNodes.push(index);
+        if (callback !== undefined) {
+          frame.eagerChangeCallbacks.push(callback);
+        }
+      }
+    }
+    this.#observedReads[index] = reads;
+    this.#observedValue[index] = n;
+    this.#lastReads[index] = records;
+    return result;
+  }
+
+  /**
+   * A recompute runs only when a source its latest computation read was
+   * written, or a derived node it read was disposed or changed value.
+   */
+  #checkJustified(index: number): void {
+    const records = this.#lastReads[index];
+    if (records === undefined) {
+      this.#fail(`node ${index} recomputed with no earlier computation`);
+    }
+    const justified = records.some((record) =>
+      record.kind === 'source'
+        ? at(this.#writeCount, record.source) > record.writes
+        : at(this.#changeCount, record.node) > record.changes ||
+          at(this.#disposeCount, record.node) > record.disposals,
+    );
+    if (!justified) {
+      this.#fail(
+        `node ${index} recomputed, and no node its latest computation read changed`,
+      );
+    }
+  }
+
+  #eagerSettled(): boolean {
+    return this.#nodes.every(
+      (node) =>
+        node.evaluation === LAZY ||
+        node.status === CLEAN ||
+        node.status === UNCOMPUTED,
+    );
+  }
+
+  #checkEagerSettled(where: string): void {
+    this.#nodes.forEach((node, index) => {
+      if (
+        node.evaluation === EAGER &&
+        node.status !== CLEAN &&
+        node.status !== UNCOMPUTED
+      ) {
+        this.#fail(`${where}, eager node ${index} has status ${node.status}`);
+      }
+    });
+  }
+
+  #compareModel(where: string): void {
+    if (this.#model.synchronization === 'out-of-sync') {
+      return;
+    }
+    this.#nodes.forEach((node, index) => {
+      const status = this.#model.status(index);
+      if (node.status !== status) {
+        this.#fail(
+          `${where}, node ${index} has status ${node.status}, the model ${status}`,
+        );
+      }
+      if (status === UNCOMPUTED) {
+        return;
+      }
+      const value = valueNumber(node.value);
+      if (value !== this.#model.value(index)) {
+        this.#fail(
+          `${where}, node ${index} holds ${value}, the model ${this.#model.value(index)}`,
+        );
+      }
+      if (
+        JSON.stringify(this.#model.reads(index)) !==
+        JSON.stringify(this.#observedReads[index])
+      ) {
+        this.#fail(
+          `${where}, node ${index} read ${JSON.stringify(this.#observedReads[index])}, the model ${JSON.stringify(this.#model.reads(index))}`,
+        );
+      }
+    });
+  }
+
+  /**
+   * After a computation, its node is in the dependents list of each node it
+   * read and of no other node. A source whose `dependentsStatus` is 1 has
+   * only `Dirty` readers.
+   */
+  #checkDependents(): void {
+    const listedIn: Array<Array<Read>> = this.#graph.nodes.map(() => []);
+    const holders: ReadonlyArray<readonly [Read, DependentsHolder]> = [
+      ...this.#sources.map(
+        (source, index) => [{ kind: 'source', source: index }, source] as const,
+      ),
+      ...this.#nodes.map(
+        (node, index) => [{ kind: 'derived', node: index }, node] as const,
+      ),
+    ];
+    holders.forEach(([holderRead, holder]) => {
+      let edge = holder.firstDependent;
+      let count = 0;
+      while (edge !== undefined) {
+        count += 1;
+        if (count > 100_000) {
+          this.#fail(
+            `the dependents list of ${JSON.stringify(holderRead)} has a cycle`,
+          );
+        }
+        const dependent = this.#indexOf.get(edge.dependent);
+        if (
+          edge.dependency !== holder ||
+          dependent === undefined ||
+          dependent.kind !== 'derived'
+        ) {
+          this.#fail(
+            `the dependents list of ${JSON.stringify(holderRead)} holds an edge of another node`,
+          );
+        }
+        listedIn[dependent.node]?.push(holderRead);
+        edge = edge.nextDependent;
+      }
+    });
+    this.#nodes.forEach((node, index) => {
+      const listed = at(listedIn, index);
+      const read =
+        node.status === UNCOMPUTED ? [] : at(this.#observedReads, index);
+      const missing = read.filter(
+        (target) => !listed.some((entry) => sameRead(entry, target)),
+      );
+      const extra = listed.filter(
+        (entry) => !read.some((target) => sameRead(entry, target)),
+      );
+      if (missing.length !== 0 || extra.length !== 0) {
+        this.#fail(
+          `node ${index} (status ${node.status}) is missing from the dependents of ${JSON.stringify(missing)} and is extra in those of ${JSON.stringify(extra)}`,
+        );
+      }
+    });
+    this.#sources.forEach((source, sourceIndex) => {
+      if (source.dependentsStatus !== 1) {
+        return;
+      }
+      this.#nodes.forEach((node, index) => {
+        if (
+          node.status !== UNCOMPUTED &&
+          node.status !== DIRTY &&
+          at(this.#observedReads, index).some((target) =>
+            sameRead(target, { kind: 'source', source: sourceIndex }),
+          )
+        ) {
+          this.#fail(
+            `source ${sourceIndex} has dependentsStatus 1, and its reader ${index} has status ${node.status}`,
+          );
+        }
+      });
+    });
+  }
+
+  #endOp(): void {
+    if (this.#bodyDepth !== 0 || this.#frames.length !== 0) {
+      this.#fail('a batch is still open after the operation');
+    }
+    this.#checkEagerSettled('after the operation');
+    const scratch = scratchValues(this.#graph, this.#model.sourceValues);
+    this.#nodes.forEach((node, index) => {
+      if (
+        node.status === CLEAN &&
+        valueNumber(node.value) !== at(scratch, index)
+      ) {
+        this.#fail(
+          `Clean node ${index} holds ${valueNumber(node.value)}, and recomputing from the sources gives ${at(scratch, index)}`,
+        );
+      }
+    });
+    this.#checkDependents();
+    switch (this.#model.synchronization) {
+      case 'in-sync':
+        this.#compareModel('after the operation');
+        if (
+          this.#actualRuns.join(',') !== this.#model.predictedRuns.join(',')
+        ) {
+          this.#fail(
+            `the operation ran [${this.#actualRuns.join(', ')}], the model [${this.#model.predictedRuns.join(', ')}]`,
+          );
+        }
+        break;
+      case 'out-of-sync':
+        this.#model.resynchronize(
+          this.#nodes.map((node) => node.status),
+          this.#observedValue,
+          this.#nodes.map((node, index) =>
+            node.status === UNCOMPUTED ? [] : at(this.#observedReads, index),
+          ),
+        );
+        break;
+    }
+    this.#actualRuns.length = 0;
+    this.#model.predictedRuns.length = 0;
+    this.log.push(
+      this.#nodes
+        .map(
+          (node) =>
+            `${node.status}:${node.status === UNCOMPUTED ? '-' : valueNumber(node.value)}`,
+        )
+        .join(' '),
+    );
+  }
+}
+
+/** mulberry32. */
+function prng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function generateCase(seed: number): Case {
+  const random = prng(seed);
+  const integer = (bound: number): number => Math.floor(random() * bound);
+  const pick = <T>(choices: ReadonlyArray<T>): T =>
+    at(choices, integer(choices.length));
+  const sourceCount = 2 + integer(4);
+  const nodeCount = 3 + integer(12);
+  const readFor = (node: number): Read =>
+    node === 0 || random() < 0.4
+      ? { kind: 'source', source: integer(sourceCount) }
+      : { kind: 'derived', node: integer(node) };
+  const graph: GraphSpec = {
+    sourceValues: Array.from({ length: sourceCount }, () => integer(4)),
+    nodes: Array.from({ length: nodeCount }, (_, node) => ({
+      selector: readFor(node),
+      branches: Array.from({ length: 3 }, () =>
+        Array.from({ length: integer(4) }, () => readFor(node)),
+      ),
+      modulus: pick([2, 3, 1000]),
+      shape: pick<ResultShape>(['number', 'reused-object', 'fresh-object']),
+      evaluation: random() < 0.3 ? EAGER : LAZY,
+    })),
+  };
+  let nextCallbackId = 0;
+  const mutation = (): Mutation => {
+    const roll = random();
+    if (roll < 0.7) {
+      return { kind: 'write', source: integer(sourceCount), value: integer(4) };
+    }
+    if (roll < 0.85) {
+      return { kind: 'dispose', node: integer(nodeCount) };
+    }
+    return {
+      kind: 'setEvaluation',
+      node: integer(nodeCount),
+      evaluation: random() < 0.5 ? EAGER : LAZY,
+    };
+  };
+  const step = (): Step =>
+    random() < 0.7 ? mutation() : { kind: 'pull', node: integer(nodeCount) };
+  const batch = (depth: number): Batch => ({
+    kind: 'batch',
+    items: Array.from({ length: 1 + integer(4) }, (): BatchItem => {
+      const roll = random();
+      if (roll < 0.6) {
+        return mutation();
+      }
+      if (roll < 0.8) {
+        return { kind: 'pull', node: integer(nodeCount) };
+      }
+      if (roll < 0.9 && depth < 2) {
+        return batch(depth + 1);
+      }
+      return { kind: 'single', mutation: mutation() };
+    }),
+  });
+  const op = (): Op => {
+    const roll = random();
+    if (roll < 0.3) {
+      return { kind: 'write', source: integer(sourceCount), value: integer(4) };
+    }
+    if (roll < 0.6) {
+      return { kind: 'pull', node: integer(nodeCount) };
+    }
+    if (roll < 0.66) {
+      return { kind: 'dispose', node: integer(nodeCount) };
+    }
+    if (roll < 0.74) {
+      return {
+        kind: 'setEvaluation',
+        node: integer(nodeCount),
+        evaluation: random() < 0.5 ? EAGER : LAZY,
+      };
+    }
+    if (roll < 0.86) {
+      const node = integer(nodeCount);
+      if (random() < 0.15) {
+        return { kind: 'setOnDirty', node, callback: undefined };
+      }
+      const id = nextCallbackId;
+      nextCallbackId += 1;
+      return {
+        kind: 'setOnDirty',
+        node,
+        callback: {
+          id,
+          budget: 1 + integer(2),
+          steps: Array.from({ length: integer(3) }, step),
+        },
+      };
+    }
+    return batch(0);
+  };
+  return { graph, ops: Array.from({ length: 40 + integer(80) }, op) };
+}
+
+function runCase(testCase: Case, mode: Mode): ReadonlyArray<string> {
+  const run = new Run(testCase.graph, mode);
+  testCase.ops.forEach((op, index) => run.execute(op, index));
+  return run.log;
+}
+
+function compareLogs(
+  single: ReadonlyArray<string>,
+  batched: ReadonlyArray<string>,
+): void {
+  const length = Math.max(single.length, batched.length);
+  for (let index = 0; index < length; index += 1) {
+    if (single[index] !== batched[index]) {
+      const context = single.slice(Math.max(0, index - 8), index).join(' | ');
+      throw new Error(
+        `single calls and one-op batches differ at log entry ${index}: ${single[index]} against ${batched[index]}, after ${context}`,
+      );
+    }
+  }
+}
+
+function failureOf(testCase: Case): string | undefined {
+  try {
+    compareLogs(runCase(testCase, 'single'), runCase(testCase, 'one-op-batch'));
+    runCase(testCase, 'grouped');
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function* simplerItems(
+  items: ReadonlyArray<BatchItem>,
+): Generator<ReadonlyArray<BatchItem>> {
+  for (let index = 0; index < items.length; index += 1) {
+    yield [...items.slice(0, index), ...items.slice(index + 1)];
+  }
+  for (let index = 0; index < items.length; index += 1) {
+    const item = at(items, index);
+    if (item.kind === 'batch') {
+      for (const simpler of simplerItems(item.items)) {
+        yield [
+          ...items.slice(0, index),
+          { kind: 'batch', items: simpler },
+          ...items.slice(index + 1),
+        ];
+      }
+    }
+  }
+}
+
+function* simplerOps(op: Op): Generator<Op> {
+  switch (op.kind) {
+    case 'batch':
+      for (const items of simplerItems(op.items)) {
+        yield { kind: 'batch', items };
+      }
+      break;
+    case 'setOnDirty': {
+      const callback = op.callback;
+      if (callback === undefined) {
+        break;
+      }
+      for (let index = 0; index < callback.steps.length; index += 1) {
+        yield {
+          ...op,
+          callback: {
+            ...callback,
+            steps: [
+              ...callback.steps.slice(0, index),
+              ...callback.steps.slice(index + 1),
+            ],
+          },
+        };
+      }
+      break;
+    }
+    case 'write':
+    case 'dispose':
+    case 'setEvaluation':
+    case 'pull':
+      break;
+  }
+}
+
+function* candidates(testCase: Case): Generator<Case> {
+  const ops = testCase.ops;
+  for (let size = ops.length >> 1; size >= 1; size >>= 1) {
+    for (let start = 0; start < ops.length; start += size) {
+      yield {
+        ...testCase,
+        ops: [...ops.slice(0, start), ...ops.slice(start + size)],
+      };
+    }
+  }
+  for (let index = 0; index < ops.length; index += 1) {
+    for (const simpler of simplerOps(at(ops, index))) {
+      yield {
+        ...testCase,
+        ops: [...ops.slice(0, index), simpler, ...ops.slice(index + 1)],
+      };
+    }
+  }
+}
+
+/** Removes operations, batch items, and callback steps while the case fails. */
+function shrink(
+  testCase: Case,
+  message: string,
+): { readonly testCase: Case; readonly message: string } {
+  let current = testCase;
+  let currentMessage = message;
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const candidate of candidates(current)) {
+      const failure = failureOf(candidate);
+      if (failure !== undefined) {
+        current = candidate;
+        currentMessage = failure;
+        progress = true;
+        break;
+      }
+    }
+  }
+  return { testCase: current, message: currentMessage };
+}
+
+function integerFromEnvironment(name: string, fallback: number): number {
+  const text = process.env[name];
+  if (text === undefined || text === '') {
+    return fallback;
+  }
+  const value = Number(text);
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`${name} is ${text}, which is not an integer`);
+  }
+  return value;
+}
+
+const seedCount = integerFromEnvironment('PICO_JS_RANDOM_SEEDS', 2000);
+const baseSeed = integerFromEnvironment('PICO_JS_RANDOM_BASE_SEED', 1);
+
+test(`random graphs and operations, seeds ${baseSeed} to ${baseSeed + seedCount - 1}`, () => {
+  for (let seed = baseSeed; seed < baseSeed + seedCount; seed += 1) {
+    const testCase = generateCase(seed);
+    const failure = failureOf(testCase);
+    if (failure !== undefined) {
+      const minimal = shrink(testCase, failure);
+      throw new Error(
+        `seed ${seed} fails: ${failure}\n\nminimal failing case (${minimal.testCase.ops.length} of ${testCase.ops.length} operations): ${minimal.message}\n${JSON.stringify(minimal.testCase)}`,
+      );
+    }
+  }
+});
+```
