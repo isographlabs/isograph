@@ -382,18 +382,18 @@ type Producer<TDependency> = {
 };
 
 /** A node in the dependents list may be `Check` or `Clean`. */
-const DEPENDENTS_MAY_NOT_BE_DIRTY = 0;
+const DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY = 0;
 /** Every node in the dependents list is `Dirty`, so a write skips the list. */
-const DEPENDENTS_ALL_DIRTY = 1;
+const DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY = 1;
 
 export type DependentsStatus =
-  | typeof DEPENDENTS_MAY_NOT_BE_DIRTY
-  | typeof DEPENDENTS_ALL_DIRTY;
+  | typeof DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY
+  | typeof DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY;
 
 /**
- * `dependentsStatus` is `DEPENDENTS_ALL_DIRTY` from a write that marks the
- * dependents list until the next `readSource`, because a node leaves `Dirty`
- * only by a recompute and joins the list only through `readSource`.
+ * `dependentsStatus` is `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY` from a write that
+ * marks the dependents list until the next `readSource`, because a node leaves
+ * `Dirty` only by a recompute and joins the list only through `readSource`.
  */
 export type SourceNode<TValue> = {
   value: TValue;
@@ -447,7 +447,7 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
     value,
     firstDependent: undefined,
     lastDependent: undefined,
-    dependentsStatus: DEPENDENTS_MAY_NOT_BE_DIRTY,
+    dependentsStatus: DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY,
   };
 }
 
@@ -584,10 +584,13 @@ function storeValue<TValue>(
 ): SourceEdge | undefined {
   source.value = value;
   const first = source.firstDependent;
-  if (first === undefined || source.dependentsStatus === DEPENDENTS_ALL_DIRTY) {
+  if (
+    first === undefined ||
+    source.dependentsStatus === DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY
+  ) {
     return undefined;
   }
-  source.dependentsStatus = DEPENDENTS_ALL_DIRTY;
+  source.dependentsStatus = DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY;
   return first;
 }
 
@@ -628,8 +631,8 @@ export function readSource<TValue>(
   callingNode: DerivedNode<unknown>,
   source: SourceNode<TValue>,
 ): TValue {
-  if (source.dependentsStatus === DEPENDENTS_ALL_DIRTY) {
-    source.dependentsStatus = DEPENDENTS_MAY_NOT_BE_DIRTY;
+  if (source.dependentsStatus === DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY) {
+    source.dependentsStatus = DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY;
   }
   const last = callingNode.lastSourceDependency;
   const next =
@@ -1094,7 +1097,7 @@ function unlinkAll<TDependency extends Producer<TDependency>>(
 - `recompute` resets `lastSourceDependency` and `lastDerivedDependency`, and each read takes the next edge of the list. An edge whose dependency is the node read stays linked. An edge whose dependency differs is unlinked from the old dependency and linked to the node read. A read past the end of the list allocates an edge, unless the previous edge already points at the node read. `trim` unlinks and drops the edges past the last read. So a recompute that reads the same nodes in the same order allocates, links, and unlinks nothing, and after a computation the dependency lists hold exactly its reads, with adjacent reads of one node sharing one edge.
 - A node that reads a dependency at two non-adjacent positions (`a, b, a`) has two edges in `a`'s dependents list. Marking visits it twice, and the second visit finds it `Dirty` and changes nothing.
 - Marking unlinks no edge. A `Dirty` node stays in the dependents lists of its dependencies, and marking skips it, because its dependents are already `Check` or `Dirty`. A `Check` node that marking sets `Dirty` is not pushed, for the same reason. So repeated writes to different sources of a node that is not pulled visit that node on each write and stop there.
-- `writeSource` marks the dependents list only when `dependentsStatus` is `DEPENDENTS_MAY_NOT_BE_DIRTY`, and sets it to `DEPENDENTS_ALL_DIRTY`, because marking from a source sets every direct reader `Dirty`. A direct reader leaves `Dirty` only through a recompute, which either reads the source again, and `readSource` sets `DEPENDENTS_MAY_NOT_BE_DIRTY`, or does not, and `trim` unlinks its edge. A node joins the list only through `readSource`, and disposal only removes nodes from it. So a write that finds `DEPENDENTS_ALL_DIRTY` would change nothing, and it visits nothing. Repeated writes to one source between reads of it visit its readers once (pico-js-losses.md, flag2).
+- `writeSource` marks the dependents list only when `dependentsStatus` is `DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY`, and sets it to `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY`, because marking from a source sets every direct reader `Dirty`. A direct reader leaves `Dirty` only through a recompute, which either reads the source again, and `readSource` sets `DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY`, or does not, and `trim` unlinks its edge. A node joins the list only through `readSource`, and disposal only removes nodes from it. So a write that finds `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY` would change nothing, and it visits nothing. Repeated writes to one source between reads of it visit its readers once (pico-js-losses.md, flag2).
 - `DependentsStatus` is a union of two numbers with a constant for each, private to `graph.ts`, so the hot path compares small integers as it does for `Status`, and each value has a name in the code.
 - Marking pushes a node onto its stack only when the node leaves `Clean` and its dependents list is not empty, so a write visits each node's dependents at most once. Marking holds the last node it must descend into in a local and allocates its stack on the first push, and it descends into a dependent that is the last entry of its list without pushing it, so a chain, or a fan-out whose readers have no readers, allocates no stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack, and the engine holds no module state (pico-js-losses.md, fast2).
 - A node becomes `Clean` only after its computation returns or after `verify` has pulled every derived dependency it is linked to. Each lazy dependency a computation links is `Clean` when it is read, and marking continues through every lazy node, so every dependent of a lazy node that is not `Clean` is `Check` or `Dirty`. A lazy recompute therefore marks only `Check` and `Dirty` nodes and takes no node out of `Clean`, so it marks through `markCheckDependentsDirty`, which walks only the node's dependents list, needs no stack, and throws on a `Clean` or `Uncomputed` dependent. A pull outside a flush recomputes only lazy nodes, so it takes no node out of `Clean` and takes no batch. A lazy node that `setDerivedNodeKind` makes lazy while `Dirty` or `Check` had its `Clean` dependents marked `Check` by that call, so this holds for it too.
