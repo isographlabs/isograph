@@ -345,10 +345,6 @@ AGENTS.md says we do not have anything we do not use, and tests-only is not a re
 
 ```ts
 // from libs/pico-js/src/graph.ts
-const NOT_SET: unique symbol = Symbol('NOT_SET');
-
-type Option<TValue> = TValue | typeof NOT_SET;
-
 export const UNCOMPUTED = 0;
 export const DIRTY = 1;
 export const CHECK = 2;
@@ -409,8 +405,9 @@ export const EAGER = 1;
 export type DerivedNodeKind = typeof LAZY | typeof EAGER;
 
 /**
- * Invariants of a derived node whose computation is not running:
- * - `Uncomputed`: `value` is `NOT_SET`, both dependency lists are empty, and
+ * Contracts of a derived node whose computation is not running, which pico-js
+ * does not check:
+ * - `Uncomputed`: `value` is `undefined`, both dependency lists are empty, and
  *   every dependent is `Dirty`. No dependents list holds the node.
  * - `Dirty`: `value` is the last computed value. A lazy node's dependents are
  *   `Check` or `Dirty`. An eager node is queued in an unflushed batch, and its
@@ -420,12 +417,10 @@ export type DerivedNodeKind = typeof LAZY | typeof EAGER;
  *   nodes on a `Dirty` or `Check` eager node.
  *
  * In every status, each edge in the node's dependency lists is in its
- * dependency's dependents list. The type is not a union on `status`, because a
- * node keeps its identity and TypeScript does not narrow an object when a
- * field is assigned, so `computedValue` and marking check these at run time.
+ * dependency's dependents list.
  */
 export type DerivedNode<TValue> = {
-  value: Option<TValue>;
+  value: TValue;
   onDirty: (() => void) | undefined;
   status: Status;
   kind: DerivedNodeKind;
@@ -476,7 +471,7 @@ function newDerivedNode<TValue>(
   ) => TValue,
 ): DerivedNode<TValue> {
   return {
-    value: NOT_SET,
+    value: undefined as unknown as TValue,
     onDirty: undefined,
     status: UNCOMPUTED,
     kind,
@@ -528,7 +523,7 @@ export class Batch {
     node.firstDerivedDependency = undefined;
     node.lastDerivedDependency = undefined;
     node.status = UNCOMPUTED;
-    node.value = NOT_SET;
+    node.value = undefined;
     if (first !== undefined) {
       markDirty(this.#eagerNodes, this.#callbacks, first);
     }
@@ -711,14 +706,14 @@ export function readDerived<TValue>(
 export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   switch (node.status) {
     case CLEAN:
-      return computedValue(node);
+      return node.value;
     case DIRTY:
-      return node.kind === LAZY ? recompute(node) : computedValue(node);
+      return node.kind === LAZY ? recompute(node) : node.value;
     case CHECK:
       if (node.kind === EAGER) {
-        return computedValue(node);
+        return node.value;
       }
-      return verify(node) === DIRTY ? recompute(node) : computedValue(node);
+      return verify(node) === DIRTY ? recompute(node) : node.value;
     case UNCOMPUTED:
       return computeFirst(node);
   }
@@ -783,11 +778,8 @@ function markDirty<TDependency>(
         node.status = DIRTY;
         break;
       case DIRTY:
-        break;
       case UNCOMPUTED:
-        throw new Error(
-          'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
-        );
+        break;
     }
   }
   if (held !== undefined) {
@@ -832,11 +824,8 @@ function markCheck(
           break;
         case CHECK:
         case DIRTY:
-          break;
         case UNCOMPUTED:
-          throw new Error(
-            'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
-          );
+          break;
       }
     }
     marked = stack === undefined ? undefined : stack.pop();
@@ -882,23 +871,8 @@ function verify(root: DerivedNode<unknown>): typeof DIRTY | typeof CLEAN {
       if (node === root) {
         return CLEAN;
       }
-      const only = node.firstDependent;
-      if (only === undefined) {
-        throw new Error(
-          'A node that verify descended into has no dependents. This is indicative of a bug in pico-js.',
-        );
-      }
-      if (only.nextDependent === undefined) {
-        edge = only;
-      } else {
-        const popped = verifyStack?.pop();
-        if (popped === undefined) {
-          throw new Error(
-            'A node that verify descended into has more than one dependent and no edge on the verification stack. This is indicative of a bug in pico-js.',
-          );
-        }
-        edge = popped;
-      }
+      const only = node.firstDependent!;
+      edge = only.nextDependent === undefined ? only : verifyStack!.pop()!;
       node = edge.dependent;
       if (node.status !== DIRTY) {
         break;
@@ -921,7 +895,7 @@ function computeFirst<TValue>(node: DerivedNode<TValue>): TValue {
 }
 
 function recompute<TValue>(node: DerivedNode<TValue>): TValue {
-  const previous = computedValue(node);
+  const previous = node.value;
   const value = rerun(node, previous);
   if (value === previous) {
     return previous;
@@ -940,7 +914,7 @@ function recomputeEager(
   callbacks: Array<() => void>,
   node: DerivedNode<unknown>,
 ): void {
-  const previous = computedValue(node);
+  const previous = node.value;
   const value = rerun(node, previous);
   if (value === previous) {
     return;
@@ -974,26 +948,11 @@ function markCheckDependentsDirty(first: DerivedEdge | undefined): void {
         node.status = DIRTY;
         break;
       case DIRTY:
-        break;
       case CLEAN:
-        throw new Error(
-          'A Clean node depends on a Dirty node. This is indicative of a bug in pico-js.',
-        );
       case UNCOMPUTED:
-        throw new Error(
-          'An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js.',
-        );
+        break;
     }
   }
-}
-
-function computedValue<TValue>(node: DerivedNode<TValue>): TValue {
-  if (node.value === NOT_SET) {
-    throw new Error(
-      'A node that is not Uncomputed has no value. This is indicative of a bug in pico-js.',
-    );
-  }
-  return node.value;
 }
 
 /** Unlinks and drops the edges after the last one the computation read. */
@@ -1036,15 +995,26 @@ function unlinkAll<TDependency extends Producer<TDependency>>(
 - `batch.writeSource` marks the dependents list only when `dependentsStatus` is `DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY`, and sets it to `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY`, because marking from a source sets every direct reader `Dirty`. A direct reader leaves `Dirty` only through a recompute, which either reads the source again, and `readSource` sets `DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY`, or does not, and `trim` unlinks its edge. A node joins the list only through `readSource`, and disposal only removes nodes from it. So a write that finds `DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY` would change nothing, and it visits nothing. Repeated writes to one source between reads of it visit its readers once (pico-js-losses.md, flag2).
 - `DependentsStatus` is a union of two numbers with a constant for each, private to `graph.ts`, so the hot path compares small integers as it does for `Status`, and each value has a name in the code.
 - Marking pushes a node onto its stack only when the node leaves `Clean` and its dependents list is not empty, so a write visits each node's dependents at most once. Marking holds the last node it must descend into in a local and allocates its stack on the first push, and it descends into a dependent that is the last entry of its list without pushing it, so a chain, or a fan-out whose readers have no readers, allocates no stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack, and the engine holds no module state (pico-js-losses.md, fast2).
-- A node becomes `Clean` only after its computation returns or after `verify` has pulled every derived dependency it is linked to. Each lazy dependency a computation links is `Clean` when it is read, and marking continues through every lazy node, so every dependent of a lazy node that is not `Clean` is `Check` or `Dirty`. A lazy recompute therefore marks only `Check` and `Dirty` nodes and takes no node out of `Clean`, so it marks through `markCheckDependentsDirty`, which walks only the node's dependents list, needs no stack, and throws on a `Clean` or `Uncomputed` dependent. A pull outside a flush recomputes only lazy nodes, so it takes no node out of `Clean` and takes no batch. A node that `batch.setDerivedNodeKind` makes lazy while `Dirty` or `Check` had its `Clean` dependents marked `Check` by that call, so this holds for it too.
+- A node becomes `Clean` only after its computation returns or after `verify` has pulled every derived dependency it is linked to. Each lazy dependency a computation links is `Clean` when it is read, and marking continues through every lazy node, so every dependent of a lazy node that is not `Clean` is `Check` or `Dirty`. A lazy recompute therefore marks only `Check` and `Dirty` nodes and takes no node out of `Clean`, so it marks through `markCheckDependentsDirty`, which walks only the node's dependents list, and needs no stack. A pull outside a flush recomputes only lazy nodes, so it takes no node out of `Clean` and takes no batch. A node that `batch.setDerivedNodeKind` makes lazy while `Dirty` or `Check` had its `Clean` dependents marked `Check` by that call, so this holds for it too.
 - An eager node that is `Dirty` or `Check` may have `Clean` dependents, and only until the flush of the batch whose `#eagerNodes` holds it. Marking queues it when it leaves `Clean`, and `batch.setDerivedNodeKind` queues a `Dirty` or `Check` node it makes eager, so every `Dirty` or `Check` eager node is queued. The flush refreshes it at the top level, outside any computation, through `refreshEager`. `recomputeEager` marks a changed value through `markDirty`, which takes the arrays of the batch being flushed, takes `Clean` dependents out of `Clean`, collects their callbacks, and queues the eager nodes among them. It collects the eager node's own `onDirty` there, when its value changed, and not when marking reached the node, so an observer of an eager node is called only when the node's value changed.
-- `batch.setDerivedNodeKind` restores the lazy invariant when it makes a `Dirty` or `Check` eager node lazy: it marks the node's `Clean` dependents `Check` through `markCheck`, the second phase of `markDirty`, which starts from the node as if marking had just taken it out of `Clean`. Leaving the node queued and its dependents `Clean` until the flush would break the invariant until then: a pull of the lazy `Dirty` node would recompute it and throw in `markCheckDependentsDirty` on a `Clean` dependent, and marking that reached the node would stop there and leave its `Clean` dependents stale. `refreshEager` skips a lazy node, because its dependents are already `Check` or `Dirty` and its `onDirty` is already collected, and a refresh would collect it again.
+- `batch.setDerivedNodeKind` restores the lazy invariant when it makes a `Dirty` or `Check` eager node lazy: it marks the node's `Clean` dependents `Check` through `markCheck`, the second phase of `markDirty`, which starts from the node as if marking had just taken it out of `Clean`. Leaving the node queued and its dependents `Clean` until the flush would break the invariant until then: a pull of the lazy `Dirty` node would recompute it, and `markCheckDependentsDirty` would leave its `Clean` dependents `Clean` and stale, and marking that reached the node would stop there and leave its `Clean` dependents stale. `refreshEager` skips a lazy node, because its dependents are already `Check` or `Dirty` and its `onDirty` is already collected, and a refresh would collect it again.
 - `startBatch` allocates the two arrays and one `Batch` per call. The methods of `Batch` are prototype methods over its private fields, so a batch allocates no closure. On Node 24.12, a loop of 2,000,000 writes each followed by a pull of one derived node that reads the written source takes, per iteration, median of nine runs (v0, untrusted): 16.2 ns for `startBatch` with one `batch.writeSource` and no `onDirty`, and 23.6 ns with an `onDirty`.
 - `flush` reads both arrays by index and checks `#eagerNodes` before each callback, so the entries that a refresh or a callback appends are drained in the same flush, and no callback runs while an eager node of the batch is queued. It does not empty the arrays, because a batch is flushed once, when its `startBatch` body returns.
 - While a computation runs, its node is `Uncomputed` or `Dirty` and is linked to what it has read so far. Every node it read is `Clean`, or is a `Dirty` or `Check` eager node whose previous value it read. A pull inside the computation recomputes only lazy nodes, which take no node out of `Clean`, so nothing takes a node the computation read out of `Clean` before the computation returns, and marking never reaches the running node while it is `Uncomputed`.
-- `verify` walks the derived dependency lists in read order with an explicit stack of edges. It descends into a lazy `Check` dependency before its reader continues and pulls any other dependency, so a `Check` eager dependency returns its previous value. After a pull that leaves the current node `Dirty`, it recomputes that node and returns to the node's reader. It does not recompute `root`. It returns the status it leaves `root` in, `DIRTY` or `CLEAN`, and its caller recomputes a `Dirty` root: `pull` through `recompute`, and `refreshEager` through `recomputeEager`. The return value carries the status because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change it. The order of pulls and recomputes is that of a recursive `verify`. It pushes an edge only when the dependency it descends into has more than one dependent, and it allocates the stack on the first push. A node with one dependent returns to its reader through its only dependents-list edge, which is the edge `verify` descended through. `verify` throws when a node it descended into has no dependents, or has more than one and no edge on the stack, because a broken invariant throws in this library and the type system cannot express either invariant. A first computation still recurses through `readDerived` and `pull`.
+- `verify` walks the derived dependency lists in read order with an explicit stack of edges. It descends into a lazy `Check` dependency before its reader continues and pulls any other dependency, so a `Check` eager dependency returns its previous value. After a pull that leaves the current node `Dirty`, it recomputes that node and returns to the node's reader. It does not recompute `root`. It returns the status it leaves `root` in, `DIRTY` or `CLEAN`, and its caller recomputes a `Dirty` root: `pull` through `recompute`, and `refreshEager` through `recomputeEager`. The return value carries the status because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change it. The order of pulls and recomputes is that of a recursive `verify`. It pushes an edge only when the dependency it descends into has more than one dependent, and it allocates the stack on the first push. A node with one dependent returns to its reader through its only dependents-list edge, which is the edge `verify` descended through. A node `verify` descended into has at least one dependent, and one with more than one has an edge on the stack. `verify` does not check either contract. A first computation still recurses through `readDerived` and `pull`.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a lazy dependency it read changed value. A `Dirty` or `Check` eager dependency returns its previous value and leaves the node as it is, and its flush marks the node if its value changed.
-- A node's `status` is `Uncomputed` exactly when its `value` is `NOT_SET`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`. `NOT_SET` and `Option` are private to `graph.ts`, so no `TValue` contains `NOT_SET`. `computedValue` throws if a node that is not `Uncomputed` holds `NOT_SET`, because a broken invariant throws in this library. The check costs one comparison per pull of a `Clean` node.
+- `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `newDerivedNode` and assigned in `disposeDerivedNode`, where `value` is `unknown` and needs no cast. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`, and a pull of a `Clean` or `Check` node reads `node.value` directly.
+- pico-js checks none of the `DerivedNode` contracts at run time, so a broken contract returns a wrong value or throws a `TypeError` instead of an error that names the contract. The caller keeps the contracts in the README's Contracts section, and the engine keeps the rest.
+
+### Checks for a future debug build
+
+A `__DEV__` build can restore these checks. Each throws `new Error(message)`.
+
+- `markDirty`, `markCheck`, and `markCheckDependentsDirty`: a dependent's `status === UNCOMPUTED`; "An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js."
+- `markCheckDependentsDirty`: a dependent's `status === CLEAN`; "A Clean node depends on a Dirty node. This is indicative of a bug in pico-js."
+- `verify`: `node.firstDependent === undefined` for a node it descended into; "A node that verify descended into has no dependents. This is indicative of a bug in pico-js."
+- `verify`: `verifyStack?.pop() === undefined` for a node it descended into with more than one dependent; "A node that verify descended into has more than one dependent and no edge on the verification stack. This is indicative of a bug in pico-js."
+- `pull`, `recompute`, and `recomputeEager`: a node whose `status !== UNCOMPUTED` holds no computed value, which needs a private `NOT_SET` sentinel in `value` while `Uncomputed`; "A node that is not Uncomputed has no value. This is indicative of a bug in pico-js."
 - A first computation has no cutoff and marks nothing, because every node in an `Uncomputed` node's dependents list is already `Dirty`: a new node has no readers, and disposal marked every reader `Dirty`.
 - On cutoff the node keeps its stored value, so a recompute that returns `-0` where the stored value is `0` leaves `0` stored and returned, and every reader of the node reads the same value.
 - Disposal marks every reader `Dirty`, unlinks the node's own edges, and discards its value, so its next computation receives `previous` `undefined`. The readers stay in the node's dependents list, and each reader's next recompute either reads the node again, which computes it first, or drops the edge. An `Uncomputed` node has empty dependency lists and only `Dirty` dependents, so its disposal changes nothing. A `Dirty` node's dependents are `Check` or `Dirty`, and its disposal marks them `Dirty`. A disposed eager node that is still in `#eagerNodes` is `Uncomputed` when the flush reaches it, and `refreshEager` leaves it `Uncomputed`, because computing it would link it to its sources again. A `Clean` eager node in `#eagerNodes` is one that was disposed and then pulled, or one that is in the list twice, and `refreshEager` leaves it as it is.
