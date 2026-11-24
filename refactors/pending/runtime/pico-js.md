@@ -444,7 +444,7 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
     value,
     firstDependent: undefined,
     lastDependent: undefined,
-    // Vacuously true of the empty dependents list.
+    // Nothing has read this source yet, so a write has no dependents to mark.
     dependentsStatus: DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY,
   };
 }
