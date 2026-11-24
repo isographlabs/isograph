@@ -635,6 +635,8 @@ export function readSource<TValue>(
   callingNode: DerivedNode<unknown>,
   source: SourceNode<TValue>,
 ): TValue {
+  // The calling node will be Clean in this source's dependents list, so the
+  // list is no longer known to be all Dirty.
   source.dependentsStatus = DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY;
   const last = callingNode.lastSourceDependency;
   const next =
