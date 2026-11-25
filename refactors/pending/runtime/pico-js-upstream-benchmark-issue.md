@@ -1,8 +1,8 @@
 Proposal: benchmark cases for observer lifetimes, multi-write batches, and cutoffs
 
-We are developing a push-pull reactive library. While comparing it against alien-signals and Preact signals, we found operation sequences that applications perform and that no case in this suite runs. In several of them, libraries differ in mechanism: one library recomputes a computed where another keeps its value, or one library visits a node on every write where another never links it. The current cases do not show those differences.
+The cases below are operation sequences that applications perform and that no case in this suite runs. After them is a list of gaps in the harness.
 
-Would you accept PRs that add these cases? Below are 17 cases, grouped by what they need from the suite, followed by a separate list of harness changes. The list includes every case we found, including the cases where our own library does worse than the others.
+Would you accept PRs that add these? The 17 cases are grouped by what they need from the suite, followed by the harness changes.
 
 ## Conventions
 
@@ -17,7 +17,7 @@ Would you accept PRs that add these cases? Below are 17 cases, grouped by what t
   }
   ```
 
-- Each case counts computation runs with a `Counter` inside the computed, the way `kairo/broad.ts` counts effect runs. For many of these cases the libraries legitimately differ in count, so the case asserts values and reports counts (harness proposal H2) instead of asserting one count.
+- Each case counts computation runs with a `Counter` inside the computed, the way `kairo/broad.ts` counts effect runs. The case asserts values and reports counts (harness proposal H2) instead of asserting one count.
 
 ## Group 1: cases that fit the current interface
 
@@ -41,7 +41,6 @@ return () => framework.withBatch(() => x.write((flag = !flag)));
 A variant makes `a` and `b` the heads of chains of depth `d`.
 
 - Measures: time per toggle, and runs of `a` and `b` per toggle. No input of `a` or `b` changes, so the minimum is 0.
-- Why it differs: the first effect drops `a` before the second effect picks it up in the same flush. Some libraries discard the value of a computed that loses its last subscriber and recompute it on the next read; others keep it and revalidate.
 - Nearest existing case: kairo `unstable` switches one reader between two computeds, but `head` both drives the switch and feeds both branches, so every switch must recompute anyway.
 
 ### 3. A row moves between group nodes
@@ -51,7 +50,7 @@ Pattern: a kanban card moves between columns, or a re-sort moves a row into anot
 - Shape: `N` row computeds over `N` sources, `G` member signals holding arrays of row ids, `G` group computeds that read their members' rows, and one effect per group.
 - Iteration: one batch removes the first id from group `k`'s members and prepends it to group `k + 1`'s members.
 - Measures: row runs per move (minimum 0), and time.
-- Runs in both write orders (losing group first, gaining group first). In some libraries the result depends on which group's effect runs first: the row is recomputed only when the losing group drops it before the gaining group reads it.
+- Runs in both write orders (losing group first, gaining group first).
 
 ### 4. Reorder a dependency list
 
@@ -59,8 +58,8 @@ Pattern: a list re-sort that keeps its members, or a page prepended to a feed.
 
 - Shape: `N` item computeds, an `order` signal holding item ids, a `list` computed that reads the items in `order`, and one effect.
 - Iteration: one batch writes `order` rotated by `k`. Variants: a full reversal, and a prepend of `k` new items.
-- Measures: time per reorder. Libraries differ in whether a computation that reads the same dependencies in a new order reuses its existing edges or allocates new ones.
-- Nearest existing case: a dynamic node in `reactively/dependencyGraph.ts` skips one source and reads the rest in the same order. No case changes the order of reads.
+- Measures: time per reorder.
+- Nearest existing case: a node in the dynamic family skips one source and reads the rest in the same order. No case changes the order of reads.
 
 ### 5. Branch flip across batches
 
@@ -85,7 +84,6 @@ return () =>
 A variant adds one effect per panel, so every panel stays observed, to measure what keeping them alive costs.
 
 - Measures: runs per switch after each tab's first visit (minimum 0), and time.
-- Why it differs: some libraries keep the values of the abandoned chain and revalidate it on return; others discard them and recompute the chain.
 - Nearest existing case: `unstable` flips on every write, but its branch inputs change on the same write. No case returns to a branch whose inputs did not change.
 
 ### 8. One batch writes many sources
@@ -95,7 +93,7 @@ Pattern: a response normalized into many records, a form reset, a bulk edit.
 - Shape: `S` sources, `M` computeds that each read two sources, and `E` effects that each read three computeds.
 - Iteration: one `withBatch` writes `W` sources. Sweep `W` from 1 to `S` and `E` from 1 to 1,000.
 - Measures: time per batch.
-- Nearest existing case: the most writes in one batch today are cellx's 4 and molBench's 2. Every other batch wraps one write.
+- Nearest existing case: the most writes in one batch today are 4 in one case and 2 in another. Every other batch wraps one write.
 
 ### 9. Repeated writes to one source in a batch
 
@@ -103,7 +101,7 @@ Pattern: drag or typing events coalesced into one frame.
 
 - Shape: `s`, a computed over `s`, one effect.
 - Iteration: one batch writes `s` `W` times with distinct values.
-- Measures: time per batch. Libraries differ in whether each write in the batch walks the subscribers again.
+- Measures: time per batch.
 - Nearest existing case: no batch writes the same source twice.
 
 ### 10. Equal-value writes, and a write reverted in the same batch
@@ -132,7 +130,7 @@ return () => framework.withBatch(() => sources.forEach((s, i) => s.write(i)));
 ```
 
 - Measures: runs of `c`, `d`, and the effect per batch (minimum 0), and time.
-- Why it differs: some libraries treat a source restored within the batch as unchanged; others recompute `c`, which returns its old value and stops there. The equal-writes variant measures what a write that changes nothing costs.
+- The equal-writes variant measures what a write that changes nothing costs.
 - Nearest existing case: almost every timed write differs from the source's current value, and no batch writes a value back.
 
 ### 11. Cutoff by returning the previous value, and cutoff position
@@ -177,8 +175,8 @@ Pattern: retained screens whose computeds were read once while visible and still
 
 - Shape: `K` computeds over one source, each read once after the build. A fraction `f` of them also has an effect.
 - Iteration: one batch writes the source. Run `f` at 0, 0.1, and 1.
-- Measures: time per write. Libraries differ in whether a computed read outside any effect stays linked to its sources, and so in whether each later write visits it.
-- Nearest existing case: in the dynamic family, the unread leaves are chosen before the first read and are never read, so no library ever links them.
+- Measures: time per write.
+- Nearest existing case: in the dynamic family, the unread leaves are chosen before the first read and are never read.
 
 ### 13. Many writes, then one read, with no effect
 
@@ -204,7 +202,7 @@ Pattern: list items that share an author record, and a selector that reads the s
 
 - Shape: one computed that reads `F` sources in sequence, `P` times over (`a, b, c, a, b, c, ...`), and one effect.
 - Iteration: one batch writes the first source.
-- Measures: time per write. Libraries differ in whether a repeated read that is not adjacent to the previous read of the same dependency adds another edge.
+- Measures: time per write.
 - Nearest existing case: `repeatedObservers` reads `head` 30 times in a row, which a check against the immediately preceding read already deduplicates.
 
 ### 16. Missing data arrives
@@ -236,7 +234,7 @@ return () => framework.withBatch(() => present.write(!present.read()));
 effect(fn: () => void): () => void;
 ```
 
-`cleanup()` disposes everything a build created, and the adapters hold one build at a time (the alien-signals adapter keeps one `scope`; the Solid, Pota, and x-reactivity adapters overwrite `cleanup` on each `withBuild`). A case therefore cannot dispose some effects while other effects that read the same computeds stay alive, and cannot have two sets of effects alive at once.
+`cleanup()` disposes everything a build created, and the adapters hold one build at a time. A case therefore cannot dispose some effects while other effects that read the same computeds stay alive, and cannot have two sets of effects alive at once.
 
 #### 6. Navigation: unmount a screen, mount the next
 
@@ -265,8 +263,7 @@ return () => {
 ```
 
 - Measures: runs of shared computeds per navigation (minimum 0), and time.
-- Why it differs: with unmount first, some libraries discard a shared computed's value when its last subscriber is disposed and recompute it for the next screen; others keep it. With mount first, no library we checked recomputes.
-- Nearest existing case: lifetimes in the suite end all at once through `cleanup()`. `sBench` disposes the whole graph inside its timed region.
+- Nearest existing case: lifetimes in the suite end all at once through `cleanup()`. One family disposes the whole graph inside its timed region.
 
 #### 7. Observer churn on a live graph
 
@@ -288,18 +285,9 @@ return () => {
 - Measures: time per cycle, and, with H1, retained heap after many cycles.
 - Nearest existing case: `createComputations` creates effects over fresh signals and disposes the whole build, with no write in between.
 
-#### Adapters that change
+#### Adapters
 
-- alien-signals: the adapter already returns `effect(fn)`, which is the disposer. Only the type changes.
-- Preact, tansu, MobX, compostate, uSignal, TC39 polyfill: the adapter already pushes a disposer onto `toCleanup` and would also return it.
-- Angular: `effect` returns an `EffectRef`, and the adapter would return `() => ref.destroy()`.
-- Vue: `effect` returns a runner, and the adapter would return `() => stop(runner)`.
-- $mol_wire: the adapter would return `() => atom.destructor()`.
-- Solid, x-reactivity, Pota, s-js: the effect function returns nothing, so the adapter would create each effect in its own root (`createRoot`, `root`, `S.root`) and return that root's dispose.
-- Svelte: the adapter would create each effect inside `effect_root` and return its result.
-- Reactively: the adapter notes that it does not support cleaning up effects, and `@reactively/core` 0.0.8 exports no disposal API. Reactively would skip these cases.
-
-Each adapter must also keep `cleanup()` correct after some of its effects were disposed individually.
+Each adapter's `effect` returns a function that disposes that one effect. An adapter whose library cannot dispose a single effect skips these cases. Each adapter must also keep `cleanup()` correct after some of its effects were disposed individually.
 
 ### Extension B: an untracked read
 
@@ -327,14 +315,10 @@ return () => framework.withBatch(() => x.write((flag = !flag)));
 ```
 
 - Measures: runs of `a` and `b` per toggle, and time.
-- Why it differs: libraries differ in whether a computed that is only ever read untracked links itself to its dependencies, and so in whether its recompute counts as `a` losing a subscriber.
 
-#### Adapters that change
+#### Adapters
 
-- `untracked`: Preact, Angular (the adapter already imports it), MobX.
-- `untrack`: Solid, x-reactivity, Pota, Svelte (`svelte/internal/client`), tansu, compostate.
-- s-js: `S.sample`. Vue: `pauseTracking()` and `resetTracking()`. alien-signals 3.x: `setActiveSub(undefined)` around the read, then restore the previous subscriber.
-- Reactively: `@reactively/core` 0.0.8 exports no untracked read. Reactively would skip this case.
+Each adapter maps `untracked` to its library's untracked read. An adapter whose library has no untracked read skips this case.
 
 ## Group 3: harness and methodology changes
 
@@ -350,15 +334,15 @@ Case 17, retained memory per node and collection of dropped nodes: after a force
 
 ### H2. Report computation counts
 
-Counts are checked today, never reported: the kairo cases `console.assert` on their `callCounter`, and the dynamic family checks `count` only when `readFraction` is 1 or `testPullCounts` is set (`util/perfTests.ts`). Proposal: an optional `count` on `PerfResult`, printed next to `time`. Several Group 1 cases differ across libraries mainly in count, and a time alone does not show why.
+Counts are checked today, never reported: the kairo cases `console.assert` on their `callCounter`, and the dynamic family checks `count` only when `readFraction` is 1 or `testPullCounts` is set (`util/perfTests.ts`). Proposal: an optional `count` on `PerfResult`, printed next to `time`. Several Group 1 cases measure counts, and a time alone does not show them.
 
 ### H3. One process per framework
 
-`runTests` runs every framework in one process, and `kairoBench` warms every case under every framework before it times any. Harness call sites and shared closures therefore see many libraries' object shapes before a library is timed, and a library's timings depend on which libraries ran before it. In our runs, removing the other frameworks' warmup changed one library's kairo timing noticeably because its call sites stayed monomorphic. Proposal: an option that runs each framework, or each framework and family, in its own process, and an option to repeat that process several times and report the median process, since background load slows whole processes.
+`runTests` runs every framework in one process, and `kairoBench` warms every case under every framework before it times any. Harness call sites and shared closures therefore receive many frameworks' object shapes before a framework is timed, so a framework's timings depend on which frameworks ran before it. Proposal: an option that runs each framework, or each framework and family, in its own process, and an option to repeat that process several times and report the median process, since background load slows whole processes.
 
 ### H4. Report more than the fastest run
 
-`fastestTest` returns the fastest run, `sBench` keeps the fastest of 10, and `cellx` sums 10 runs. The minimum discards GC pauses and tails, so a library that allocates more pays for it in GC that the reported number omits. Proposal: report the median and a high percentile (or every sample) next to the minimum, and GC time per test, for example from `PerformanceObserver` `gc` entries in Node. The README lists "Tracks garbage collection overhead per test" as a feature, but no code measures GC time today.
+`fastestTest` returns the fastest run, one family keeps the fastest of 10, and another sums 10 runs. The minimum discards GC pauses and tails, so the reported number omits GC cost. Proposal: report the median and a high percentile (or every sample) next to the minimum, and GC time per test, for example from `PerformanceObserver` `gc` entries in Node. The README lists "Tracks garbage collection overhead per test" as a feature, but no code measures GC time today.
 
 ### H5. Expose GC in the Node runner
 
@@ -366,7 +350,7 @@ Every family calls `gc()` only `if (globalThis.gc)`, and the Node package's `run
 
 ### H6. A first, unwarmed run
 
-Every family warms up before it times. Applications run many computations only once or a few times, and cold costs differ between libraries. Proposal: in a fresh process (H3), record the first iteration of each case before any warmup, as its own result.
+Every family warms up before it times. Applications run many computations only once or a few times. Proposal: in a fresh process (H3), record the first iteration of each case before any warmup, as its own result.
 
 ### H7. Costlier computations and more distinct function literals
 
