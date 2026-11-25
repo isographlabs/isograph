@@ -4,62 +4,52 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 
 ## Model
 
-- A source node holds a value that the caller writes. A derived node holds a computation, its last value, a status, the source and derived nodes its computation read, and the derived nodes that read it. Each dependency is an edge object that sits in the reader's dependency list, in read order, and in the dependents list of the node it read.
-- A write marks the source's direct readers `Dirty` and the nodes above them `Check`. It runs no computation. Marking continues through a lazy node, created by `createDerivedNode`, and stops at an eager node, created by `createEagerDerivedNode`. A derived node's `evaluation` field holds `LAZY` or `EAGER`, and `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation` change it. A source records that a write left every node in its dependents list `Dirty`, and until a computation reads the source again, a write to it visits none of those nodes.
-- A derived node has one of four statuses: `Uncomputed`, `Dirty`, `Check`, and `Clean`. The `status` field holds one of the numeric constants `UNCOMPUTED`, `DIRTY`, `CHECK`, and `CLEAN`. A new node is `Uncomputed`.
-- `pull` brings a node up to date. An `Uncomputed` node computes for the first time. A `Clean` node returns its value. A `Check` node pulls its derived dependencies in the order they were read and recomputes after the first pull that leaves it `Dirty`. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, it becomes `Clean` without running. A `Dirty` node recomputes.
-- A computation receives its node and the previous value. An `Uncomputed` node's computation receives `undefined`, as Solid's `createMemo` passes it. A recompute whose value is `===` the previous value marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
-- Under `===`, a `NaN` value always counts as changed. Under `===`, `0` and `-0` count as equal.
-- Each read during a computation records the node it read in the calling node's dependency list and links the calling node into the dependents list of the node it read. A recompute reuses the edges of the previous computation in read order and drops the edges past its last read.
-- Code outside a computation reads a source's current value as `source.value`. An untracked read inside a computation, `source.value` or `pull(node)`, records no dependency and is allowed. A later change to a node read that way does not mark the computing node.
-- Marking a node `Dirty` keeps its edges. A `Dirty` node stays in the dependents lists of the nodes it read, and marking that reaches it again changes nothing. Its next computation keeps each edge whose dependency it reads at the same position.
-- Disposing a node marks its readers `Dirty` and returns the node to `Uncomputed`, the state of a new node.
-- `startBatch(body)` creates a batch, calls `body` with `mutators`, an instance of the unexported class `Mutators`, and flushes the batch when `body` returns. The methods `writeSource(source, value)`, `disposeDerivedNode(node)`, and `setDerivedNodeEvaluation(node, evaluation)` of `mutators` act in its batch.
-- The top-level `writeSource(source, value)`, `disposeDerivedNode(node)`, and `setDerivedNodeEvaluation(node, evaluation)` are a batch of one: each acts in a batch of its own, then flushes it before it returns, so each behaves as a `startBatch` whose `body` makes the one call. An update that writes several sources belongs in one `startBatch`, so that no callback observes an intermediate state. Each single call flushes before it returns, so a callback that its flush runs observes the state between two writes of the update.
-- A batch holds two arrays, `eagerNodes` and `callbacks`, each in the order they were added. `startBatch` creates them, and `mutators` holds them in the private fields `#eagerNodes` and `#callbacks`. A single call creates them, in a `Queue`, on its first push, so a single call that queues nothing allocates no queue. Marking adds a node when it takes it out of `Clean`, which happens at most once until the node is pulled or refreshed.
-- A `startBatch` or a single call inside the `body` of another `startBatch` or inside a flush flushes its own batch before it returns. Its callbacks can run while eager nodes of the outer batch are queued, and they read those nodes' previous values. Joining the outer batch would need module state that records the running batch, and the engine holds no module state.
-- A `DerivedNode` has a writable field `onDirty: (() => void) | undefined`. Marking adds a lazy node's `onDirty` to `callbacks` when the node goes from `Clean` to `Dirty` or `Check`. Two nodes that share one callback function add it twice.
-- Marking that takes an eager node out of `Clean`, to `Dirty` or, through a derived dependency, to `Check`, appends the node to `eagerNodes` and does not mark the node's dependents.
-- `setDerivedNodeEvaluation(node, evaluation)` and `mutators.setDerivedNodeEvaluation(node, evaluation)` set `node.evaluation`. Setting the evaluation a node has, or the evaluation of an `Uncomputed` or `Clean` node, changes only that field. A `Dirty` or `Check` node set eager is appended to `eagerNodes`, so the flush refreshes it. Its dependents are `Check` or `Dirty`, because it was lazy, and they stay as they are. A `Dirty` or `Check` node set lazy can have `Clean` dependents, because it was eager, so the call marks those dependents `Check` and the nodes above them as marking does above a `Dirty` node, collects their callbacks, queues the eager nodes among them, and adds the node's own `onDirty` to `callbacks`, as marking does when a lazy node leaves `Clean`. The lazy node stays in `eagerNodes`, and the flush skips a queued node that is lazy when the flush reaches it. A node set lazy and then eager again before the flush is in `eagerNodes` twice, and the second refresh finds it `Clean` or lazy. A lazy node whose `onDirty` marking collected and that is set eager while `Dirty` or `Check` has its `onDirty` collected again when the refresh changes its value.
-- The flush refreshes the next queued eager node while one is queued, and otherwise calls the next callback, until both arrays are drained. Refreshing verifies a `Check` eager node and recomputes it if a dependency changed, and recomputes a `Dirty` one. A recompute that returns a value `===` the previous one marks nothing. A recompute whose value changed adds the eager node's own `onDirty` to `callbacks`, marks its dependents `Dirty` and the nodes above them `Check` through `markDirty`, and so collects their callbacks and queues the eager nodes among them into the batch being flushed. So every callback runs while no eager node of the batch is queued, and callbacks run in the order they were collected.
-- A callback may pull, write, dispose, and set a node's evaluation, either through a `startBatch` or a single call of its own, which flushes its own batch before it returns, or through the methods of the batch being flushed, which append to its arrays, and the same flush drains them, eager nodes first. A collected callback is called even when an earlier callback disposed its node.
-- A queued eager node that was disposed before the flush reaches it stays `Uncomputed`, and the flush does not compute it. A queued eager node that is `Clean` when the flush reaches it is left as it is, and so is a queued node that is lazy when the flush reaches it.
-- A pull of a `Dirty` or `Check` eager node returns its previous value and runs nothing, whether the pull is outside a computation or a `readDerived` inside one. Only the flush of its batch refreshes it. A refresh inside a running computation could take out of `Clean` a node that the computation already read, while the running node is `Dirty` and marking skips it, and the running node would end `Clean` over a `Dirty` dependency that nothing marks again.
+- A source node holds a value that the caller writes. A derived node holds a computation and the value that computation last returned.
+- A computation reads through `readSource(callingNode, source)` and `readDerived(callingNode, node)`. Each read records an edge from the calling node to the node it read. A node depends on exactly the nodes its latest computation read.
+- A lazy derived node recomputes when it is read. An eager derived node recomputes in the flush of the batch whose write marked it.
+- A write runs no computation. It marks the derived nodes that read the source `Dirty` and the lazy nodes above them `Check`. Marking continues through a lazy node and stops at an eager node, which it queues in the batch.
+- A read of a `Dirty` node recomputes it. A read of a `Check` node reads its derived dependencies in the order its computation read them, and recomputes the node as soon as one of them changed, without reading the rest. If none changed, the node becomes `Clean` without running.
+- A recompute receives `previous`, the node's last value. A recompute whose value is `===` to `previous` keeps `previous` and marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
+- `startBatch(body)` calls `body` with `mutators` and flushes the batch when `body` returns. The flush recomputes every queued eager node, then calls the `onChange` of each eager node whose value the flush changed. The top-level `writeSource` and `setDerivedNodeEvaluation` are a batch of one call.
+- `onChange` is a field of every derived node. The flush calls it only for eager nodes, so on a lazy node it is unused until the node is set eager.
+- A derived node is needed while its `retainCount` is above 0 or another node reads it. `retainDerivedNode` and `releaseDerivedNode` count holders. A node that becomes unneeded is disposed: it returns to `Uncomputed`, drops its value, and unlinks its edges, and each derived dependency that the disposal leaves unneeded is disposed in turn. A node becomes unneeded when a release brings its count to 0, or when a recompute of its last reader stops reading it. A recompute defers that check until the recompute ends, so a node that the run reads again later survives. Sources are never disposed.
+- A computation whose branch flips, such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)`, disposes the branch it stopped reading and computes it from scratch when the flag flips back. A caller that retains both `b` and `c` keeps both computed.
 
 ### Contracts
 
-These are the caller's obligations. pico-js checks none of them at run time, and a program that breaks one has unspecified behavior. The types enforce the field contract, except for `computation`.
+These are the caller's obligations. pico-js checks none of them at run time, and a program that breaks one has unspecified behavior.
 
 - The caller writes a source only when its value changed.
-- A computation, and any function it calls, does not throw. A callback, and the `body` of `startBatch`, do not throw.
-- A computation does not write a source, dispose a node, set a node's evaluation, call `startBatch`, or call a method of `mutators`.
-- A computation is synchronous. `readSource` and `readDerived` are called only inside a computation, with the node that computation received as `callingNode`.
-- A computation's result depends only on `previous` and on the values its `readSource` and `readDerived` calls return. An untracked read, `source.value` or `pull(node)` inside a computation, is outside this contract: it records no dependency, so a later change to the node it read does not mark the computing node.
-- The derived nodes form a directed acyclic graph, in which an untracked `pull` inside a computation counts as a read.
-- A callback that writes eventually stops writing.
-- The chains of derived nodes that a first pull or a pull of `Dirty` nodes descends stay well below the call stack limit. Each node of such a chain adds frames to the call stack. In Node 24.12 with its default stack and one-line computations, a first pull of a chain overflows at about 1,900 derived nodes, and a pull through a chain of `Dirty` derived nodes at about 1,850.
-- A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns, or a value it passed to `createSourceNode` or `writeSource`.
-- A caller creates nodes only through `createSourceNode`, `createDerivedNode`, and `createEagerDerivedNode`, and writes no field of a node except `onDirty`. Every field of `SourceNode` and `DerivedNode` except `onDirty` is `readonly`, so the type enforces this for every field except `computation`, a method, which a type cannot mark `readonly`.
-- A caller calls each method of `mutators` through `mutators`, as in `mutators.writeSource(source, value)`. A method detached from `mutators`, or called through a `Proxy` of it, throws a `TypeError`, because it cannot reach the private fields of `mutators`.
-- A caller calls the methods of `mutators` only until its `startBatch` returns.
-- A caller disposes each derived node it stops using. Disposal is the only release. A derived node dropped without `disposeDerivedNode` stays in the dependents list of every node it read, so its edges, its value, and its computation closure stay reachable, every later write that reaches it visits it, and its `onDirty` is still called. In Node 24, 100,000 derived nodes that each read 34 sources, pulled once and then dropped without disposal, kept 237.6 MB reachable after two forced collections, against 0.04 MB when each was disposed first.
-- A caller that needs current values reads after the batch flushes. Between a write and the flush of its batch, a marked eager node and the nodes that depend on it return their previous values. A `startBatch` or a single call inside `body` or inside a callback flushes its own batch while the outer batch's eager nodes are still queued, so its callbacks can read those nodes' previous values.
+- A computation, an `onChange`, and the `body` of `startBatch` do not throw.
+- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received. It may read untracked, through `readDerivedNode` and `source.value`. An untracked read records no dependency, so the result can be stale with respect to what it read.
+- A computation does not write a source, set an evaluation, retain, release, set an `onChange`, start a batch, or call a method of `mutators`.
+- An `onChange` does not write, start a batch, set an evaluation, retain, release, or set an `onChange`. It may read through `readDerivedNode` and `source.value`.
+- A computation's result depends only on `previous` and on the values its reads return.
+- The derived nodes form a directed acyclic graph, counting untracked reads and the edges a node keeps from its previous run.
+- `readDerivedNode` is called only on a node that is retained, including an untracked read inside a computation.
+- Each `retainDerivedNode` is matched by exactly one `releaseDerivedNode`. A second release decrements again and can dispose a node that another holder still counts.
+- The chains of derived nodes that a first computation or a recompute of `Dirty` nodes descends stay well below the call stack limit, because each node adds frames. In Node 24.12 with its default stack and one-line computations, the first computation of a chain overflows at about 2,000 derived nodes, and a recompute through a chain of `Dirty` nodes at about 2,200.
+- A caller does not mutate a value that a read returns, or a value it passed to `createSourceNode` or `writeSource`.
+- A caller creates nodes only through `createSourceNode`, `createDerivedNode`, and `createEagerDerivedNode`, and writes no field except `onChange`. The types enforce this for every field except `computation`, a method, which a type cannot mark `readonly`.
+- A caller calls each method of `mutators` through `mutators`, and only until its `startBatch` returns. A detached method throws a `TypeError`, because it cannot reach the private field of `mutators`.
+- A caller that needs current values reads after the batch flushes. Until the flush, a marked eager node and the nodes that read it return their previous values.
 
 ### Guarantees
 
-pico-js upholds these guarantees while every contract holds.
+pico-js upholds these while every contract holds.
 
-- A `pull` made while no batch has an eager node queued, which includes every pull outside a `startBatch` body and outside a flush, returns the node's stored value. The stored value is the value the node's latest computation returned, or the previous value when the latest computation returned a value `===` to it. Each `readSource` and `readDerived` call of that latest computation returned the value that the node it read holds at the time of the pull.
-- A computation runs only inside a `pull` or `readDerived` of its node or of a node that depends on it, or inside a flush that refreshes its node or an eager node that depends on it. It runs only when its node is `Uncomputed`, because it was never computed or was disposed, or when, since the node's latest computation, a source that computation read was written, or a derived node it read was disposed or recomputed to a value that is not `===` its previous value.
-- A pull of a `Check` node pulls its derived dependencies in the order its latest computation read them, and recomputes the node as soon as one of those pulls leaves it `Dirty`, without pulling the rest. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node to a changed value. If no pull leaves the node `Dirty`, the node becomes `Clean` without running. A pull of a `Dirty` lazy node recomputes it without pulling its dependencies first.
-- A recompute whose value is `===` to its node's previous value keeps the previous value, marks no reader, and collects no callback. `NaN` is not `===` to itself, so a recompute that returns `NaN` counts as changed. `-0 === 0`, so a recompute that returns `-0` where the stored value is `0` keeps `0`.
-- Marking collects a lazy node's `onDirty` each time it takes the node out of `Clean`. The flush collects an eager node's `onDirty` each time it recomputes the node to a value that is not `===` its previous value. A call that sets a `Dirty` or `Check` eager node lazy collects that node's `onDirty`. Disposal does not collect the disposed node's own `onDirty`, and a pull collects no callback. Two nodes that share one callback function collect it twice, and a lazy node whose `onDirty` marking collected and that is set eager while `Dirty` or `Check` has its `onDirty` collected again when the flush changes its value.
-- A batch calls each collected callback once, in the order the callbacks were collected, after its `body` returns or its single call acts. Before each callback, the flush refreshes every eager node queued in the batch. A collected callback is called even if its node is disposed or its `onDirty` is changed before the flush reaches it. A `startBatch` or a single call inside `body` or inside a callback flushes its own batch before it returns.
-- When a flush returns, every eager node is `Clean` or `Uncomputed`, except an eager node queued in a batch whose flush has not returned. Only a pull computes an eager node for the first time. A pull of a `Dirty` or `Check` eager node, including a `readDerived` inside a computation, returns its previous value and runs nothing. An eager node can recompute more than once in one flush, when it reads another eager node that the flush refreshes after it.
-- `mutators.writeSource`, `mutators.disposeDerivedNode`, and `mutators.setDerivedNodeEvaluation` run no computation and call no callback. A write walks the dependents list of the source, and of each lazy derived node it takes out of `Clean`, at most once each, and does not walk the dependents list of a `Dirty`, `Check`, or eager node it reaches. A write returns after storing the value, without visiting any derived node, when no `readSource` of the source has run since the source was created or last written.
-- After a computation, its node is in the dependents list of each node that computation read through `readSource` and `readDerived`, and of no other node, until its next computation or its disposal. Marking unlinks no edge, so a `Dirty` or `Check` node keeps its edges.
-- The reads of a recompute allocate no edge and link or unlink none when they match, in order, the edges of the previous run. A computation that makes the same reads on every run allocates no edge from run `r + 2` on, where `r` is the number of its reads that repeat the run's previous read of the same kind: a `readSource` of the source the previous `readSource` read, or a `readDerived` of the node the previous `readDerived` read.
-- Marking and the verification of `Check` nodes keep their stacks in arrays, so a write, and a pull through a chain of `Check` nodes, add no call-stack frame per node. In Node 24.12, a pull through a chain of 200,000 `Check` nodes does not overflow.
+- A read made while no batch has an eager node queued returns the value the node's latest computation returned, or `previous` when that computation returned a value `===` to it, and each read of that computation returned the current value of the node it read.
+- A computation runs only when its node is `Uncomputed`, or when a source its latest computation read was written, or a derived node it read recomputed to a value not `===` to its previous value.
+- A read of a `Check` node reads its derived dependencies in the order its latest computation read them, and recomputes the node as soon as one of them changed, without reading the rest. A read of a `Dirty` lazy node recomputes it without reading its dependencies first.
+- A recompute whose value is `===` to its previous value keeps the previous value and marks nothing. `NaN` counts as changed, and `-0` over a stored `0` keeps `0`.
+- The flush calls `onChange` once for each eager node that it recomputed to a value not `===` to the previous one, even when the node recomputed more than once, in the order of each node's first changed recompute. It calls them after every queued eager node is refreshed. A first computation, a cutoff, and a lazy node call no `onChange`.
+- When a flush returns, every eager node is `Clean` or `Uncomputed`, except one queued in a batch whose flush has not returned. Only a read computes an eager node for the first time. A read of a `Dirty` or `Check` eager node returns its previous value and runs nothing.
+- `mutators.writeSource` and `mutators.setDerivedNodeEvaluation` run no computation and call no `onChange`. A write walks the dependents list of the source and of each lazy node it takes out of `Clean` at most once each. A write returns without visiting a derived node when no `readSource` of the source has run since the source was created or last written.
+- After a computation, its node is in the dependents list of each node it read through `readSource` and `readDerived`, and of no other node, until its next computation or its disposal. Marking unlinks no edge.
+- A node that is not `Uncomputed` has `retainCount` above 0 or a dependent once the computation that is running, if any, returns. A disposed node is `Uncomputed`, holds `undefined`, and has no edges. Disposal marks nothing and calls nothing.
+- A recompute whose reads match, in order, the edges of its previous run allocates no edge and links or unlinks none.
+- Marking, verification of `Check` nodes, and disposal keep their stacks in arrays. In Node 24.12, a read through a chain of 200,000 `Check` nodes, and a release that disposes a chain of 100,000 nodes, do not overflow.
+- `retainDerivedNode`, a `releaseDerivedNode` that leaves no derived dependency unneeded, and a `readDerivedNode` of a `Clean` node allocate nothing. A single-call write that queues no eager node allocates no queue, and a flush that changes no node with an `onChange` allocates no list. A write still allocates one marking-stack array when it takes out of `Clean` two or more lazy nodes that have readers, or one that has readers and is not the last entry of the list it was reached through.
 - pico-js holds no module state, so two graphs that share no node do not affect each other.
 
 ## The package
@@ -201,7 +191,7 @@ export default defineConfig({
 
 Deltas of `tsconfig.test.json` from the runtime's: no `paths` entry and no `fixtures/**/*.ts`, because the tests import `../src` and there are no fixtures. Deltas of `vitest.config.ts`: no Babel plugin. With `typecheck.enabled`, vitest type-checks `graph.test-d.ts` as the runtime's `read.test-d.ts` is.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is writable except `Edge.dependent`: `value`, `status`, `dependentsStatus`, and the edge-list fields change on every write, read, and recompute, a reused edge changes its `dependency`, a caller sets `onDirty`, and `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation` set `evaluation`. `Mutators` is the engine's one class. Its two arrays are ES private fields, `readonly` because a batch appends to them in place and never replaces them, and `index.ts` does not export `Mutators`, so a caller gets an instance only from `startBatch`. A `Queue`'s two arrays are `readonly` for the same reason. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body, and no `switch` has a `default` arm.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. Every type field is writable except `Edge.dependent`: `value`, `status`, `dependentsStatus`, and the edge-list fields change on every write, read, and recompute, a reused edge changes its `dependency`, a caller sets `onChange`, the flush sets `onChangeStatus`, `retainDerivedNode` and `releaseDerivedNode` set `retainCount`, a recompute sets `disposalCandidates`, and `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation` set `evaluation`. `Mutators` is the engine's one class. Its eager-node array is an ES private field, `readonly` because a batch appends to it in place and never replaces it, and `index.ts` does not export `Mutators`, so a caller gets an instance only from `startBatch`. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition in the body. oxlint's `switch-exhaustiveness-check` holds for every `switch` in the body, and no `switch` has a `default` arm.
 
 ### Pre-commit hooks
 
@@ -255,29 +245,53 @@ The second step runs the random differential test on seeds 1 to 2,000, which too
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js is a push-pull memoization engine. A write to a source node eagerly marks the derived nodes that depend on it, and a derived node lazily recomputes when it is pulled.
+pico-js is a push-pull memoization engine. A write to a source node eagerly marks the derived nodes that depend on it, and a derived node lazily recomputes when it is read.
+
+## Goals
+
+pico-js aims for correctness first and performance second. Where a rule can be the caller's obligation instead of a check on the hot path, pico-js makes it a contract and checks nothing at run time.
 
 ## Model
 
-The graph has two kinds of node. A source node holds a value that code outside the graph writes. A derived node holds a computation and the value that computation last returned. A computation reads other nodes through `readSource` and `readDerived`, and each read records the node it read as a dependency. A node depends on exactly the nodes its latest computation read, so a computation that reads different nodes on different runs has different dependencies after each run. A node keeps its dependencies while it is `Dirty`, and its next computation reuses them in read order. Each read records one edge, of 64 bytes in Node 24, unless no edge of the previous run is left at its position and it is a `readSource` of the source that the run's previous `readSource` read, or a `readDerived` of the node that the run's previous `readDerived` read. A computation that reads `a, b, a` holds two edges to `a`. A computation that reads `a, a, b` holds two edges after its first run. Its second run reuses the edge to `b` for the second read of `a` and appends a third edge, to `b`, and later runs reuse those three.
+- A source node holds a value that the caller writes. A derived node holds a computation and the value that computation last returned.
+- A computation reads through `readSource(callingNode, source)` and `readDerived(callingNode, node)`. Each read records an edge from the calling node to the node it read. A node depends on exactly the nodes its latest computation read.
+- A lazy derived node recomputes when it is read. An eager derived node recomputes in the flush of the batch whose write marked it.
+- A write runs no computation. It marks the derived nodes that read the source `Dirty` and the lazy nodes above them `Check`. Marking continues through a lazy node and stops at an eager node, which it queues in the batch.
+- A read of a `Dirty` node recomputes it. A read of a `Check` node reads its derived dependencies in the order its computation read them, and recomputes the node as soon as one of them changed, without reading the rest. If none changed, the node becomes `Clean` without running.
+- A recompute receives `previous`, the node's last value. A recompute whose value is `===` to `previous` keeps `previous` and marks nothing. A computation that finds its result structurally equal to `previous` returns `previous`.
+- `startBatch(body)` calls `body` with `mutators` and flushes the batch when `body` returns. The flush recomputes every queued eager node, then calls the `onChange` of each eager node whose value the flush changed. The top-level `writeSource` and `setDerivedNodeEvaluation` are a batch of one call.
+- `onChange` is a field of every derived node. The flush calls it only for eager nodes, so on a lazy node it is unused until the node is set eager.
+- A derived node is needed while its `retainCount` is above 0 or another node reads it. `retainDerivedNode` and `releaseDerivedNode` count holders. A node that becomes unneeded is disposed: it returns to `Uncomputed`, drops its value, and unlinks its edges, and each derived dependency that the disposal leaves unneeded is disposed in turn. A node becomes unneeded when a release brings its count to 0, or when a recompute of its last reader stops reading it. A recompute defers that check until the recompute ends, so a node that the run reads again later survives. Sources are never disposed.
+- A computation whose branch flips, such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)`, disposes the branch it stopped reading and computes it from scratch when the flag flips back. A caller that retains both `b` and `c` keeps both computed.
 
-A write runs no computation. It marks the derived nodes that read the source `Dirty`, because one of their inputs is known to have changed, and it marks every node that depends on those through derived nodes `Check`, because one of their inputs might have changed. A write that reaches a node that is already `Dirty` changes nothing. A source records that a write left every node that read it `Dirty`. No lazy node is recomputed until it is pulled.
+## API
 
-`startBatch(body)` calls `body` with a batch and flushes the batch when `body` returns. The batch's `writeSource`, `disposeDerivedNode`, and `setDerivedNodeEvaluation` methods collect the `onDirty` callbacks of the observed nodes they take out of `Clean`, and the flush calls them after the last write, so a callback sees every write of its batch. The top-level `writeSource`, `disposeDerivedNode`, and `setDerivedNodeEvaluation` are a batch of one: each acts, then flushes before it returns. An update that writes several sources belongs in one `startBatch`, so that no callback observes an intermediate state. Each single call flushes before it returns, so a callback that its flush runs observes the state between two writes of the update. A `startBatch` or a single call inside `body` or inside a callback flushes its own batch before it returns.
-
-An eager derived node, created by `createEagerDerivedNode` or set eager by `setDerivedNodeEvaluation(node, EAGER)`, stops marking. A write that marks it `Dirty` or `Check` queues it in the batch and marks none of its readers. The flush first recomputes every queued eager node, in the order they were queued. A recompute that returns the previous value marks nothing, so its readers stay `Clean` and no callback runs. A recompute whose value changed marks its readers as a write does. A selector that many readers read and that rarely changes value, such as `isSelected` for each row of a list, is eager, so a write marks only the readers whose selector changed. Until the flush, a marked eager node and the nodes that read it return their previous values.
-
-A pull brings one node up to date and runs only the computations that requires. A `Dirty` node recomputes. A `Check` node pulls its derived dependencies in the order its computation read them. As soon as a pull leaves the node `Dirty`, the node recomputes, without pulling the rest. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node, and that other dependency changed. If no pull leaves the node `Dirty`, the node becomes `Clean` and returns its value without running. Because the pulls follow read order, a computation such as `readDerived(callingNode, flag) ? readDerived(callingNode, b) : readDerived(callingNode, c)` recomputes as soon as `flag` comes back changed, before it pulls `b`, which the new run may not read.
-
-## Example
+- `createSourceNode(value): SourceNode<TValue>` returns a source node that holds `value`.
+- `createDerivedNode(computation): DerivedNode<TValue>` returns an `Uncomputed` lazy derived node. `computation(callingNode, previous)` returns its value, and `previous` is `undefined` on a first computation.
+- `createEagerDerivedNode(computation): DerivedNode<TValue>` returns an `Uncomputed` eager derived node.
+- `readSource(callingNode, source): TValue` returns the value of `source` and records it as a dependency of `callingNode`.
+- `readDerived(callingNode, node): TValue` brings `node` up to date, returns its value, and records it as a dependency of `callingNode`.
+- `retainDerivedNode(node): void` increments `node.retainCount`. It allocates nothing.
+- `readDerivedNode(node): TValue` brings a retained `node` up to date and returns its value. Inside a computation it is an untracked read.
+- `releaseDerivedNode(node): void` decrements `node.retainCount`, and disposes the node, and the dependencies the disposal leaves unneeded, when the count reaches 0 and no node reads it.
+- `startBatch(body): void` calls `body(mutators)`, then flushes the batch.
+- `mutators.writeSource(source, value): void` stores `value` and marks the readers of `source`. It runs no computation.
+- `mutators.setDerivedNodeEvaluation(node, evaluation): void` sets `node` `LAZY` or `EAGER`. A `Dirty` or `Check` node set eager is queued, and a `Dirty` or `Check` node set lazy marks its readers `Check`.
+- `writeSource(source, value): void` and `setDerivedNodeEvaluation(node, evaluation): void` are the `mutators` methods in a batch of their own, flushed before they return.
+- `node.onChange: (() => void) | undefined` is the writable callback the flush calls after it changes the eager node's value.
+- `UNCOMPUTED`, `DIRTY`, `CHECK`, and `CLEAN` are the values of `node.status`, of type `Status`. `LAZY` and `EAGER` are the values of `node.evaluation`, of type `DerivedNodeEvaluation`.
+- `SourceNode<TValue>` and `DerivedNode<TValue>` are the node types. Every field is `readonly` except `onChange`. `DependentsStatus` is the type of `source.dependentsStatus`, and `OnChangeStatus` the type of `node.onChangeStatus`, both internal bookkeeping.
 
 ```ts
 import {
   createDerivedNode,
+  createEagerDerivedNode,
   createSourceNode,
-  pull,
   readDerived,
+  readDerivedNode,
   readSource,
+  releaseDerivedNode,
+  retainDerivedNode,
   startBatch,
   writeSource,
 } from '@isograph/pico-js';
@@ -303,97 +317,88 @@ const greeting = createDerivedNode((callingNode) => {
   return `Hello, ${first} ${last}`;
 });
 
-pull(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
+retainDerivedNode(greeting);
+readDerivedNode(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
 
 writeSource(person, { first: 'Ada', last: 'Lovelace', age: 37 });
-pull(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
+readDerivedNode(greeting); // 'Hello, Ada Lovelace', greetingRuns === 1
 
 startBatch((mutators) => {
   mutators.writeSource(person, { first: 'Ada', last: 'Lovelace', age: 38 });
   mutators.writeSource(person, { first: 'Ada', last: 'King', age: 38 });
 });
-pull(greeting); // 'Hello, Ada King', greetingRuns === 2
+readDerivedNode(greeting); // 'Hello, Ada King', greetingRuns === 2
+
+const rendered: Array<string> = [];
+const view = createEagerDerivedNode((callingNode) =>
+  readDerived(callingNode, greeting),
+);
+retainDerivedNode(view);
+readDerivedNode(view);
+view.onChange = () => rendered.push(readDerivedNode(view));
+writeSource(person, { first: 'Augusta', last: 'King', age: 38 });
+// rendered is ['Hello, Augusta King']
+
+releaseDerivedNode(view);
+releaseDerivedNode(greeting); // greeting and name are Uncomputed
 ```
 
 After the first write, `name` recomputes and returns `previous`, so `greeting` becomes `Clean` without running.
 
-## API
-
-- `createSourceNode(value)` returns a source node that holds `value`.
-- `startBatch(body)` creates a batch, calls `body(mutators)`, and then flushes the batch. The flush recomputes the queued eager nodes, then calls the collected callbacks in the order they were collected. Before each callback, it recomputes the eager nodes that the earlier callbacks' calls queued.
-- `mutators.writeSource(source, value)` stores `value` in `source`, marks the derived nodes that read it, and adds to the batch each eager node that marking reaches and the `onDirty` of each other observed node that leaves `Clean`. It runs no computation.
-- `writeSource(source, value)` is `mutators.writeSource(source, value)` in a batch of its own, flushed before it returns. A write that queues an eager node or a callback allocates its queue, 128 bytes in Node 24 for a queue of one. A write that queues neither allocates nothing, unless marking takes out of `Clean` two or more lazy readers of the source that have readers of their own, or a lazy node that has readers of its own and is not the last entry of the dependents list that marking reached it through. Either case allocates one array for the marking stack. A write to a source with 100 lazy readers that each have one reader allocates about 2,360 bytes.
-- `createDerivedNode(computation)` returns an `Uncomputed` lazy derived node whose value `computation(callingNode, previous)` computes.
-- `createEagerDerivedNode(computation)` returns an `Uncomputed` eager derived node.
-- `readSource(callingNode, source)` returns the value of `source` and records `source` as a dependency of `callingNode`.
-- `readDerived(callingNode, node)` pulls `node`, returns its value, and records `node` as a dependency of `callingNode`.
-- `pull(node)` brings `node` up to date and returns its value.
-- `mutators.disposeDerivedNode(node)` marks the readers of `node` `Dirty`, adds their eager nodes and `onDirty` callbacks to the batch, and returns `node` to `Uncomputed`. `disposeDerivedNode(node)` does the same in a batch of its own.
-- `mutators.setDerivedNodeEvaluation(node, evaluation)` makes `node` lazy (`LAZY`) or eager (`EAGER`). A `Dirty` or `Check` node set eager is queued in the batch, so the flush recomputes it. A `Dirty` or `Check` node set lazy marks its readers `Check`, as a write marks the nodes above a written source, and adds its own `onDirty` and theirs to the batch. A node of any other status only changes evaluation. `setDerivedNodeEvaluation(node, evaluation)` does the same in a batch of its own.
-- `node.onDirty` is a callback that a write or disposal collects when the lazy node `node` leaves `Clean`, and that the flush collects when it recomputes the eager node `node` to a changed value. A collected callback is called even if its node is disposed or its `onDirty` is changed before the flush reaches it.
-- `startBatch` calls `body` with `mutators`, an instance of `Mutators`, a class the package does not export. It holds the batch's eager nodes and callbacks in private fields.
-- `SourceNode<TValue>` is the type of a source node whose value has type `TValue`.
-- `DerivedNode<TValue>` is the type of a derived node whose value has type `TValue`.
-- `Status` is the type of a derived node's `status` field, one of the exported constants `UNCOMPUTED`, `DIRTY`, `CHECK`, and `CLEAN`. A caller compares `node.status` with a constant, for example `node.status === CLEAN`.
-- `DerivedNodeEvaluation` is the type of a derived node's `evaluation` field and of the `evaluation` parameter of `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation`, one of the exported constants `LAZY` and `EAGER`.
-- `DependentsStatus` is the type of a source node's `dependentsStatus` field: `1` means every derived node that read the source is `Dirty`, so a write visits none of them. A new source, which no derived node has read, starts at `1`. `0` means one of them may be `Check` or `Clean`, so a write marks them.
-
-Each `readSource` and `readDerived` call during a computation records a dependency. A node's dependencies are the nodes its latest computation read. Code outside a computation reads a source's current value as `source.value`. A computation may also read untracked, through `source.value` or `pull(node)`, which records no dependency.
-
-## Statuses
-
-- An `Uncomputed` node (`status` `UNCOMPUTED`) has no value. Its next pull runs its computation with `previous` `undefined`. A computation whose value type includes `undefined` cannot tell its first run from a run after a stored `undefined`, because `previous` is `undefined` in both.
-- A `Dirty` node (`status` `DIRTY`) read a source that was written, or a derived node whose value changed or that was disposed. Its next pull runs its computation with its last value as `previous`.
-- A `Check` node (`status` `CHECK`) depends through derived nodes on a source that was written or on a derived node that was disposed. Its next pull pulls its derived dependencies in the order they were read and recomputes the node after the first pull that leaves it `Dirty`. If no pull leaves the node `Dirty`, the node becomes `Clean` without running.
-- A `Clean` node (`status` `CLEAN`) holds an up-to-date value, which a pull returns without running anything, unless it depends on an eager node whose batch has not been flushed.
-- A `Dirty` or `Check` eager node is queued in a batch. A pull returns its previous value without running anything, and the flush of that batch brings it up to date. A queued node that is set lazy before the flush is left for a pull to recompute.
-
-## Cutoff
-
-The engine compares a recompute's value with the previous value only by `===`. Structural sharing is the computation's responsibility: a computation that wants a structurally equal result to count as unchanged compares its new result with `previous` and returns `previous` when they are equal.
-
-## Disposal
-
-`disposeDerivedNode(node)` marks the readers of `node` `Dirty`, removes `node` from the dependents of every node it read, and discards its value. The node is `Uncomputed`, and its next pull computes it with `previous` `undefined`. Disposing an `Uncomputed` node changes nothing. A queued eager node that is disposed before the flush stays `Uncomputed`, and the flush does not compute it.
-
 ## Contracts
 
-These are the caller's obligations. pico-js checks none of them at run time, and a program that breaks one has unspecified behavior. The types enforce the field contract, except for `computation`.
+These are the caller's obligations. pico-js checks none of them at run time, and a program that breaks one has unspecified behavior.
 
 - The caller writes a source only when its value changed.
-- A computation, and any function it calls, does not throw. A callback, and the `body` of `startBatch`, do not throw.
-- A computation does not write a source, dispose a node, set a node's evaluation, call `startBatch`, or call a method of `mutators`.
-- A computation is synchronous. `readSource` and `readDerived` are called only inside a computation, with the node that computation received as `callingNode`.
-- A computation's result depends only on `previous` and on the values its `readSource` and `readDerived` calls return. An untracked read, `source.value` or `pull(node)` inside a computation, is outside this contract: it records no dependency, so a later change to the node it read does not mark the computing node.
-- The derived nodes form a directed acyclic graph, in which an untracked `pull` inside a computation counts as a read.
-- A callback that writes eventually stops writing.
-- The chains of derived nodes that a first pull or a pull of `Dirty` nodes descends stay well below the call stack limit. Each node of such a chain adds frames to the call stack. In Node 24.12 with its default stack and one-line computations, a first pull of a chain overflows at about 1,900 derived nodes, and a pull through a chain of `Dirty` derived nodes at about 1,850.
-- A caller does not mutate a value that `pull`, `readSource`, or `readDerived` returns, or a value it passed to `createSourceNode` or `writeSource`.
-- A caller creates nodes only through `createSourceNode`, `createDerivedNode`, and `createEagerDerivedNode`, and writes no field of a node except `onDirty`. Every field of `SourceNode` and `DerivedNode` except `onDirty` is `readonly`, so the type enforces this for every field except `computation`, a method, which a type cannot mark `readonly`.
-- A caller calls each method of `mutators` through `mutators`, as in `mutators.writeSource(source, value)`. A method detached from `mutators`, or called through a `Proxy` of it, throws a `TypeError`, because it cannot reach the private fields of `mutators`.
-- A caller calls the methods of `mutators` only until its `startBatch` returns.
-- A caller disposes each derived node it stops using. Disposal is the only release. A derived node dropped without `disposeDerivedNode` stays in the dependents list of every node it read, so its edges, its value, and its computation closure stay reachable, every later write that reaches it visits it, and its `onDirty` is still called. In Node 24, 100,000 derived nodes that each read 34 sources, pulled once and then dropped without disposal, kept 237.6 MB reachable after two forced collections, against 0.04 MB when each was disposed first.
-- A caller that needs current values reads after the batch flushes. Between a write and the flush of its batch, a marked eager node and the nodes that depend on it return their previous values. A `startBatch` or a single call inside `body` or inside a callback flushes its own batch while the outer batch's eager nodes are still queued, so its callbacks can read those nodes' previous values.
+- A computation, an `onChange`, and the `body` of `startBatch` do not throw.
+- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received. It may read untracked, through `readDerivedNode` and `source.value`. An untracked read records no dependency, so the result can be stale with respect to what it read.
+- A computation does not write a source, set an evaluation, retain, release, set an `onChange`, start a batch, or call a method of `mutators`.
+- An `onChange` does not write, start a batch, set an evaluation, retain, release, or set an `onChange`. It may read through `readDerivedNode` and `source.value`.
+- A computation's result depends only on `previous` and on the values its reads return.
+- The derived nodes form a directed acyclic graph, counting untracked reads and the edges a node keeps from its previous run.
+- `readDerivedNode` is called only on a node that is retained, including an untracked read inside a computation.
+- Each `retainDerivedNode` is matched by exactly one `releaseDerivedNode`. A second release decrements again and can dispose a node that another holder still counts.
+- The chains of derived nodes that a first computation or a recompute of `Dirty` nodes descends stay well below the call stack limit, because each node adds frames. In Node 24.12 with its default stack and one-line computations, the first computation of a chain overflows at about 2,000 derived nodes, and a recompute through a chain of `Dirty` nodes at about 2,200.
+- A caller does not mutate a value that a read returns, or a value it passed to `createSourceNode` or `writeSource`.
+- A caller creates nodes only through `createSourceNode`, `createDerivedNode`, and `createEagerDerivedNode`, and writes no field except `onChange`. The types enforce this for every field except `computation`, a method, which a type cannot mark `readonly`.
+- A caller calls each method of `mutators` through `mutators`, and only until its `startBatch` returns. A detached method throws a `TypeError`, because it cannot reach the private field of `mutators`.
+- A caller that needs current values reads after the batch flushes. Until the flush, a marked eager node and the nodes that read it return their previous values.
 
 ## Guarantees
 
-pico-js upholds these guarantees while every contract holds.
+pico-js upholds these while every contract holds.
 
-- A `pull` made while no batch has an eager node queued, which includes every pull outside a `startBatch` body and outside a flush, returns the node's stored value. The stored value is the value the node's latest computation returned, or the previous value when the latest computation returned a value `===` to it. Each `readSource` and `readDerived` call of that latest computation returned the value that the node it read holds at the time of the pull.
-- A computation runs only inside a `pull` or `readDerived` of its node or of a node that depends on it, or inside a flush that refreshes its node or an eager node that depends on it. It runs only when its node is `Uncomputed`, because it was never computed or was disposed, or when, since the node's latest computation, a source that computation read was written, or a derived node it read was disposed or recomputed to a value that is not `===` its previous value.
-- A pull of a `Check` node pulls its derived dependencies in the order its latest computation read them, and recomputes the node as soon as one of those pulls leaves it `Dirty`, without pulling the rest. The dependency that pull targeted may be unchanged, because pulling it can recompute another dependency of the node to a changed value. If no pull leaves the node `Dirty`, the node becomes `Clean` without running. A pull of a `Dirty` lazy node recomputes it without pulling its dependencies first.
-- A recompute whose value is `===` to its node's previous value keeps the previous value, marks no reader, and collects no callback. `NaN` is not `===` to itself, so a recompute that returns `NaN` counts as changed. `-0 === 0`, so a recompute that returns `-0` where the stored value is `0` keeps `0`.
-- Marking collects a lazy node's `onDirty` each time it takes the node out of `Clean`. The flush collects an eager node's `onDirty` each time it recomputes the node to a value that is not `===` its previous value. A call that sets a `Dirty` or `Check` eager node lazy collects that node's `onDirty`. Disposal does not collect the disposed node's own `onDirty`, and a pull collects no callback. Two nodes that share one callback function collect it twice, and a lazy node whose `onDirty` marking collected and that is set eager while `Dirty` or `Check` has its `onDirty` collected again when the flush changes its value.
-- A batch calls each collected callback once, in the order the callbacks were collected, after its `body` returns or its single call acts. Before each callback, the flush refreshes every eager node queued in the batch. A collected callback is called even if its node is disposed or its `onDirty` is changed before the flush reaches it. A `startBatch` or a single call inside `body` or inside a callback flushes its own batch before it returns.
-- When a flush returns, every eager node is `Clean` or `Uncomputed`, except an eager node queued in a batch whose flush has not returned. Only a pull computes an eager node for the first time. A pull of a `Dirty` or `Check` eager node, including a `readDerived` inside a computation, returns its previous value and runs nothing. An eager node can recompute more than once in one flush, when it reads another eager node that the flush refreshes after it.
-- `mutators.writeSource`, `mutators.disposeDerivedNode`, and `mutators.setDerivedNodeEvaluation` run no computation and call no callback. A write walks the dependents list of the source, and of each lazy derived node it takes out of `Clean`, at most once each, and does not walk the dependents list of a `Dirty`, `Check`, or eager node it reaches. A write returns after storing the value, without visiting any derived node, when no `readSource` of the source has run since the source was created or last written.
-- After a computation, its node is in the dependents list of each node that computation read through `readSource` and `readDerived`, and of no other node, until its next computation or its disposal. Marking unlinks no edge, so a `Dirty` or `Check` node keeps its edges.
-- The reads of a recompute allocate no edge and link or unlink none when they match, in order, the edges of the previous run. A computation that makes the same reads on every run allocates no edge from run `r + 2` on, where `r` is the number of its reads that repeat the run's previous read of the same kind: a `readSource` of the source the previous `readSource` read, or a `readDerived` of the node the previous `readDerived` read.
-- Marking and the verification of `Check` nodes keep their stacks in arrays, so a write, and a pull through a chain of `Check` nodes, add no call-stack frame per node. In Node 24.12, a pull through a chain of 200,000 `Check` nodes does not overflow.
+- A read made while no batch has an eager node queued returns the value the node's latest computation returned, or `previous` when that computation returned a value `===` to it, and each read of that computation returned the current value of the node it read.
+- A computation runs only when its node is `Uncomputed`, or when a source its latest computation read was written, or a derived node it read recomputed to a value not `===` to its previous value.
+- A read of a `Check` node reads its derived dependencies in the order its latest computation read them, and recomputes the node as soon as one of them changed, without reading the rest. A read of a `Dirty` lazy node recomputes it without reading its dependencies first.
+- A recompute whose value is `===` to its previous value keeps the previous value and marks nothing. `NaN` counts as changed, and `-0` over a stored `0` keeps `0`.
+- The flush calls `onChange` once for each eager node that it recomputed to a value not `===` to the previous one, even when the node recomputed more than once, in the order of each node's first changed recompute. It calls them after every queued eager node is refreshed. A first computation, a cutoff, and a lazy node call no `onChange`.
+- When a flush returns, every eager node is `Clean` or `Uncomputed`, except one queued in a batch whose flush has not returned. Only a read computes an eager node for the first time. A read of a `Dirty` or `Check` eager node returns its previous value and runs nothing.
+- `mutators.writeSource` and `mutators.setDerivedNodeEvaluation` run no computation and call no `onChange`. A write walks the dependents list of the source and of each lazy node it takes out of `Clean` at most once each. A write returns without visiting a derived node when no `readSource` of the source has run since the source was created or last written.
+- After a computation, its node is in the dependents list of each node it read through `readSource` and `readDerived`, and of no other node, until its next computation or its disposal. Marking unlinks no edge.
+- A node that is not `Uncomputed` has `retainCount` above 0 or a dependent once the computation that is running, if any, returns. A disposed node is `Uncomputed`, holds `undefined`, and has no edges. Disposal marks nothing and calls nothing.
+- A recompute whose reads match, in order, the edges of its previous run allocates no edge and links or unlinks none.
+- Marking, verification of `Check` nodes, and disposal keep their stacks in arrays. In Node 24.12, a read through a chain of 200,000 `Check` nodes, and a release that disposes a chain of 100,000 nodes, do not overflow.
+- `retainDerivedNode`, a `releaseDerivedNode` that leaves no derived dependency unneeded, and a `readDerivedNode` of a `Clean` node allocate nothing. A single-call write that queues no eager node allocates no queue, and a flush that changes no node with an `onChange` allocates no list. A write still allocates one marking-stack array when it takes out of `Clean` two or more lazy nodes that have readers, or one that has readers and is not the last entry of the list it was reached through.
 - pico-js holds no module state, so two graphs that share no node do not affect each other.
+
+## Design choices
+
+- Edges are objects in intrusive doubly linked lists, one in the reader's dependency list and one in the dependency's dependents list, instead of sets. Linking and unlinking are O(1) and allocate nothing.
+- A recompute reuses the edge at each read position when it reads the same node there, so a stable computation allocates and relinks nothing.
+- A `Dirty` node keeps its edges linked, so a second write that reaches it finds it `Dirty` and stops, and its recompute reuses them.
+- A source's `dependentsStatus` records that a write left every reader `Dirty`, so the next write skips the list until a computation reads the source again.
+- Marking, verification, and disposal walk explicit stacks, so the graph's depth costs no call-stack frames there.
+- Hot paths allocate nothing. A single-call write creates its queue only when it queues an eager node, the flush walks that queue by index as its eager-node array, and the flush creates its `onChange` list only when a changed node has one.
+- Each kind of node is one object shape, so property access stays monomorphic.
+- Public node types are `readonly`, and the engine writes through an internal `Mutable` view, so the types enforce the field contract.
+- A computation receives an explicit `callingNode` and passes it to every read, instead of the engine tracking the running computation in ambient state.
+- pico-js has no globals and no module state.
+- Retaining is a counter on the node, so there is no handle and retaining allocates nothing.
+- pico-js checks no contract at run time. A future version may add the checks as a compile-time option.
 ````
 
-The Contracts and Guarantees lists copy the Model section's lists word for word, and the API, statuses, cutoff, and disposal sections describe `src/graph.ts` above.
+The Model, Contracts, and Guarantees sections at the top of this doc copy the README's sections word for word. The README's Design choices section names the choices that `src/graph.ts` below makes, and the notes after it give the measurements behind them.
 
 ### Readers before the Isograph runtime depends on it
 
@@ -475,10 +480,22 @@ export const EAGER = 1;
 
 export type DerivedNodeEvaluation = typeof LAZY | typeof EAGER;
 
+/** The node is in no flush's list of nodes whose `onChange` it calls. */
+const ON_CHANGE_NOT_QUEUED = 0;
+/**
+ * The node is in the list of the flush that is running, so a second changed
+ * recompute in that flush does not add it again.
+ */
+const ON_CHANGE_QUEUED = 1;
+
+export type OnChangeStatus =
+  | typeof ON_CHANGE_NOT_QUEUED
+  | typeof ON_CHANGE_QUEUED;
+
 /**
  * Internal invariants of a derived node whose computation is not running:
  * - `Uncomputed`: `value` is `undefined`, both dependency lists are empty, and
- *   every dependent is `Dirty`. No dependents list holds the node.
+ *   the node has no dependents.
  * - `Dirty`: `value` is the last computed value. A lazy node's dependents are
  *   `Check` or `Dirty`. An eager node is queued in an unflushed batch, and its
  *   dependents may be `Clean`.
@@ -487,17 +504,34 @@ export type DerivedNodeEvaluation = typeof LAZY | typeof EAGER;
  *   nodes on a `Dirty` or `Check` eager node.
  *
  * In every status, each edge in the node's dependency lists is in its
- * dependency's dependents list.
+ * dependency's dependents list. A node that is not `Uncomputed` has
+ * `retainCount > 0` or a dependent, except a node in the `disposalCandidates`
+ * of a node whose computation is running, and a node that a computation
+ * returned to a `readDerived` that has not linked its edge yet.
  *
- * Contract: a caller writes no field except `onDirty`. The type enforces it.
+ * Contract: a caller writes no field except `onChange`. The type enforces it.
  */
 export type DerivedNode<TValue> = {
   readonly value: TValue;
-  // Contract: the callback does not throw. A callback that writes eventually
-  // stops writing.
-  onDirty: (() => void) | undefined;
+  // Guarantee: the flush calls it once for each eager node that the flush
+  // recomputed to a value that is not `===` its previous value, after every
+  // queued eager node is refreshed. A first computation does not call it, and
+  // on a lazy node it is unused.
+  //
+  // Contract: the callback does not throw. It does not write, start a batch,
+  // set an evaluation, retain, release, or set an `onChange`. It may read
+  // through `readDerivedNode` and `source.value`.
+  onChange: (() => void) | undefined;
+  readonly onChangeStatus: OnChangeStatus;
   readonly status: Status;
   readonly evaluation: DerivedNodeEvaluation;
+  // The number of `retainDerivedNode` calls not yet matched by a
+  // `releaseDerivedNode`.
+  readonly retainCount: number;
+  // The derived nodes that this node's running computation repointed an edge
+  // away from and that were left with no dependent and `retainCount` 0. They
+  // are disposed after `trim`, unless the run read them again.
+  readonly disposalCandidates: Array<DerivedNode<unknown>> | undefined;
   readonly firstSourceDependency: SourceEdge | undefined;
   readonly lastSourceDependency: SourceEdge | undefined;
   readonly firstDerivedDependency: DerivedEdge | undefined;
@@ -521,8 +555,9 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
 
 /**
  * Contract: `computation` is synchronous and does not throw. It reads other
- * nodes only through `readSource` and `readDerived` with the `callingNode` it
- * receives, and it does not write, dispose, set an evaluation, or start a
+ * nodes through `readSource` and `readDerived` with the `callingNode` it
+ * receives, or untracked through `readDerivedNode` and `source.value`. It does
+ * not write, retain, release, set an evaluation, set an `onChange`, or start a
  * batch.
  */
 export function createDerivedNode<TValue>(
@@ -553,9 +588,12 @@ function newDerivedNode<TValue>(
 ): DerivedNode<TValue> {
   return {
     value: undefined as unknown as TValue,
-    onDirty: undefined,
+    onChange: undefined,
+    onChangeStatus: ON_CHANGE_NOT_QUEUED,
     status: UNCOMPUTED,
     evaluation,
+    retainCount: 0,
+    disposalCandidates: undefined,
     firstSourceDependency: undefined,
     lastSourceDependency: undefined,
     firstDerivedDependency: undefined,
@@ -568,35 +606,22 @@ function newDerivedNode<TValue>(
 
 /**
  * The object `startBatch` passes to its body. Its methods defer eager refreshes
- * and `onDirty` callbacks to the flush.
+ * to the flush.
  *
  * Contract: a caller calls these methods through `mutators`, and only until
  * its `startBatch` returns.
  */
 class Mutators {
   readonly #eagerNodes: Array<MutableDerivedNode<unknown>>;
-  readonly #callbacks: Array<() => void>;
 
-  constructor(
-    eagerNodes: Array<MutableDerivedNode<unknown>>,
-    callbacks: Array<() => void>,
-  ) {
+  constructor(eagerNodes: Array<MutableDerivedNode<unknown>>) {
     this.#eagerNodes = eagerNodes;
-    this.#callbacks = callbacks;
   }
 
   writeSource<TValue>(source: SourceNode<TValue>, value: TValue): void {
     const first = storeValue(source as MutableSourceNode<TValue>, value);
     if (first !== undefined) {
-      markDirty(this.#eagerNodes, this.#callbacks, first);
-    }
-  }
-
-  disposeDerivedNode(node: DerivedNode<unknown>): void {
-    const first = node.firstDependent;
-    resetToUncomputed(node as MutableDerivedNode<unknown>);
-    if (first !== undefined) {
-      markDirty(this.#eagerNodes, this.#callbacks, first);
+      markDirty(this.#eagerNodes, first);
     }
   }
 
@@ -624,22 +649,12 @@ class Mutators {
             this.#eagerNodes.push(mutableNode);
             break;
           case LAZY:
-            // As an eager node it left Clean without queuing its callback, so
-            // the callback is queued now.
-            if (mutableNode.onDirty !== undefined) {
-              this.#callbacks.push(mutableNode.onDirty);
-            }
-            markCheck(
-              this.#eagerNodes,
-              this.#callbacks,
-              mutableNode,
-              undefined,
-            );
+            markCheck(this.#eagerNodes, mutableNode, undefined);
             break;
         }
         break;
       // Internal invariant: a Clean node is up to date under either
-      // evaluation, and an Uncomputed node has only Dirty dependents.
+      // evaluation, and an Uncomputed node has no dependents.
       case CLEAN:
       case UNCOMPUTED:
         break;
@@ -654,19 +669,16 @@ class Mutators {
  */
 export function startBatch(body: (mutators: Mutators) => void): void {
   const eagerNodes: Array<MutableDerivedNode<unknown>> = [];
-  const callbacks: Array<() => void> = [];
-  body(new Mutators(eagerNodes, callbacks));
-  flush(eagerNodes, callbacks);
+  body(new Mutators(eagerNodes));
+  flush(eagerNodes);
 }
 
 /**
- * The eager nodes and callbacks of a batch of one, created on its first push,
- * so a single call that queues nothing allocates no queue.
+ * The eager nodes of a batch of one, created on its first push, so a single
+ * call that queues nothing allocates no queue. The flush walks it as its
+ * eager-node array.
  */
-type Queue = {
-  readonly eagerNodes: Array<MutableDerivedNode<unknown>>;
-  readonly callbacks: Array<() => void>;
-};
+type Queue = Array<MutableDerivedNode<unknown>>;
 
 /** A batch of one write. */
 export function writeSource<TValue>(
@@ -679,20 +691,7 @@ export function writeSource<TValue>(
   }
   const queue = markDirtyQueue(first);
   if (queue !== undefined) {
-    flush(queue.eagerNodes, queue.callbacks);
-  }
-}
-
-/** A batch of one disposal. */
-export function disposeDerivedNode(node: DerivedNode<unknown>): void {
-  const first = node.firstDependent;
-  resetToUncomputed(node as MutableDerivedNode<unknown>);
-  if (first === undefined) {
-    return;
-  }
-  const queue = markDirtyQueue(first);
-  if (queue !== undefined) {
-    flush(queue.eagerNodes, queue.callbacks);
+    flush(queue);
   }
 }
 
@@ -715,19 +714,12 @@ export function setDerivedNodeEvaluation(
     case CHECK:
       switch (evaluation) {
         case EAGER:
-          flush([mutableNode], []);
+          flush([mutableNode]);
           break;
         case LAZY: {
-          // The callback is queued first, as in the batch's method.
-          const queue = markCheckQueue(
-            mutableNode.onDirty === undefined
-              ? undefined
-              : { eagerNodes: [], callbacks: [mutableNode.onDirty] },
-            mutableNode,
-            undefined,
-          );
+          const queue = markCheckQueue(undefined, mutableNode, undefined);
           if (queue !== undefined) {
-            flush(queue.eagerNodes, queue.callbacks);
+            flush(queue);
           }
           break;
         }
@@ -756,48 +748,121 @@ function storeValue<TValue>(
   return source.firstDependent;
 }
 
-/** Leaves the dependents list for marking. */
-function resetToUncomputed(node: MutableDerivedNode<unknown>): void {
-  unlinkAll(node.firstSourceDependency);
-  unlinkAll(node.firstDerivedDependency);
-  node.firstSourceDependency = undefined;
-  node.lastSourceDependency = undefined;
-  node.firstDerivedDependency = undefined;
-  node.lastDerivedDependency = undefined;
-  node.status = UNCOMPUTED;
-  node.value = undefined;
+/**
+ * Counts a holder of `node`. A retained node keeps its value and its
+ * dependencies until its last release. Allocates nothing.
+ *
+ * Contract: called outside computations and `onChange` callbacks.
+ */
+export function retainDerivedNode(node: DerivedNode<unknown>): void {
+  (node as MutableDerivedNode<unknown>).retainCount += 1;
 }
 
 /**
- * Guarantee: each callback runs while no eager node of the batch is queued.
+ * Drops one holder of `node`. A release that leaves the node with
+ * `retainCount` 0 and no dependent disposes it, and then each derived
+ * dependency that the disposal leaves in the same state.
+ *
+ * Contract: called once for each `retainDerivedNode` of the node, outside
+ * computations and `onChange` callbacks. A second release of the same retain
+ * decrements again, and can dispose a node another holder still holds.
+ */
+export function releaseDerivedNode(node: DerivedNode<unknown>): void {
+  const mutableNode = node as MutableDerivedNode<unknown>;
+  mutableNode.retainCount -= 1;
+  if (
+    mutableNode.retainCount === 0 &&
+    mutableNode.firstDependent === undefined
+  ) {
+    disposeUnneeded(mutableNode, undefined);
+  }
+}
+
+/**
+ * Disposes `first` and each node on the stack that is unneeded: not
+ * `Uncomputed`, with `retainCount` 0 and no dependent. Each derived dependency
+ * that a disposal leaves with `retainCount` 0 and no dependent joins the stack.
+ * A node on the stack twice, or that was read again after it joined, is
+ * skipped. Sources are never disposed.
+ */
+function disposeUnneeded(
+  first: MutableDerivedNode<unknown>,
+  initialStack: Array<DerivedNode<unknown>> | undefined,
+): void {
+  let stack = initialStack;
+  let node: MutableDerivedNode<unknown> | undefined = first;
+  while (node !== undefined) {
+    if (
+      node.retainCount === 0 &&
+      node.firstDependent === undefined &&
+      node.status !== UNCOMPUTED
+    ) {
+      unlinkAll(node.firstSourceDependency);
+      let edge = node.firstDerivedDependency;
+      while (edge !== undefined) {
+        unlinkEdge(edge);
+        const dependency = edge.dependency;
+        if (
+          dependency.firstDependent === undefined &&
+          dependency.retainCount === 0
+        ) {
+          (stack ??= []).push(dependency);
+        }
+        edge = edge.nextDependency;
+      }
+      node.firstSourceDependency = undefined;
+      node.lastSourceDependency = undefined;
+      node.firstDerivedDependency = undefined;
+      node.lastDerivedDependency = undefined;
+      node.status = UNCOMPUTED;
+      node.value = undefined;
+    }
+    node = stack?.pop() as MutableDerivedNode<unknown> | undefined;
+  }
+}
+
+/**
+ * Refreshes every queued eager node, then calls the `onChange` of each one
+ * whose value a refresh changed, in the order of their first changed
+ * recompute.
+ *
+ * Guarantee: every `onChange` runs while no eager node of the batch is queued.
  *
  * Internal invariant: a node queued twice, by setting it lazy and then eager,
  * is `Clean` or lazy the second time, so the eager list needs no
- * deduplication.
+ * deduplication. An `onChange` writes nothing, so it queues no eager node.
  */
-function flush(
-  eagerNodes: Array<MutableDerivedNode<unknown>>,
-  callbacks: Array<() => void>,
-): void {
-  // Indices walk both arrays, because a refresh appends to them during the
+function flush(eagerNodes: Array<MutableDerivedNode<unknown>>): void {
+  // Created on the first changed node with an `onChange`, so a flush that
+  // calls nothing allocates nothing.
+  let changed: Array<MutableDerivedNode<unknown>> | undefined;
+  // An index walks the array, because a refresh appends to it during the
   // walk.
-  let eagerIndex = 0;
-  let callbackIndex = 0;
+  let index = 0;
   while (true) {
-    // Every queued eager node is refreshed before the next callback runs. A
-    // refresh whose value changed can queue more of both.
-    const eager = eagerNodes[eagerIndex];
-    if (eager !== undefined) {
-      eagerIndex += 1;
-      refreshEager(eagerNodes, callbacks, eager);
-      continue;
-    }
-    const callback = callbacks[callbackIndex];
-    if (callback === undefined) {
+    const node = eagerNodes[index];
+    if (node === undefined) {
       break;
     }
-    callbackIndex += 1;
-    callback();
+    index += 1;
+    if (
+      refreshEager(eagerNodes, node) === CHANGED &&
+      node.onChange !== undefined &&
+      node.onChangeStatus === ON_CHANGE_NOT_QUEUED
+    ) {
+      node.onChangeStatus = ON_CHANGE_QUEUED;
+      (changed ??= []).push(node);
+    }
+  }
+  if (changed === undefined) {
+    return;
+  }
+  for (index = 0; index < changed.length; index += 1) {
+    const node = changed[index]!;
+    node.onChangeStatus = ON_CHANGE_NOT_QUEUED;
+    // Contract: no computation or `onChange` sets an `onChange`, so the field
+    // still holds the function it held when the refresh changed the value.
+    node.onChange!();
   }
 }
 
@@ -908,9 +973,18 @@ export function readDerived<TValue>(
     // An edge from the previous run to a different node moves to this
     // node's dependents list. An edge to the same node is reused as is.
     if (next.dependency !== node) {
+      const previousDependency = next.dependency;
       unlinkEdge(next);
       next.dependency = node as DerivedNode<unknown>;
       linkEdge(next);
+      // The run may read the previous dependency again, so its disposal waits
+      // until the run ends.
+      if (
+        previousDependency.firstDependent === undefined &&
+        previousDependency.retainCount === 0
+      ) {
+        (mutableCallingNode.disposalCandidates ??= []).push(previousDependency);
+      }
     }
     mutableCallingNode.lastDerivedDependency = next;
   } else if (last === undefined || last.dependency !== node) {
@@ -935,10 +1009,20 @@ export function readDerived<TValue>(
 }
 
 /**
+ * Brings `node` up to date and returns its value. Inside a computation it is
+ * an untracked read, which records no dependency.
+ *
+ * Contract: `node` is retained.
+ */
+export function readDerivedNode<TValue>(node: DerivedNode<TValue>): TValue {
+  return pull(node);
+}
+
+/**
  * Guarantee: a `Dirty` or `Check` eager node returns its previous value and
  * runs nothing.
  */
-export function pull<TValue>(node: DerivedNode<TValue>): TValue {
+function pull<TValue>(node: DerivedNode<TValue>): TValue {
   const mutableNode = node as MutableDerivedNode<TValue>;
   switch (mutableNode.status) {
     case CLEAN:
@@ -961,39 +1045,43 @@ export function pull<TValue>(node: DerivedNode<TValue>): TValue {
   }
 }
 
+/** The refresh recomputed the node to a value not `===` its previous one. */
+const CHANGED = 0;
+/** The refresh left the node's value as it was, or did not refresh it. */
+const UNCHANGED = 1;
+
+type RefreshResult = typeof CHANGED | typeof UNCHANGED;
+
 /**
  * A node set lazy after it was queued is skipped, because setting it lazy
  * marked its dependents.
  */
 function refreshEager(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
-  callbacks: Array<() => void>,
   node: MutableDerivedNode<unknown>,
-): void {
+): RefreshResult {
   if (node.evaluation === LAZY) {
-    return;
+    return UNCHANGED;
   }
   switch (node.status) {
     case DIRTY:
-      recomputeEager(eagerNodes, callbacks, node);
-      break;
+      return recomputeEager(eagerNodes, node);
     case CHECK:
-      if (verify(node) === DIRTY) {
-        recomputeEager(eagerNodes, callbacks, node);
-      }
-      break;
-    // Internal invariant: a Clean node was disposed and then pulled, or is in
-    // the list twice. An Uncomputed node was disposed, and computing it would
-    // relink its sources.
+      return verify(node) === DIRTY
+        ? recomputeEager(eagerNodes, node)
+        : UNCHANGED;
+    // Internal invariant: a Clean node is in the list twice, or was disposed
+    // and computed again. An Uncomputed node was disposed by a release or by
+    // a recompute that stopped reading it, and computing it would relink its
+    // sources.
     case CLEAN:
     case UNCOMPUTED:
-      break;
+      return UNCHANGED;
   }
 }
 
 function markDirty<TDependency>(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
-  callbacks: Array<() => void>,
   first: Edge<TDependency>,
 ): void {
   // `held` is the latest marked lazy node with dependents, and the stack holds
@@ -1013,9 +1101,6 @@ function markDirty<TDependency>(
           eagerNodes.push(node);
           break;
         }
-        if (node.onDirty !== undefined) {
-          callbacks.push(node.onDirty);
-        }
         if (node.firstDependent !== undefined) {
           if (held !== undefined) {
             (stack ??= []).push(held);
@@ -1023,13 +1108,13 @@ function markDirty<TDependency>(
           held = node;
         }
         break;
-      // Internal invariant: a Check node marked its dependents, and queued
-      // its callback or itself, when it left Clean.
+      // Internal invariant: a Check node marked its dependents, or queued
+      // itself, when it left Clean.
       case CHECK:
         node.status = DIRTY;
         break;
-      // Internal invariant: a Dirty node was marked earlier. No dependents
-      // list holds an Uncomputed node.
+      // Internal invariant: a Dirty node was marked earlier. An Uncomputed
+      // node has no dependency, so no dependents list holds it.
       case DIRTY:
       case UNCOMPUTED:
         break;
@@ -1038,7 +1123,7 @@ function markDirty<TDependency>(
   // The dependents of the nodes marked Dirty might keep their values, so they
   // become Check.
   if (held !== undefined) {
-    markCheck(eagerNodes, callbacks, held, stack);
+    markCheck(eagerNodes, held, stack);
   }
 }
 
@@ -1048,7 +1133,6 @@ function markDirty<TDependency>(
  */
 function markCheck(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
-  callbacks: Array<() => void>,
   held: MutableDerivedNode<unknown>,
   initialStack: Array<MutableDerivedNode<unknown>> | undefined,
 ): void {
@@ -1067,9 +1151,6 @@ function markCheck(
           if (dependent.evaluation === EAGER) {
             eagerNodes.push(dependent);
             break;
-          }
-          if (dependent.onDirty !== undefined) {
-            callbacks.push(dependent.onDirty);
           }
           if (dependent.firstDependent !== undefined) {
             // After the last dependent of the list, the walk continues into
@@ -1118,9 +1199,6 @@ function markDirtyQueue<TDependency>(
           queue = queueEagerNode(queue, node);
           break;
         }
-        if (node.onDirty !== undefined) {
-          queue = queueCallback(queue, node.onDirty);
-        }
         if (node.firstDependent !== undefined) {
           if (held !== undefined) {
             (stack ??= []).push(held);
@@ -1128,13 +1206,13 @@ function markDirtyQueue<TDependency>(
           held = node;
         }
         break;
-      // Internal invariant: a Check node marked its dependents, and queued
-      // its callback or itself, when it left Clean.
+      // Internal invariant: a Check node marked its dependents, or queued
+      // itself, when it left Clean.
       case CHECK:
         node.status = DIRTY;
         break;
-      // Internal invariant: a Dirty node was marked earlier. No dependents
-      // list holds an Uncomputed node.
+      // Internal invariant: a Dirty node was marked earlier. An Uncomputed
+      // node has no dependency, so no dependents list holds it.
       case DIRTY:
       case UNCOMPUTED:
         break;
@@ -1167,9 +1245,6 @@ function markCheckQueue(
           if (dependent.evaluation === EAGER) {
             queue = queueEagerNode(queue, dependent);
             break;
-          }
-          if (dependent.onDirty !== undefined) {
-            queue = queueCallback(queue, dependent.onDirty);
           }
           if (dependent.firstDependent !== undefined) {
             // After the last dependent of the list, the walk continues into
@@ -1204,18 +1279,9 @@ function queueEagerNode(
   node: MutableDerivedNode<unknown>,
 ): Queue {
   if (queue === undefined) {
-    return { eagerNodes: [node], callbacks: [] };
+    return [node];
   }
-  queue.eagerNodes.push(node);
-  return queue;
-}
-
-/** `queueEagerNode` for a callback. */
-function queueCallback(queue: Queue | undefined, callback: () => void): Queue {
-  if (queue === undefined) {
-    return { eagerNodes: [], callbacks: [callback] };
-  }
-  queue.callbacks.push(callback);
+  queue.push(node);
   return queue;
 }
 
@@ -1317,31 +1383,24 @@ function recompute<TValue>(node: MutableDerivedNode<TValue>): TValue {
 /**
  * Internal invariant: an eager node's dependents may be `Clean`, so a changed
  * value marks them through `markDirty`.
- *
- * Guarantee: an eager node's `onDirty` is collected only when its value
- * changed.
  */
 function recomputeEager(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
-  callbacks: Array<() => void>,
   node: MutableDerivedNode<unknown>,
-): void {
+): RefreshResult {
   const previous = node.value;
   const value = rerun(node, previous);
-  // On cutoff the dependents stay Clean and no callback runs.
+  // On cutoff the dependents stay Clean.
   if (value === previous) {
-    return;
+    return UNCHANGED;
   }
   node.value = value;
-  // Marking the node queued no callback, so its callback is queued now.
-  if (node.onDirty !== undefined) {
-    callbacks.push(node.onDirty);
-  }
   // Eager dependents that this marks join the list the flush is walking.
   const first = node.firstDependent;
   if (first !== undefined) {
-    markDirty(eagerNodes, callbacks, first);
+    markDirty(eagerNodes, first);
   }
+  return CHANGED;
 }
 
 function rerun<TValue>(
@@ -1353,6 +1412,16 @@ function rerun<TValue>(
   const value = node.computation(node, previous);
   trim(node);
   node.status = CLEAN;
+  // The run is over, so a node it repointed away from and did not read again
+  // has no dependent.
+  const candidates = node.disposalCandidates;
+  if (candidates !== undefined) {
+    node.disposalCandidates = undefined;
+    disposeUnneeded(
+      candidates.pop() as MutableDerivedNode<unknown>,
+      candidates,
+    );
+  }
   return value;
 }
 
@@ -1373,7 +1442,10 @@ function markCheckDependentsDirty(first: DerivedEdge | undefined): void {
   }
 }
 
-/** Unlinks and drops the edges after the last one the computation read. */
+/**
+ * Unlinks and drops the edges after the last one the computation read, and
+ * disposes each derived dependency that the drop leaves unneeded.
+ */
 function trim(node: MutableDerivedNode<unknown>): void {
   // The edges after the cursor are left from the previous run, which read more
   // than this one. A run that read nothing of a kind drops the whole list.
@@ -1387,11 +1459,36 @@ function trim(node: MutableDerivedNode<unknown>): void {
   }
   const lastDerived = node.lastDerivedDependency;
   if (lastDerived === undefined) {
-    unlinkAll(node.firstDerivedDependency);
-    node.firstDerivedDependency = undefined;
+    // A call with an empty list slowed a recompute of a node that reads only
+    // sources.
+    const first = node.firstDerivedDependency;
+    if (first !== undefined) {
+      unlinkDropped(first);
+      node.firstDerivedDependency = undefined;
+    }
   } else if (lastDerived.nextDependency !== undefined) {
-    unlinkAll(lastDerived.nextDependency);
+    unlinkDropped(lastDerived.nextDependency);
     lastDerived.nextDependency = undefined;
+  }
+}
+
+/**
+ * Unlinks the derived edges from `first` on, and disposes each dependency that
+ * an unlink leaves unneeded. The run is over, so a dependency it read is
+ * linked and is not disposed.
+ */
+function unlinkDropped(first: DerivedEdge): void {
+  let edge: DerivedEdge | undefined = first;
+  while (edge !== undefined) {
+    unlinkEdge(edge);
+    const dependency = edge.dependency;
+    if (
+      dependency.firstDependent === undefined &&
+      dependency.retainCount === 0
+    ) {
+      disposeUnneeded(dependency as MutableDerivedNode<unknown>, undefined);
+    }
+    edge = edge.nextDependency;
   }
 }
 
@@ -1416,16 +1513,20 @@ function unlinkAll<TDependency extends NodeWithDependents<TDependency>>(
 - `DependentsStatus` is a union of two numbers with a constant for each, private to `graph.ts`, so the hot path compares small integers as it does for `Status`, and each value has a name in the code.
 - Marking pushes a node onto its stack only when the node leaves `Clean` and its dependents list is not empty, so a write visits each node's dependents at most once. Marking holds the last node it must descend into in a local and allocates its stack on the first push, and it descends into a dependent that is the last entry of its list without pushing it, so a chain, or a fan-out whose readers have no readers, allocates no stack. A write allocates the stack when it takes out of `Clean` two or more lazy direct readers that have readers, or a lazy node that has readers and is not the last entry of the dependents list marking reached it through. A write to a source with 100 lazy readers that each have one reader allocates about 2,360 bytes (Node 24.12, `heapUsed` over 20,000 writes). Marking each direct reader's dependents as soon as the reader is marked allocates no stack, and that variant measured mixed in the PR #1027 performance review: 1,000 readers with one reader each went from 34.6 µs to 29.2 µs per write and pull, and a `writeSource` with one observed reader from 21.3 ns to 24.9 ns, so `markDirty` keeps `held` and the stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack, and the engine holds no module state (pico-js-losses.md, fast2).
 - A node becomes `Clean` only after its computation returns or after `verify` has pulled every derived dependency it is linked to. Each lazy dependency a computation links is `Clean` when it is read, and marking continues through every lazy node, so every dependent of a lazy node that is not `Clean` is `Check` or `Dirty`. A lazy recompute therefore marks only `Check` and `Dirty` nodes and takes no node out of `Clean`, so it marks through `markCheckDependentsDirty`, which walks only the node's dependents list, and needs no stack. A pull outside a flush recomputes only lazy nodes, so it takes no node out of `Clean` and takes no batch. A node that `setDerivedNodeEvaluation` or `mutators.setDerivedNodeEvaluation` makes lazy while `Dirty` or `Check` had its `Clean` dependents marked `Check` by that call, so this holds for it too.
-- An eager node that is `Dirty` or `Check` may have `Clean` dependents, and only until the flush of the batch whose `eagerNodes` holds it. Marking queues it when it leaves `Clean`, and `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation` queue a `Dirty` or `Check` node it makes eager, so every `Dirty` or `Check` eager node is queued. The flush refreshes it at the top level, outside any computation, through `refreshEager`. `recomputeEager` marks a changed value through `markDirty`, which takes the arrays of the batch being flushed, takes `Clean` dependents out of `Clean`, collects their callbacks, and queues the eager nodes among them. It collects the eager node's own `onDirty` there, when its value changed, and not when marking reached the node, so an observer of an eager node is called only when the node's value changed.
-- `mutators.setDerivedNodeEvaluation` and `setDerivedNodeEvaluation` restore the lazy invariant when they make a `Dirty` or `Check` eager node lazy: they mark the node's `Clean` dependents `Check` through `markCheck` or `markCheckQueue`, the second phase of `markDirty`, which starts from the node as if marking had just taken it out of `Clean`. Leaving the node queued and its dependents `Clean` until the flush would break the invariant until then: a pull of the lazy `Dirty` node would recompute it, and `markCheckDependentsDirty` would leave its `Clean` dependents `Clean` and stale, and marking that reached the node would stop there and leave its `Clean` dependents stale. `refreshEager` skips a lazy node, because its dependents are already `Check` or `Dirty` and its `onDirty` is already collected, and a refresh would collect it again.
-- `startBatch` allocates the two arrays and one `Mutators` per call, and the caller's `body` is a closure. The methods of `Mutators` are prototype methods over its private fields. A single call allocates no queue until marking pushes, and then one `Queue` and its two arrays. `markDirtyQueue` and `markCheckQueue` are copies of `markDirty` and `markCheck` that create the queue on the first push, through `queueEagerNode` and `queueCallback`, with the array that receives the push as a literal that holds the pushed element. A literal of one element has room for one, and a push onto an empty array allocates room for 17, so a `writeSource` that queues one callback allocates 128.7 bytes against 257.0 for a queue of two empty arrays, and one that queues one eager node 128.8 against 257.2 (Node 24.12, `heapUsed` over 20,000 writes). Per write, median of six processes of `bench/single` with two more cases, a `writeSource` to a source whose one reader has an `onDirty`, with a pull after each write, takes 12.6 ns against 19.7 ns for the queue of two empty arrays, and one to a source whose one reader is eager 11.9 ns against 16.8 ns. The two helpers are functions of their own because the same branches written inside `markDirtyQueue` and `markCheckQueue` slowed a write to a source that one lazy derived node reads, which queues nothing, from 5.1 ns to 7.6 ns. With the helpers it takes 5.2 ns. One `markDirty` that took an optional queue and returned it slowed `startBatch`: on Node 24.12, median of five processes, a batch of one write with an `onDirty` took 24.9 ns against 22.8 ns, and a batch of two writes 29.2 ns against 23.7 ns. Creating the queue in `startBatch` and passing it to that `markDirty` left 23.8 ns and 25.0 ns. With the copies, every batched case is within 0.2 ns of the engine without single calls. Per write, median of five processes of nine rounds of 2,000,000 writes (`bench/single`): 1.1 ns for `writeSource` against 4.3 ns for a `startBatch` of one `mutators.writeSource` to a source that no derived node has read, and 5.1 ns against 14.6 ns to a source that one derived node reads, with a pull after each write.
-- `flush` reads both arrays by index and checks `eagerNodes` before each callback, so the entries that a refresh or a callback appends are drained in the same flush, and no callback runs while an eager node of the batch is queued. It does not empty the arrays, because a batch is flushed once, when its `startBatch` body or its single call returns.
+- An eager node that is `Dirty` or `Check` may have `Clean` dependents, and only until the flush of the batch whose `eagerNodes` holds it. Marking queues it when it leaves `Clean`, and `setDerivedNodeEvaluation` and `mutators.setDerivedNodeEvaluation` queue a `Dirty` or `Check` node it makes eager, so every `Dirty` or `Check` eager node is queued. The flush refreshes it at the top level, outside any computation, through `refreshEager`. `recomputeEager` marks a changed value through `markDirty`, which takes the eager-node array of the batch being flushed, takes `Clean` dependents out of `Clean`, and queues the eager nodes among them, and it returns `CHANGED`. `flush` then appends the node to its list of changed nodes if the node has an `onChange` and its `onChangeStatus` is `ON_CHANGE_NOT_QUEUED`, and sets it to `ON_CHANGE_QUEUED`, so a node that recomputes twice in one flush, because it read an eager node that the flush refreshed after it, is in the list once. Marking collects nothing, so a lazy node's `onChange` is never called, and an eager node's is called only when its value changed.
+- `mutators.setDerivedNodeEvaluation` and `setDerivedNodeEvaluation` restore the lazy invariant when they make a `Dirty` or `Check` eager node lazy: they mark the node's `Clean` dependents `Check` through `markCheck` or `markCheckQueue`, the second phase of `markDirty`, which starts from the node as if marking had just taken it out of `Clean`. Leaving the node queued and its dependents `Clean` until the flush would break the invariant until then: a pull of the lazy `Dirty` node would recompute it, and `markCheckDependentsDirty` would leave its `Clean` dependents `Clean` and stale, and marking that reached the node would stop there and leave its `Clean` dependents stale. `refreshEager` skips a lazy node, because its dependents are already `Check` or `Dirty`, and a read recomputes it.
+- `startBatch` allocates one array and one `Mutators` per call, and the caller's `body` is a closure. The methods of `Mutators` are prototype methods over its private field. A single call allocates no queue until marking pushes an eager node, and then one array, which the flush walks as its eager-node array. `markDirtyQueue` and `markCheckQueue` are copies of `markDirty` and `markCheck` that create the queue on the first push, through `queueEagerNode`, with an array literal that holds the pushed element. A literal of one element has room for one, and a push onto an empty array allocates room for 17. The helper is a function of its own because the same branch written inside `markDirtyQueue` and `markCheckQueue` slowed a write to a source that one lazy derived node reads, which queues nothing, from 5.1 ns to 7.6 ns. One `markDirty` that took an optional queue and returned it slowed `startBatch`: on Node 24.12, median of five processes, a batch of one write took 24.9 ns against 22.8 ns, and a batch of two writes 29.2 ns against 23.7 ns. With the copies, every batched case is within 0.2 ns of the engine without single calls. In Node 24.12, `heapUsed` over 20,000 single-call writes and reads grows by 0.4 bytes per write for a source whose one reader is lazy, 4.2 bytes for one whose one reader is eager, and 31.3 bytes for one whose eager reader has an `onChange`, which is the flush's list of changed nodes.
+- `flush` reads the eager-node array by index, so the entries that a refresh appends are refreshed in the same walk. It creates its list of changed nodes on the first changed node that has an `onChange`, and walks that list by index after the eager-node array is drained, so every `onChange` runs while no eager node of the batch is queued. No `onChange` writes or starts a batch, so no flush runs inside another, and the walk over the list queues nothing. Neither array is emptied, because a flush walks each once. A nested `startBatch` in a `body` allocates its own array, because without module state it cannot reach the outer batch's.
+- `retainCount` counts holders. `retainDerivedNode` and a `releaseDerivedNode` that leaves the node needed write one field and allocate nothing, so there is no handle. A node is unneeded when it is not `Uncomputed`, its `retainCount` is 0, and its dependents list is empty. `disposeUnneeded` disposes such a node and walks its derived dependencies with an explicit stack, allocated on its first push, and disposes each one the disposal leaves unneeded, so a release of the head of a chain of 100,000 nodes adds no call-stack frame per node. It skips a node that is on the stack twice or that something read again. Disposal unlinks the node's own edges and marks nothing, because a disposed node has no dependents by definition.
+- A recompute can leave a dependency unneeded in two places. `readDerived` repoints an edge whose previous dependency differs from the node it reads, and the run may read that previous dependency again at a later position, so `readDerived` pushes it onto `callingNode.disposalCandidates` when the repoint leaves it with no dependent and `retainCount` 0, and `rerun` runs `disposeUnneeded` over that array after `trim`. A node that the run read again is linked by then and is skipped. `trim` unlinks the edges past the last read through `unlinkDropped`, which runs after the last read, so it disposes each dependency an unlink leaves unneeded at once. A first computation has no previous edges, so `computeFirst` neither repoints nor drops. The check is per calling node: when a node `X` that runs during the run of `A` drops `Y`, and `A` reads `Y` later in its own run, `Y` was disposed at the end of `X`'s run and `A` computes it from scratch. The result is correct and the work is wasted.
+- `trim` calls `unlinkDropped` only when the node has a derived edge to drop. A call with an empty list, on every recompute of a node that reads only sources, slowed the write-then-read loop of `bench/single`'s read case from 4.45 ns to 6.39 ns, and the guard brought it to 4.0 ns.
+- A branch that flips is disposed and recomputed: a toggle of a flag that picks between two chains of 100 lazy nodes cost 2,142 ns per toggle in the prototype of this design, against 11.3 ns when both chains stay computed, and 11.5 ns when the caller retains both heads. The README states that a caller retains both branches to keep both computed.
 - While a computation runs, its node is `Uncomputed` or `Dirty` and is linked to what it has read so far. Every node it read is `Clean`, or is a `Dirty` or `Check` eager node whose previous value it read. A pull inside the computation recomputes only lazy nodes, which take no node out of `Clean`, so nothing takes a node the computation read out of `Clean` before the computation returns, and marking never reaches the running node while it is `Uncomputed`.
 - `verify` walks the derived dependency lists in read order with an explicit stack of edges. It descends into a lazy `Check` dependency before its reader continues and pulls any other dependency, so a `Check` eager dependency returns its previous value. After a pull that leaves the current node `Dirty`, it recomputes that node and returns to the node's reader. It does not recompute `root`. It returns the status it leaves `root` in, `DIRTY` or `CLEAN`, and its caller recomputes a `Dirty` root: `pull` through `recompute`, and `refreshEager` through `recomputeEager`. The return value carries the status because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change it. The order of pulls and recomputes is that of a recursive `verify`. It pushes an edge only when the dependency it descends into has more than one dependent, and it allocates the stack on the first push. A node with one dependent returns to its reader through its only dependents-list edge, which is the edge `verify` descended through. A node `verify` descended into has at least one dependent, and one with more than one has an edge on the stack. `verify` does not check either contract. A first computation still recurses through `readDerived` and `pull`.
 - Because a write marks the source's direct readers `Dirty`, a `Check` node has no changed source, and `verify` pulls only its derived dependencies. A dependency's `recompute` marks its readers `Dirty` exactly when its new value is not `===` its previous value, so after a pull in `verify` the node is `Dirty` exactly when a lazy dependency it read changed value. A `Dirty` or `Check` eager dependency returns its previous value and leaves the node as it is, and its flush marks the node if its value changed.
-- `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `newDerivedNode` and assigned in `disposeDerivedNode`, where `value` is `unknown` and needs no cast. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`, and a pull of a `Clean` or `Check` node reads `node.value` directly.
+- `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `newDerivedNode` and assigned in `disposeUnneeded`, where `value` is `unknown` and needs no cast. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`, so a `Dirty` node always has a value for its next computation to receive as `previous`, and a pull of a `Clean` or `Check` node reads `node.value` directly.
 - The `DerivedNode` doc comment lists internal invariants: the engine's state between computations, which the engine keeps and the README does not list. pico-js checks none of them at run time, so a bug that breaks one returns a wrong value or throws a `TypeError` instead of an error that names the invariant. The README's Contracts section lists the caller's obligations, and its Guarantees section lists what pico-js upholds while they hold. A comment in `graph.ts` that states a caller's obligation starts with `Contract:`, and one that states what the engine ensures starts with `Guarantee:` or `Internal invariant:`.
-- The exported `SourceNode` and `DerivedNode` mark every field `readonly` except `onDirty`, so a caller's write to any other field is a type error, and the type test checks it. `computation` is a method, which a type cannot mark `readonly`. It stays a method so that `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`. Inside `graph.ts`, `Mutable<T>` removes `readonly`, and the engine writes through `MutableSourceNode` and `MutableDerivedNode`. Each exported function and each method of `Mutators` casts its node arguments to the mutable view once. `Edge` holds the public node types, because the public edge-list fields expose edges, and an edge that held the mutable view would let a caller write a node's fields through `node.firstDependent.dependent`. So `markDirty`, `markCheck`, their queue copies, `markCheckDependentsDirty`, and `verify` cast each node they reach through an edge. `linkEdge`, `unlinkEdge`, and `unlinkAll` write a node's dependents-list fields through the constraint `NodeWithDependents`, whose fields are mutable, and TypeScript lets a `readonly` field satisfy it. `Edge.dependent` is `readonly`. `Edge.dependency` is repointed when a recompute reads a different node at that position, and appends, `trim`, `linkEdge`, and `unlinkEdge` rewrite `nextDependency`, `previousDependent`, and `nextDependent`.
+- The exported `SourceNode` and `DerivedNode` mark every field `readonly` except `onChange`, so a caller's write to any other field is a type error, and the type test checks it. `computation` is a method, which a type cannot mark `readonly`. It stays a method so that `DerivedNode<TValue>` is assignable to `DerivedNode<unknown>`. Inside `graph.ts`, `Mutable<T>` removes `readonly`, and the engine writes through `MutableSourceNode` and `MutableDerivedNode`. Each exported function and each method of `Mutators` casts its node arguments to the mutable view once. `Edge` holds the public node types, because the public edge-list fields expose edges, and an edge that held the mutable view would let a caller write a node's fields through `node.firstDependent.dependent`. So `markDirty`, `markCheck`, their queue copies, `markCheckDependentsDirty`, `verify`, `disposeUnneeded`, and `unlinkDropped` cast each node they reach through an edge. `linkEdge`, `unlinkEdge`, and `unlinkAll` write a node's dependents-list fields through the constraint `NodeWithDependents`, whose fields are mutable, and TypeScript lets a `readonly` field satisfy it. `Edge.dependent` is `readonly`. `Edge.dependency` is repointed when a recompute reads a different node at that position, and appends, `trim`, `linkEdge`, and `unlinkEdge` rewrite `nextDependency`, `previousDependent`, and `nextDependent`.
 
 ### Checks for a future debug build
 
@@ -1435,10 +1536,13 @@ A `__DEV__` build can restore these checks. Each throws `new Error(message)`.
 - `markCheckDependentsDirty`: a dependent's `status === CLEAN`; "A Clean node depends on a Dirty node. This is indicative of a bug in pico-js."
 - `verify`: `node.firstDependent === undefined` for a node it descended into; "A node that verify descended into has no dependents. This is indicative of a bug in pico-js."
 - `verify`: `verifyStack?.pop() === undefined` for a node it descended into with more than one dependent; "A node that verify descended into has more than one dependent and no edge on the verification stack. This is indicative of a bug in pico-js."
+- `releaseDerivedNode`: `retainCount === 0` before the decrement; "A node was released more often than it was retained."
+- `readDerivedNode`: a node with `retainCount === 0` and no dependent; "A node was read without being retained."
+- `flush`: `node.onChange === undefined` for a node in its list of changed nodes; "An onChange was cleared during a flush."
 - `pull`, `recompute`, and `recomputeEager`: a node whose `status !== UNCOMPUTED` holds no computed value, which needs a private `NOT_SET` sentinel in `value` while `Uncomputed`; "A node that is not Uncomputed has no value. This is indicative of a bug in pico-js."
-- A first computation has no cutoff and marks nothing, because every node in an `Uncomputed` node's dependents list is already `Dirty`: a new node has no readers, and disposal marked every reader `Dirty`.
+- A first computation has no cutoff and marks nothing, because an `Uncomputed` node has no dependents.
 - On cutoff the node keeps its stored value, so a recompute that returns `-0` where the stored value is `0` leaves `0` stored and returned, and every reader of the node reads the same value.
-- Disposal marks every reader `Dirty`, unlinks the node's own edges, and discards its value, so its next computation receives `previous` `undefined`. The readers stay in the node's dependents list, and each reader's next recompute either reads the node again, which computes it first, or drops the edge. An `Uncomputed` node has empty dependency lists and only `Dirty` dependents, so its disposal changes nothing. A `Dirty` node's dependents are `Check` or `Dirty`, and its disposal marks them `Dirty`. A disposed eager node that is still in `eagerNodes` is `Uncomputed` when the flush reaches it, and `refreshEager` leaves it `Uncomputed`, because computing it would link it to its sources again. A `Clean` eager node in `eagerNodes` is one that was disposed and then pulled, or one that is in the list twice, and `refreshEager` leaves it as it is.
+- Disposal discards the node's value and unlinks its own edges, so its next computation receives `previous` `undefined`. A disposed eager node that is still in `eagerNodes` is `Uncomputed` when the flush reaches it, and `refreshEager` leaves it `Uncomputed`, because computing it would link it to its sources again. A `Clean` eager node in `eagerNodes` is one that is in the list twice, or one that was disposed and computed again, and `refreshEager` leaves it as it is.
 
 ## `src/index.ts`
 
@@ -1451,12 +1555,13 @@ export {
   createEagerDerivedNode,
   createSourceNode,
   DIRTY,
-  disposeDerivedNode,
   EAGER,
   LAZY,
-  pull,
   readDerived,
+  readDerivedNode,
   readSource,
+  releaseDerivedNode,
+  retainDerivedNode,
   setDerivedNodeEvaluation,
   startBatch,
   UNCOMPUTED,
@@ -1466,6 +1571,7 @@ export type {
   DependentsStatus,
   DerivedNode,
   DerivedNodeEvaluation,
+  OnChangeStatus,
   SourceNode,
   Status,
 } from './graph';
@@ -1483,12 +1589,13 @@ import {
   createEagerDerivedNode,
   createSourceNode,
   DIRTY,
-  disposeDerivedNode,
   EAGER,
   LAZY,
-  pull,
   readDerived,
+  readDerivedNode,
   readSource,
+  releaseDerivedNode,
+  retainDerivedNode,
   setDerivedNodeEvaluation,
   startBatch,
   UNCOMPUTED,
@@ -1502,8 +1609,15 @@ function write<TValue>(source: SourceNode<TValue>, value: TValue): void {
   startBatch((mutators) => mutators.writeSource(source, value));
 }
 
-function dispose(node: DerivedNode<unknown>): void {
-  startBatch((mutators) => mutators.disposeDerivedNode(node));
+const retainedByRead = new WeakSet<DerivedNode<unknown>>();
+
+/** Retains `node` on its first call, never releases it, and reads it. */
+function read<TValue>(node: DerivedNode<TValue>): TValue {
+  if (!retainedByRead.has(node)) {
+    retainedByRead.add(node);
+    retainDerivedNode(node);
+  }
+  return readDerivedNode(node);
 }
 
 function setEvaluation(
@@ -1520,7 +1634,7 @@ const writers: ReadonlyArray<
   ['mutators.writeSource', write],
 ];
 
-describe('pull', () => {
+describe('reads', () => {
   test('a derived node runs nothing until it is pulled, and a second pull of the Clean node runs nothing', () => {
     let runs = 0;
     const a = createSourceNode(1);
@@ -1530,9 +1644,9 @@ describe('pull', () => {
     });
     expect(runs).toBe(0);
     expect(double.status).toBe(UNCOMPUTED);
-    expect(pull(double)).toBe(2);
+    expect(read(double)).toBe(2);
     expect(double.status).toBe(CLEAN);
-    expect(pull(double)).toBe(2);
+    expect(read(double)).toBe(2);
     expect(runs).toBe(1);
   });
 
@@ -1545,10 +1659,10 @@ describe('pull', () => {
       );
       return readDerived(callingNode, inner);
     });
-    expect(pull(outer)).toBe(10);
+    expect(read(outer)).toBe(10);
     write(source, 2);
     expect(outer.status).toBe(CHECK);
-    expect(pull(outer)).toBe(20);
+    expect(read(outer)).toBe(20);
   });
 
   test('the first computation receives undefined as previous and a recompute receives the previous value', () => {
@@ -1558,9 +1672,9 @@ describe('pull', () => {
       previousValues.push(previous);
       return readSource(callingNode, a) * 2;
     });
-    pull(double);
+    read(double);
     write(a, 2);
-    pull(double);
+    read(double);
     expect(previousValues).toEqual([undefined, 2]);
   });
 });
@@ -1578,7 +1692,7 @@ describe('marking', () => {
       runs.label += 1;
       return readDerived(callingNode, sum) > 2 ? 'big' : 'small';
     });
-    expect(pull(label)).toBe('big');
+    expect(read(label)).toBe('big');
     write(a, 5);
     expect(sum.status).toBe(DIRTY);
     expect(label.status).toBe(CHECK);
@@ -1600,7 +1714,7 @@ describe('marking', () => {
       (callingNode) =>
         readDerived(callingNode, left) + readDerived(callingNode, right),
     );
-    pull(top);
+    read(top);
     write(source, 2);
     expect([shared.status, left.status, right.status, top.status]).toEqual([
       DIRTY,
@@ -1615,13 +1729,13 @@ describe('marking', () => {
     const bottom = createDerivedNode((callingNode) =>
       readSource(callingNode, source),
     );
-    pull(bottom);
+    read(bottom);
     const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>(
       (below) => {
         const node = createDerivedNode(
           (callingNode) => readDerived(callingNode, below) + 1,
         );
-        pull(node);
+        read(node);
         return node;
       },
       bottom,
@@ -1645,10 +1759,10 @@ describe('cutoff', () => {
       runs.label += 1;
       return readDerived(callingNode, sum) > 2 ? 'big' : 'small';
     });
-    pull(label);
+    read(label);
     write(a, 0);
     write(b, 3);
-    expect(pull(label)).toBe('big');
+    expect(read(label)).toBe('big');
     expect(label.status).toBe(CLEAN);
     expect(runs).toEqual({ sum: 2, label: 1 });
   });
@@ -1668,12 +1782,12 @@ describe('cutoff', () => {
       readerRuns += 1;
       return readDerived(callingNode, parity).even;
     });
-    const first = pull(parity);
-    pull(reader);
+    const first = read(parity);
+    read(reader);
     write(a, 3);
-    expect(pull(reader)).toBe(false);
+    expect(read(reader)).toBe(false);
     expect(reader.status).toBe(CLEAN);
-    expect(pull(parity)).toBe(first);
+    expect(read(parity)).toBe(first);
     expect(readerRuns).toBe(1);
   });
 
@@ -1691,13 +1805,13 @@ describe('cutoff', () => {
       runs.reader += 1;
       return readDerived(callingNode, node) === undefined;
     });
-    expect(pull(reader)).toBe(true);
+    expect(read(reader)).toBe(true);
     expect(node.status).toBe(CLEAN);
-    expect(pull(node)).toBeUndefined();
+    expect(read(node)).toBeUndefined();
     expect(runs).toEqual({ node: 1, reader: 1 });
     write(a, 2);
     expect(node.status).toBe(DIRTY);
-    expect(pull(reader)).toBe(true);
+    expect(read(reader)).toBe(true);
     expect(reader.status).toBe(CLEAN);
     expect(runs).toEqual({ node: 2, reader: 1 });
     expect(previousValues).toEqual([undefined, undefined]);
@@ -1719,9 +1833,9 @@ describe('cutoff', () => {
       runs.d3 += 1;
       return readDerived(callingNode, d2) * 2;
     });
-    expect(pull(d3)).toBe(4);
+    expect(read(d3)).toBe(4);
     write(a, 10);
-    expect(pull(d3)).toBe(4);
+    expect(read(d3)).toBe(4);
     expect(runs).toEqual({ d1: 2, d2: 2, d3: 1 });
   });
 });
@@ -1746,9 +1860,9 @@ describe('verification', () => {
       runs.top += 1;
       return readDerived(callingNode, left) + readDerived(callingNode, right);
     });
-    expect(pull(top)).toBe(10);
+    expect(read(top)).toBe(10);
     write(source, 2);
-    expect(pull(top)).toBe(15);
+    expect(read(top)).toBe(15);
     expect(runs).toEqual({ shared: 2, left: 2, right: 2, top: 2 });
   });
 
@@ -1770,10 +1884,10 @@ describe('verification', () => {
         ? readDerived(callingNode, other)
         : 0;
     });
-    expect(pull(node)).toBe(1);
+    expect(read(node)).toBe(1);
     write(gateSource, 2);
     write(otherSource, 2);
-    expect(pull(node)).toBe(0);
+    expect(read(node)).toBe(0);
     expect(runs).toEqual({ gate: 2, other: 1, node: 2 });
   });
 });
@@ -1796,11 +1910,11 @@ describe('source writes and verification', () => {
         ? readDerived(callingNode, b)
         : readDerived(callingNode, c),
     );
-    expect(pull(foo)).toBe(1);
+    expect(read(foo)).toBe(1);
     write(bInput, 2);
     write(a, false);
     expect(foo.status).toBe(DIRTY);
-    expect(pull(foo)).toBe(0);
+    expect(read(foo)).toBe(0);
     expect(runs).toEqual({ b: 1, c: 1 });
   });
 });
@@ -1817,12 +1931,12 @@ describe('dependencies', () => {
         ? readSource(callingNode, a)
         : readSource(callingNode, b);
     });
-    expect(pull(pick)).toBe(1);
+    expect(read(pick)).toBe(1);
     write(useA, false);
-    expect(pull(pick)).toBe(2);
+    expect(read(pick)).toBe(2);
     write(a, 10);
     expect(pick.status).toBe(CLEAN);
-    expect(pull(pick)).toBe(2);
+    expect(read(pick)).toBe(2);
     expect(runs).toBe(2);
   });
 
@@ -1832,15 +1946,15 @@ describe('dependencies', () => {
     const sum = createDerivedNode(
       (callingNode) => readSource(callingNode, a) + readSource(callingNode, b),
     );
-    pull(sum);
+    read(sum);
     write(a, 3);
-    expect(pull(sum)).toBe(5);
+    expect(read(sum)).toBe(5);
     write(b, 4);
     expect(sum.status).toBe(DIRTY);
-    expect(pull(sum)).toBe(7);
+    expect(read(sum)).toBe(7);
     write(a, 5);
     expect(sum.status).toBe(DIRTY);
-    expect(pull(sum)).toBe(9);
+    expect(read(sum)).toBe(9);
   });
 
   test('a Dirty node stays in the dependents list of its other sources, and a second write leaves it Dirty', () => {
@@ -1854,13 +1968,13 @@ describe('dependencies', () => {
     const label = createDerivedNode(
       (callingNode) => `${readDerived(callingNode, sum)}`,
     );
-    pull(label);
+    read(label);
     write(a, 3);
     expect(hasDependent(b, sum)).toBe(true);
     write(b, 4);
     expect(sum.status).toBe(DIRTY);
     expect(label.status).toBe(CHECK);
-    expect(pull(label)).toBe('7');
+    expect(read(label)).toBe('7');
     expect(runs).toBe(2);
   });
 
@@ -1876,14 +1990,14 @@ describe('dependencies', () => {
         readSource(callingNode, a)
       );
     });
-    expect(pull(node)).toBe(12);
+    expect(read(node)).toBe(12);
     write(a, 2);
-    expect(pull(node)).toBe(14);
+    expect(read(node)).toBe(14);
     write(b, 20);
-    expect(pull(node)).toBe(24);
+    expect(read(node)).toBe(24);
     write(a, 3);
     write(b, 30);
-    expect(pull(node)).toBe(36);
+    expect(read(node)).toBe(36);
     expect(runs).toBe(4);
   });
 
@@ -1900,16 +2014,16 @@ describe('dependencies', () => {
         .slice(0, readSource(callingNode, count))
         .reduce((sum, source) => sum + readSource(callingNode, source), 0);
     });
-    expect(pull(node)).toBe(3);
+    expect(read(node)).toBe(3);
     write(count, 1);
-    expect(pull(node)).toBe(0);
+    expect(read(node)).toBe(0);
     write(third, 100);
     expect(node.status).toBe(CLEAN);
     write(count, 3);
-    expect(pull(node)).toBe(101);
+    expect(read(node)).toBe(101);
     write(third, 200);
     expect(node.status).toBe(DIRTY);
-    expect(pull(node)).toBe(201);
+    expect(read(node)).toBe(201);
     expect(runs).toBe(4);
   });
 
@@ -1920,97 +2034,22 @@ describe('dependencies', () => {
       runs += 1;
       return readSource(callingNode, a) + readSource(callingNode, a);
     });
-    expect(pull(twice)).toBe(2);
+    expect(read(twice)).toBe(2);
     write(a, 2);
-    expect(pull(twice)).toBe(4);
+    expect(read(twice)).toBe(4);
     expect(runs).toBe(2);
   });
 });
 
-describe('disposal', () => {
-  test('disposing a node returns it to Uncomputed, marks its readers Dirty, and its next pull computes it with previous undefined', () => {
-    const runs = { inner: 0, outer: 0 };
-    const innerPreviousValues: Array<number | undefined> = [];
-    const source = createSourceNode(1);
-    const inner = createDerivedNode<number>((callingNode, previous) => {
-      runs.inner += 1;
-      innerPreviousValues.push(previous);
-      return readSource(callingNode, source);
-    });
-    const outer = createDerivedNode((callingNode) => {
-      runs.outer += 1;
-      return readDerived(callingNode, inner) + 1;
-    });
-    expect(pull(outer)).toBe(2);
-    dispose(inner);
-    expect(inner.status).toBe(UNCOMPUTED);
-    expect(outer.status).toBe(DIRTY);
-    expect(pull(outer)).toBe(2);
-    expect(runs).toEqual({ inner: 2, outer: 2 });
-    write(source, 2);
-    expect(outer.status).toBe(CHECK);
-    expect(pull(outer)).toBe(3);
-    expect(innerPreviousValues).toEqual([undefined, undefined, 1]);
-  });
-
-  test('a disposed node is in no dependents list of the sources it read', () => {
-    const source = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) =>
-      readSource(callingNode, source),
-    );
-    pull(inner);
-    dispose(inner);
-    expect(inner.status).toBe(UNCOMPUTED);
-    expect(hasDependent(source, inner)).toBe(false);
-    write(source, 2);
-    expect(pull(inner)).toBe(2);
-  });
-
-  test('disposing a Dirty node marks its Check readers Dirty, and its next pull computes it with previous undefined', () => {
-    const innerPreviousValues: Array<number | undefined> = [];
-    const source = createSourceNode(1);
-    const inner = createDerivedNode<number>((callingNode, previous) => {
-      innerPreviousValues.push(previous);
-      return readSource(callingNode, source);
-    });
-    const outer = createDerivedNode(
-      (callingNode) => readDerived(callingNode, inner) + 1,
-    );
-    pull(outer);
-    write(source, 2);
-    expect(inner.status).toBe(DIRTY);
-    expect(outer.status).toBe(CHECK);
-    dispose(inner);
-    expect(inner.status).toBe(UNCOMPUTED);
-    expect(outer.status).toBe(DIRTY);
-    expect(pull(outer)).toBe(3);
-    expect(innerPreviousValues).toEqual([undefined, undefined]);
-  });
-
-  test('disposing a node that was never computed changes nothing', () => {
-    const previousValues: Array<number | undefined> = [];
-    const source = createSourceNode(1);
-    const node = createDerivedNode<number>((callingNode, previous) => {
-      previousValues.push(previous);
-      return readSource(callingNode, source);
-    });
-    expect(node.status).toBe(UNCOMPUTED);
-    dispose(node);
-    expect(node.status).toBe(UNCOMPUTED);
-    expect(pull(node)).toBe(1);
-    expect(previousValues).toEqual([undefined]);
-  });
-});
-
-describe('batches and onDirty', () => {
+describe('batches and onChange', () => {
   test('a write calls nothing until the batch is flushed', () => {
     const calls: Array<string> = [];
     const a = createSourceNode(1);
-    const double = createDerivedNode(
+    const double = createEagerDerivedNode(
       (callingNode) => readSource(callingNode, a) * 2,
     );
-    pull(double);
-    double.onDirty = () => calls.push('double');
+    read(double);
+    double.onChange = () => calls.push('double');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       expect(calls).toEqual([]);
@@ -2018,20 +2057,20 @@ describe('batches and onDirty', () => {
     expect(calls).toEqual(['double']);
   });
 
-  test('two writes in one batch call each onDirty once, after both writes', () => {
+  test('two writes in one batch call each onChange once, after both writes', () => {
     const calls: Array<string> = [];
     const a = createSourceNode(1);
     const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
+    const readsA = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
-    const readsB = createDerivedNode((callingNode) =>
+    const readsB = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, b),
     );
-    pull(readsA);
-    pull(readsB);
-    readsA.onDirty = () => calls.push('readsA');
-    readsB.onDirty = () => calls.push('readsB');
+    read(readsA);
+    read(readsB);
+    readsA.onChange = () => calls.push('readsA');
+    readsB.onChange = () => calls.push('readsB');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       mutators.writeSource(b, 2);
@@ -2040,41 +2079,15 @@ describe('batches and onDirty', () => {
     expect(calls).toEqual(['readsA', 'readsB']);
   });
 
-  test('several writes in one batch call each onDirty once, in the order the nodes left Clean', () => {
-    const calls: Array<string> = [];
-    const a = createSourceNode(1);
-    const b = createSourceNode(2);
-    const readsB = createDerivedNode((callingNode) =>
-      readSource(callingNode, b),
-    );
-    const readsA = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const readsBoth = createDerivedNode(
-      (callingNode) =>
-        readDerived(callingNode, readsA) + readDerived(callingNode, readsB),
-    );
-    pull(readsBoth);
-    readsA.onDirty = () => calls.push('readsA');
-    readsB.onDirty = () => calls.push('readsB');
-    readsBoth.onDirty = () => calls.push('readsBoth');
-    startBatch((mutators) => {
-      mutators.writeSource(b, 3);
-      mutators.writeSource(a, 4);
-      mutators.writeSource(b, 5);
-    });
-    expect(calls).toEqual(['readsB', 'readsBoth', 'readsA']);
-  });
-
-  test('a callback that pulls sees every write of the batch', () => {
+  test('an onChange that reads its node sees every write of the batch', () => {
     const seen: Array<number> = [];
     const a = createSourceNode(1);
     const b = createSourceNode(2);
-    const sum = createDerivedNode(
+    const sum = createEagerDerivedNode(
       (callingNode) => readSource(callingNode, a) + readSource(callingNode, b),
     );
-    pull(sum);
-    sum.onDirty = () => seen.push(pull(sum));
+    read(sum);
+    sum.onChange = () => seen.push(readDerivedNode(sum));
     startBatch((mutators) => {
       mutators.writeSource(a, 10);
       mutators.writeSource(b, 20);
@@ -2082,175 +2095,67 @@ describe('batches and onDirty', () => {
     expect(seen).toEqual([30]);
   });
 
-  test('a node that is already marked does not call onDirty again until it is pulled', () => {
-    let calls = 0;
-    const a = createSourceNode(1);
-    const double = createDerivedNode(
-      (callingNode) => readSource(callingNode, a) * 2,
-    );
-    pull(double);
-    double.onDirty = () => {
-      calls += 1;
-    };
-    write(a, 2);
-    write(a, 3);
-    expect(calls).toBe(1);
-    pull(double);
-    write(a, 4);
-    expect(calls).toBe(2);
-  });
-
-  test('a node that becomes Check calls onDirty', () => {
-    let calls = 0;
-    const a = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const outer = createDerivedNode(
-      (callingNode) => readDerived(callingNode, inner) + 1,
-    );
-    pull(outer);
-    outer.onDirty = () => {
-      calls += 1;
-    };
-    write(a, 2);
-    expect(outer.status).toBe(CHECK);
-    expect(calls).toBe(1);
-  });
-
-  test('a pull calls no onDirty, even when a recompute changes a value', () => {
-    let calls = 0;
-    const a = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const outer = createDerivedNode(
-      (callingNode) => readDerived(callingNode, inner) + 1,
-    );
-    pull(outer);
-    startBatch((mutators) => {
-      mutators.writeSource(a, 2);
-      outer.onDirty = () => {
-        calls += 1;
-      };
-      expect(pull(outer)).toBe(3);
-    });
-    expect(calls).toBe(0);
-  });
-
-  test('a callback collected in a batch is called even if an earlier callback disposed its node', () => {
-    const calls: Array<string> = [];
-    const a = createSourceNode(1);
-    const first = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const second = createDerivedNode(
-      (callingNode) => readSource(callingNode, a) + 1,
-    );
-    pull(first);
-    pull(second);
-    first.onDirty = () => {
-      calls.push('first');
-      dispose(second);
-    };
-    second.onDirty = () => calls.push('second');
-    write(a, 2);
-    expect(calls).toEqual(['first', 'second']);
-  });
-
-  test('a callback that writes through the batch being flushed has its new callbacks called in the same flush', () => {
-    const calls: Array<string> = [];
-    const a = createSourceNode(1);
-    const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const readsB = createDerivedNode((callingNode) =>
-      readSource(callingNode, b),
-    );
-    pull(readsA);
-    pull(readsB);
-    startBatch((mutators) => {
-      readsA.onDirty = () => {
-        calls.push('readsA');
-        mutators.writeSource(b, 2);
-      };
-      readsB.onDirty = () => calls.push('readsB');
-      mutators.writeSource(a, 2);
-    });
-    expect(calls).toEqual(['readsA', 'readsB']);
-  });
-
-  test('a callback that pulls its node and is marked again in the same flush is called again', () => {
-    const calls: Array<number> = [];
-    const a = createSourceNode(1);
-    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
-    pull(node);
-    startBatch((mutators) => {
-      node.onDirty = () => {
-        const value = pull(node);
-        calls.push(value);
-        if (value < 3) {
-          mutators.writeSource(a, value + 1);
-        }
-      };
-      mutators.writeSource(a, 2);
-    });
-    expect(calls).toEqual([2, 3]);
-  });
-
   test('two nodes that share one callback call it once per node', () => {
     let calls = 0;
     const a = createSourceNode(1);
-    const left = createDerivedNode((callingNode) => readSource(callingNode, a));
-    const right = createDerivedNode(
+    const left = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const right = createEagerDerivedNode(
       (callingNode) => readSource(callingNode, a) + 1,
     );
-    pull(left);
-    pull(right);
+    read(left);
+    read(right);
     const callback = () => {
       calls += 1;
     };
-    left.onDirty = callback;
-    right.onDirty = callback;
+    left.onChange = callback;
+    right.onChange = callback;
     write(a, 2);
     expect(calls).toBe(2);
   });
 
-  test('disposing an observed reader calls its onDirty', () => {
+  test('a batch that writes nothing calls nothing', () => {
     let calls = 0;
     const a = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) =>
+    const node = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
-    const outer = createDerivedNode(
-      (callingNode) => readDerived(callingNode, inner) + 1,
-    );
-    pull(outer);
-    outer.onDirty = () => {
-      calls += 1;
-    };
-    dispose(inner);
-    expect(outer.status).toBe(DIRTY);
-    expect(calls).toBe(1);
-  });
-
-  test('a batch whose callback does nothing calls nothing', () => {
-    let calls = 0;
-    const a = createSourceNode(1);
-    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
-    pull(node);
-    node.onDirty = () => {
+    read(node);
+    node.onChange = () => {
       calls += 1;
     };
     startBatch(() => {});
     expect(calls).toBe(0);
     expect(node.status).toBe(CLEAN);
   });
+
+  test('a node that changes in each of two batches calls onChange once per batch, and an eager node without onChange calls nothing', () => {
+    let calls = 0;
+    const a = createSourceNode(1);
+    const node = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const silent = createEagerDerivedNode(
+      (callingNode) => readSource(callingNode, a) + 1,
+    );
+    read(node);
+    read(silent);
+    node.onChange = () => {
+      calls += 1;
+    };
+    write(a, 2);
+    startBatch((mutators) => {
+      mutators.writeSource(a, 3);
+      mutators.writeSource(a, 4);
+    });
+    expect(calls).toBe(2);
+    expect([read(node), read(silent)]).toEqual([4, 5]);
+  });
 });
 
 describe('eager nodes', () => {
-  test('an eager node whose recompute returns the previous value leaves its readers Clean, and no callback runs', () => {
+  test('an eager node whose recompute returns the previous value leaves its readers Clean, and no onChange runs', () => {
     const runs = { isOne: 0, reader: 0 };
     let calls = 0;
     const a = createSourceNode(2);
@@ -2262,11 +2167,8 @@ describe('eager nodes', () => {
       runs.reader += 1;
       return readDerived(callingNode, isOne) ? 'one' : 'other';
     });
-    pull(reader);
-    reader.onDirty = () => {
-      calls += 1;
-    };
-    isOne.onDirty = () => {
+    read(reader);
+    isOne.onChange = () => {
       calls += 1;
     };
     write(a, 3);
@@ -2274,15 +2176,15 @@ describe('eager nodes', () => {
     expect(isOne.status).toBe(CLEAN);
     expect(reader.status).toBe(CLEAN);
     expect(calls).toBe(0);
-    expect(pull(reader)).toBe('other');
+    expect(read(reader)).toBe('other');
     expect(runs).toEqual({ isOne: 3, reader: 1 });
   });
 
-  test('a changed eager value marks its readers, and their callbacks run after every queued eager node is refreshed', () => {
+  test('a changed eager value marks its lazy readers Dirty, and onChange runs after every queued eager node is refreshed', () => {
     const calls: Array<string> = [];
     const a = createSourceNode(1);
     const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
+    const eagerA = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
     const eagerB = createEagerDerivedNode((callingNode) =>
@@ -2291,19 +2193,19 @@ describe('eager nodes', () => {
     const readsEager = createDerivedNode(
       (callingNode) => readDerived(callingNode, eagerB) + 1,
     );
-    pull(readsA);
-    pull(readsEager);
-    readsA.onDirty = () => calls.push(`readsA, eagerB ${eagerB.status}`);
-    readsEager.onDirty = () => calls.push('readsEager');
-    eagerB.onDirty = () => calls.push('eagerB');
+    read(eagerA);
+    read(readsEager);
+    eagerA.onChange = () =>
+      calls.push(`eagerA, eagerB ${eagerB.status} ${eagerB.value}`);
+    eagerB.onChange = () => calls.push('eagerB');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       mutators.writeSource(b, 2);
       expect(readsEager.status).toBe(CLEAN);
     });
-    expect(calls).toEqual([`readsA, eagerB ${CLEAN}`, 'eagerB', 'readsEager']);
+    expect(calls).toEqual([`eagerA, eagerB ${CLEAN} 2`, 'eagerB']);
     expect(readsEager.status).toBe(DIRTY);
-    expect(pull(readsEager)).toBe(3);
+    expect(read(readsEager)).toBe(3);
   });
 
   test('in a chain of eager nodes, each refreshes in the same flush, and a changed value at the top marks its reader', () => {
@@ -2324,11 +2226,7 @@ describe('eager nodes', () => {
     const reader = createDerivedNode((callingNode) =>
       readDerived(callingNode, third),
     );
-    pull(reader);
-    let calls = 0;
-    reader.onDirty = () => {
-      calls += 1;
-    };
+    read(reader);
     write(a, 2);
     expect([first.status, second.status, third.status]).toEqual([
       CLEAN,
@@ -2336,8 +2234,8 @@ describe('eager nodes', () => {
       CLEAN,
     ]);
     expect(runs).toEqual({ first: 2, second: 2, third: 2 });
-    expect(calls).toBe(1);
-    expect(pull(reader)).toBe(50);
+    expect(reader.status).toBe(DIRTY);
+    expect(read(reader)).toBe(50);
   });
 
   test('an eager node behind a derived node becomes Check, and the flush verifies and recomputes it', () => {
@@ -2355,8 +2253,8 @@ describe('eager nodes', () => {
     const reader = createDerivedNode((callingNode) =>
       readDerived(callingNode, eager),
     );
-    pull(reader);
-    reader.onDirty = () => {
+    read(reader);
+    eager.onChange = () => {
       calls += 1;
     };
     startBatch((mutators) => {
@@ -2370,73 +2268,7 @@ describe('eager nodes', () => {
     write(a, 4);
     expect(runs).toEqual({ inner: 3, eager: 2 });
     expect(calls).toBe(1);
-    expect(pull(reader)).toBe(true);
-  });
-
-  test('a callback that writes during the flush has the eager nodes it marks refreshed before the next callback', () => {
-    const calls: Array<string> = [];
-    const a = createSourceNode(1);
-    const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const readsANext = createDerivedNode(
-      (callingNode) => readSource(callingNode, a) + 1,
-    );
-    const eagerB = createEagerDerivedNode((callingNode) =>
-      readSource(callingNode, b),
-    );
-    const readsEager = createDerivedNode((callingNode) =>
-      readDerived(callingNode, eagerB),
-    );
-    pull(readsA);
-    pull(readsANext);
-    pull(readsEager);
-    startBatch((mutators) => {
-      readsA.onDirty = () => {
-        calls.push('readsA');
-        mutators.writeSource(b, 2);
-      };
-      readsANext.onDirty = () =>
-        calls.push(`readsANext, eagerB ${eagerB.status}`);
-      readsEager.onDirty = () => calls.push('readsEager');
-      mutators.writeSource(a, 2);
-    });
-    expect(calls).toEqual([
-      'readsA',
-      `readsANext, eagerB ${CLEAN}`,
-      'readsEager',
-    ]);
-    expect(pull(readsEager)).toBe(2);
-  });
-
-  test('disposing an eager node marks its readers Dirty, and a queued eager node disposed before the flush stays Uncomputed', () => {
-    let runs = 0;
-    let calls = 0;
-    const a = createSourceNode(1);
-    const eager = createEagerDerivedNode((callingNode) => {
-      runs += 1;
-      return readSource(callingNode, a);
-    });
-    const reader = createDerivedNode(
-      (callingNode) => readDerived(callingNode, eager) + 1,
-    );
-    pull(reader);
-    reader.onDirty = () => {
-      calls += 1;
-    };
-    startBatch((mutators) => {
-      mutators.writeSource(a, 2);
-      expect(eager.status).toBe(DIRTY);
-      mutators.disposeDerivedNode(eager);
-    });
-    expect(eager.status).toBe(UNCOMPUTED);
-    expect(reader.status).toBe(DIRTY);
-    expect(calls).toBe(1);
-    expect(runs).toBe(1);
-    expect(hasDependent(a, eager)).toBe(false);
-    expect(pull(reader)).toBe(3);
-    expect(runs).toBe(2);
+    expect(read(reader)).toBe(true);
   });
 
   test('before the flush, a marked eager node and its readers return their previous values', () => {
@@ -2450,17 +2282,17 @@ describe('eager nodes', () => {
     const late = createDerivedNode(
       (callingNode) => readDerived(callingNode, eager) + 100,
     );
-    pull(reader);
+    read(reader);
     startBatch((mutators) => {
       mutators.writeSource(a, 5);
-      expect(pull(eager)).toBe(2);
-      expect(pull(reader)).toBe(3);
-      expect(pull(late)).toBe(102);
+      expect(read(eager)).toBe(2);
+      expect(read(reader)).toBe(3);
+      expect(read(late)).toBe(102);
       expect(eager.status).toBe(DIRTY);
     });
-    expect(pull(eager)).toBe(10);
-    expect(pull(reader)).toBe(11);
-    expect(pull(late)).toBe(110);
+    expect(read(eager)).toBe(10);
+    expect(read(reader)).toBe(11);
+    expect(read(late)).toBe(110);
   });
 
   test('several writes in one batch recompute an eager node once', () => {
@@ -2471,74 +2303,32 @@ describe('eager nodes', () => {
       runs += 1;
       return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    pull(eager);
+    read(eager);
     startBatch((mutators) => {
       mutators.writeSource(a, 10);
       mutators.writeSource(b, 20);
       mutators.writeSource(a, 30);
     });
     expect(runs).toBe(2);
-    expect(pull(eager)).toBe(50);
+    expect(read(eager)).toBe(50);
   });
 });
 
 describe('nested batches', () => {
-  test('a startBatch inside a callback flushes its own batch before the callback continues', () => {
+  test('a startBatch inside the body of another startBatch flushes its own batch before it returns', () => {
     const calls: Array<string> = [];
     const a = createSourceNode(1);
     const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
+    const readsA = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
-    const readsB = createDerivedNode((callingNode) =>
+    const readsB = createEagerDerivedNode((callingNode) =>
       readSource(callingNode, b),
     );
-    const eagerB = createEagerDerivedNode(
-      (callingNode) => readSource(callingNode, b) * 10,
-    );
-    const readsEager = createDerivedNode((callingNode) =>
-      readDerived(callingNode, eagerB),
-    );
-    const readsANext = createDerivedNode(
-      (callingNode) => readSource(callingNode, a) + 1,
-    );
-    pull(readsA);
-    pull(readsB);
-    pull(readsEager);
-    pull(readsANext);
-    readsA.onDirty = () => {
-      calls.push('readsA');
-      write(b, 2);
-      calls.push(`readsA after write, eagerB ${eagerB.status}`);
-    };
-    readsB.onDirty = () => calls.push('readsB');
-    readsEager.onDirty = () => calls.push(`readsEager ${pull(readsEager)}`);
-    readsANext.onDirty = () => calls.push('readsANext');
-    write(a, 2);
-    expect(calls).toEqual([
-      'readsA',
-      'readsB',
-      'readsEager 20',
-      `readsA after write, eagerB ${CLEAN}`,
-      'readsANext',
-    ]);
-    expect([pull(readsA), pull(readsB), pull(readsANext)]).toEqual([2, 2, 3]);
-  });
-
-  test('a startBatch inside the callback of another startBatch flushes its own batch before it returns', () => {
-    const calls: Array<string> = [];
-    const a = createSourceNode(1);
-    const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
-    );
-    const readsB = createDerivedNode((callingNode) =>
-      readSource(callingNode, b),
-    );
-    pull(readsA);
-    pull(readsB);
-    readsA.onDirty = () => calls.push('readsA');
-    readsB.onDirty = () => calls.push('readsB');
+    read(readsA);
+    read(readsB);
+    readsA.onChange = () => calls.push('readsA');
+    readsB.onChange = () => calls.push('readsB');
     startBatch((outer) => {
       outer.writeSource(a, 2);
       startBatch((inner) => {
@@ -2558,11 +2348,8 @@ describe('nested batches', () => {
       eagerRuns += 1;
       return readSource(callingNode, a) + readSource(callingNode, b);
     });
-    const reader = createDerivedNode((callingNode) =>
-      readDerived(callingNode, eager),
-    );
-    pull(reader);
-    reader.onDirty = () => calls.push(`reader ${pull(reader)}`);
+    read(eager);
+    eager.onChange = () => calls.push(`eager ${readDerivedNode(eager)}`);
     startBatch((outer) => {
       outer.writeSource(a, 2);
       startBatch((inner) => {
@@ -2572,7 +2359,7 @@ describe('nested batches', () => {
       expect(calls).toEqual([]);
     });
     expect(eagerRuns).toBe(2);
-    expect(calls).toEqual(['reader 4']);
+    expect(calls).toEqual(['eager 4']);
   });
 });
 
@@ -2597,10 +2384,9 @@ describe('single calls', () => {
     const reader = createDerivedNode(
       (callingNode) => readDerived(callingNode, eager) + 1,
     );
-    pull(reader);
-    inner.onDirty = () => calls.push(`inner ${eager.status}`);
-    eager.onDirty = () => calls.push('eager');
-    reader.onDirty = () => calls.push('reader');
+    read(reader);
+    eager.onChange = () =>
+      calls.push(`eager ${readDerivedNode(eager)} ${inner.status}`);
     return { a, calls, inner, eager, reader };
   }
 
@@ -2608,36 +2394,24 @@ describe('single calls', () => {
     return [graph.inner.status, graph.eager.status, graph.reader.status];
   }
 
-  test('writeSource calls the same callbacks and leaves the same statuses and values as a batch of one write', () => {
+  test('writeSource calls the same onChange and leaves the same statuses and values as a batch of one write', () => {
     const single = build();
     const batched = build();
     writeSource(single.a, 2);
     startBatch((mutators) => mutators.writeSource(batched.a, 2));
-    expect(single.calls).toEqual([`inner ${CLEAN}`, 'eager', 'reader']);
+    expect(single.calls).toEqual([`eager 4 ${CLEAN}`]);
     expect(batched.calls).toEqual(single.calls);
+    expect(statuses(single)).toEqual([CLEAN, CLEAN, DIRTY]);
     expect(statuses(batched)).toEqual(statuses(single));
     expect(
-      [single.inner, single.eager, single.reader].map((node) => pull(node)),
+      [single.inner, single.eager, single.reader].map((node) => read(node)),
     ).toEqual([2, 4, 5]);
     expect(
-      [batched.inner, batched.eager, batched.reader].map((node) => pull(node)),
+      [batched.inner, batched.eager, batched.reader].map((node) => read(node)),
     ).toEqual([2, 4, 5]);
   });
 
-  test('disposeDerivedNode calls the same callbacks and leaves the same statuses and values as a batch of one disposal', () => {
-    const single = build();
-    const batched = build();
-    disposeDerivedNode(single.eager);
-    startBatch((mutators) => mutators.disposeDerivedNode(batched.eager));
-    expect(single.calls).toEqual(['reader']);
-    expect(batched.calls).toEqual(single.calls);
-    expect(statuses(single)).toEqual([CLEAN, UNCOMPUTED, DIRTY]);
-    expect(statuses(batched)).toEqual(statuses(single));
-    expect(pull(single.reader)).toBe(3);
-    expect(pull(batched.reader)).toBe(3);
-  });
-
-  test('setDerivedNodeEvaluation calls the same callbacks and leaves the same statuses and values as a batch of one evaluation change', () => {
+  test('setDerivedNodeEvaluation calls the same onChange and leaves the same statuses and values as a batch of one evaluation change', () => {
     const single = build();
     const batched = build();
     write(single.a, 2);
@@ -2654,34 +2428,35 @@ describe('single calls', () => {
     startBatch((mutators) =>
       mutators.setDerivedNodeEvaluation(batched.eager, EAGER),
     );
-    expect(single.calls).toEqual([`inner ${CHECK}`, 'eager', 'eager']);
+    expect(single.calls).toEqual([`eager 6 ${CLEAN}`]);
     expect(batched.calls).toEqual(single.calls);
     expect(statuses(single)).toEqual([CLEAN, CLEAN, DIRTY]);
     expect(statuses(batched)).toEqual(statuses(single));
-    expect(pull(single.reader)).toBe(7);
-    expect(pull(batched.reader)).toBe(7);
+    expect(read(single.reader)).toBe(7);
+    expect(read(batched.reader)).toBe(7);
   });
 
-  test('a writeSource inside a callback flushes before the callback continues', () => {
-    const calls: Array<string> = [];
+  test('a single-call write whose marking reaches only lazy nodes runs nothing and calls nothing, and a later write queues and refreshes an eager reader', () => {
+    let runs = 0;
+    const calls: Array<number> = [];
     const a = createSourceNode(1);
-    const b = createSourceNode(1);
-    const readsA = createDerivedNode((callingNode) =>
-      readSource(callingNode, a),
+    const lazy = createDerivedNode((callingNode) => readSource(callingNode, a));
+    const above = createDerivedNode((callingNode) =>
+      readDerived(callingNode, lazy),
     );
-    const readsB = createDerivedNode((callingNode) =>
-      readSource(callingNode, b),
-    );
-    pull(readsA);
-    pull(readsB);
-    readsA.onDirty = () => {
-      calls.push('readsA');
-      writeSource(b, 2);
-      calls.push('readsA after write');
-    };
-    readsB.onDirty = () => calls.push('readsB');
+    const eager = createEagerDerivedNode((callingNode) => {
+      runs += 1;
+      return readDerived(callingNode, above) * 10;
+    });
+    read(above);
     writeSource(a, 2);
-    expect(calls).toEqual(['readsA', 'readsB', 'readsA after write']);
+    expect([lazy.status, above.status]).toEqual([DIRTY, CHECK]);
+    expect(read(above)).toBe(2);
+    read(eager);
+    eager.onChange = () => calls.push(readDerivedNode(eager));
+    writeSource(a, 3);
+    expect(runs).toBe(2);
+    expect(calls).toEqual([30]);
   });
 });
 
@@ -2694,13 +2469,13 @@ describe('setDerivedNodeEvaluation', () => {
       runs += 1;
       return readSource(callingNode, a);
     });
-    node.onDirty = () => {
+    node.onChange = () => {
       calls += 1;
     };
     setEvaluation(node, EAGER);
     expect(node.evaluation).toBe(EAGER);
     expect(node.status).toBe(UNCOMPUTED);
-    pull(node);
+    read(node);
     setEvaluation(node, EAGER);
     setEvaluation(node, LAZY);
     setEvaluation(node, LAZY);
@@ -2718,22 +2493,22 @@ describe('setDerivedNodeEvaluation', () => {
     const top = createDerivedNode(
       (callingNode) => readDerived(callingNode, n) + 1,
     );
-    expect(pull(top)).toBe(11);
+    expect(read(top)).toBe(11);
     setEvaluation(n, LAZY);
     write(s, 2);
     expect(n.status).toBe(DIRTY);
     expect(top.status).toBe(CHECK);
     setEvaluation(n, EAGER);
     expect(n.status).toBe(CLEAN);
-    expect(pull(n)).toBe(20);
-    expect(pull(top)).toBe(21);
+    expect(read(n)).toBe(20);
+    expect(read(top)).toBe(21);
     write(s, 3);
     expect(n.status).toBe(CLEAN);
-    expect(pull(n)).toBe(30);
-    expect(pull(top)).toBe(31);
+    expect(read(n)).toBe(30);
+    expect(read(top)).toBe(31);
   });
 
-  test('a lazy node set eager while Dirty is recomputed in the flush, and a changed value marks its readers and calls its onDirty', () => {
+  test('a lazy node set eager while Dirty is recomputed in the flush, and a changed value marks its readers and calls its onChange', () => {
     let runs = 0;
     const calls: Array<string> = [];
     const a = createSourceNode(1);
@@ -2744,10 +2519,9 @@ describe('setDerivedNodeEvaluation', () => {
     const reader = createDerivedNode((callingNode) =>
       readDerived(callingNode, node) ? 'positive' : 'not positive',
     );
-    pull(reader);
+    read(reader);
     write(a, -1);
-    node.onDirty = () => calls.push('node');
-    reader.onDirty = () => calls.push('reader');
+    node.onChange = () => calls.push('node');
     startBatch((mutators) => {
       mutators.setDerivedNodeEvaluation(node, EAGER);
       expect(node.status).toBe(DIRTY);
@@ -2757,7 +2531,7 @@ describe('setDerivedNodeEvaluation', () => {
     expect(node.status).toBe(CLEAN);
     expect(reader.status).toBe(DIRTY);
     expect(calls).toEqual(['node']);
-    expect(pull(reader)).toBe('not positive');
+    expect(read(reader)).toBe('not positive');
     write(a, -2);
     expect(runs).toBe(3);
     expect(reader.status).toBe(CLEAN);
@@ -2775,16 +2549,16 @@ describe('setDerivedNodeEvaluation', () => {
       runs.node += 1;
       return readDerived(callingNode, inner) * 10;
     });
-    pull(node);
+    read(node);
     write(a, 3);
     expect(node.status).toBe(CHECK);
     setEvaluation(node, EAGER);
     expect(runs).toEqual({ inner: 2, node: 1 });
     expect(node.status).toBe(CLEAN);
-    expect(pull(node)).toBe(10);
+    expect(read(node)).toBe(10);
   });
 
-  test('an eager node set lazy while queued marks its readers Check, calls its onDirty and theirs, and is not recomputed by the flush', () => {
+  test('an eager node set lazy while queued marks its readers Check, calls no onChange, and is not recomputed by the flush', () => {
     let runs = 0;
     const calls: Array<string> = [];
     const a = createSourceNode(1);
@@ -2798,10 +2572,8 @@ describe('setDerivedNodeEvaluation', () => {
     const outer = createDerivedNode(
       (callingNode) => readDerived(callingNode, reader) + 1,
     );
-    pull(outer);
-    eager.onDirty = () => calls.push('eager');
-    reader.onDirty = () => calls.push('reader');
-    outer.onDirty = () => calls.push('outer');
+    read(outer);
+    eager.onChange = () => calls.push('eager');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       expect([eager.status, reader.status, outer.status]).toEqual([
@@ -2816,10 +2588,10 @@ describe('setDerivedNodeEvaluation', () => {
         CHECK,
       ]);
     });
-    expect(calls).toEqual(['eager', 'reader', 'outer']);
+    expect(calls).toEqual([]);
     expect(runs).toBe(1);
     expect(eager.status).toBe(DIRTY);
-    expect(pull(outer)).toBe(6);
+    expect(read(outer)).toBe(6);
     expect(runs).toBe(2);
   });
 
@@ -2831,14 +2603,14 @@ describe('setDerivedNodeEvaluation', () => {
     const reader = createDerivedNode(
       (callingNode) => readDerived(callingNode, eager) + 1,
     );
-    pull(reader);
+    read(reader);
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       mutators.setDerivedNodeEvaluation(eager, LAZY);
-      expect(pull(reader)).toBe(5);
+      expect(read(reader)).toBe(5);
       expect([eager.status, reader.status]).toEqual([CLEAN, CLEAN]);
     });
-    expect(pull(reader)).toBe(5);
+    expect(read(reader)).toBe(5);
   });
 
   test('a node set lazy and eager again in one batch is refreshed once', () => {
@@ -2852,8 +2624,8 @@ describe('setDerivedNodeEvaluation', () => {
     const reader = createDerivedNode((callingNode) =>
       readDerived(callingNode, eager),
     );
-    pull(reader);
-    reader.onDirty = () => calls.push('reader');
+    read(reader);
+    eager.onChange = () => calls.push('eager');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       mutators.setDerivedNodeEvaluation(eager, LAZY);
@@ -2861,8 +2633,8 @@ describe('setDerivedNodeEvaluation', () => {
     });
     expect(runs).toBe(2);
     expect(eager.status).toBe(CLEAN);
-    expect(calls).toEqual(['reader']);
-    expect(pull(reader)).toBe(2);
+    expect(calls).toEqual(['eager']);
+    expect(read(reader)).toBe(2);
   });
 
   test('a node toggled between lazy and eager across several batches returns current values after each', () => {
@@ -2876,8 +2648,8 @@ describe('setDerivedNodeEvaluation', () => {
     const reader = createDerivedNode(
       (callingNode) => readDerived(callingNode, node) + 100,
     );
-    pull(reader);
-    reader.onDirty = () => calls.push(`reader ${reader.status}`);
+    read(reader);
+    node.onChange = () => calls.push(`node ${readDerivedNode(node)}`);
 
     startBatch((mutators) => {
       mutators.setDerivedNodeEvaluation(node, LAZY);
@@ -2888,15 +2660,15 @@ describe('setDerivedNodeEvaluation', () => {
       DIRTY,
       CHECK,
     ]);
-    expect(calls).toEqual([`reader ${CHECK}`]);
+    expect(calls).toEqual([]);
 
     startBatch((mutators) => mutators.setDerivedNodeEvaluation(node, EAGER));
     expect([node.status, reader.status, runs]).toEqual([CLEAN, DIRTY, 2]);
-    expect(pull(reader)).toBe(102);
+    expect(read(reader)).toBe(102);
 
     startBatch((mutators) => mutators.writeSource(a, 5));
     expect([node.status, reader.status, runs]).toEqual([CLEAN, CLEAN, 3]);
-    expect(calls).toEqual([`reader ${CHECK}`]);
+    expect(calls).toEqual(['node 2']);
 
     startBatch((mutators) => {
       mutators.writeSource(a, 6);
@@ -2908,15 +2680,16 @@ describe('setDerivedNodeEvaluation', () => {
       CHECK,
       3,
     ]);
-    expect(calls).toEqual([`reader ${CHECK}`, `reader ${CHECK}`]);
-    expect(pull(reader)).toBe(100);
+    expect(calls).toEqual(['node 2']);
+    expect(read(reader)).toBe(100);
 
     startBatch((mutators) => {
       mutators.setDerivedNodeEvaluation(node, EAGER);
       mutators.writeSource(a, 7);
     });
     expect([node.status, reader.status, runs]).toEqual([CLEAN, DIRTY, 5]);
-    expect(pull(reader)).toBe(101);
+    expect(calls).toEqual(['node 2', 'node 1']);
+    expect(read(reader)).toBe(101);
   });
 });
 
@@ -2950,14 +2723,14 @@ describe('verification of chains', () => {
       runs.top += 1;
       return readDerived(callingNode, middle) + 1;
     });
-    expect(pull(top)).toBe(3);
+    expect(read(top)).toBe(3);
     writeSource(source, 2);
     expect([bottom.status, middle.status, top.status]).toEqual([
       DIRTY,
       CHECK,
       CHECK,
     ]);
-    expect(pull(top)).toBe(4);
+    expect(read(top)).toBe(4);
     expect([bottom.status, middle.status, top.status]).toEqual([
       CLEAN,
       CLEAN,
@@ -2971,21 +2744,21 @@ describe('verification of chains', () => {
     const bottom = createDerivedNode((callingNode) =>
       readSource(callingNode, source),
     );
-    pull(bottom);
+    read(bottom);
     const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>(
       (below) => {
         const node = createDerivedNode(
           (callingNode) => readDerived(callingNode, below) + 1,
         );
-        pull(node);
+        read(node);
         return node;
       },
       bottom,
     );
-    expect(pull(top)).toBe(99_999);
+    expect(read(top)).toBe(99_999);
     writeSource(source, 1);
     expect(top.status).toBe(CHECK);
-    expect(pull(top)).toBe(100_000);
+    expect(read(top)).toBe(100_000);
     expect(top.status).toBe(CLEAN);
   });
 
@@ -2996,7 +2769,7 @@ describe('verification of chains', () => {
       readSource(callingNode, source);
       return 0;
     });
-    pull(bottom);
+    read(bottom);
     const nodes: Array<DerivedNode<number>> = [];
     const top = Array.from({ length: 99_999 }).reduce<DerivedNode<number>>(
       (below) => {
@@ -3004,7 +2777,7 @@ describe('verification of chains', () => {
           runs += 1;
           return readDerived(callingNode, below) + 1;
         });
-        pull(node);
+        read(node);
         nodes.push(node);
         return node;
       },
@@ -3013,7 +2786,7 @@ describe('verification of chains', () => {
     expect(runs).toBe(99_999);
     writeSource(source, 1);
     expect(top.status).toBe(CHECK);
-    expect(pull(top)).toBe(99_999);
+    expect(read(top)).toBe(99_999);
     expect(runs).toBe(99_999);
     expect(nodes.every((node) => node.status === CLEAN)).toBe(true);
   });
@@ -3036,11 +2809,11 @@ describe('verification of chains', () => {
         readDerived(callingNode, first) && readDerived(callingNode, second)
       );
     });
-    expect(pull(node)).toBe(true);
+    expect(read(node)).toBe(true);
     writeSource(a, 2);
     writeSource(b, 2);
     expect(node.status).toBe(CHECK);
-    expect(pull(node)).toBe(true);
+    expect(read(node)).toBe(true);
     expect([first.status, second.status, node.status]).toEqual([
       CLEAN,
       CLEAN,
@@ -3092,7 +2865,7 @@ describe('verification of diamonds below a Check node', () => {
       runs.top += 1;
       return readDerived(callingNode, left) + readDerived(callingNode, right);
     });
-    expect(pull(top)).toBe(10);
+    expect(read(top)).toBe(10);
     return { source, runs, bottom, shared, left, right, top };
   }
 
@@ -3106,7 +2879,7 @@ describe('verification of diamonds below a Check node', () => {
       graph.right.status,
       graph.top.status,
     ]).toEqual([DIRTY, CHECK, CHECK, CHECK, CHECK]);
-    expect(pull(graph.top)).toBe(15);
+    expect(read(graph.top)).toBe(15);
     expect(graph.runs).toEqual({
       bottom: 2,
       shared: 2,
@@ -3119,7 +2892,7 @@ describe('verification of diamonds below a Check node', () => {
   test('a pull of the top runs only the bottom node when the bottom node cuts off, and leaves every node Clean', () => {
     const graph = build(() => 1);
     writeSource(graph.source, 2);
-    expect(pull(graph.top)).toBe(10);
+    expect(read(graph.top)).toBe(10);
     expect(graph.runs).toEqual({
       bottom: 2,
       shared: 1,
@@ -3139,7 +2912,7 @@ describe('verification of diamonds below a Check node', () => {
   test('a pull of the node that read the shared node last runs each node once, and a later pull of the top runs the rest', () => {
     const graph = build((value) => value);
     writeSource(graph.source, 2);
-    expect(pull(graph.right)).toBe(9);
+    expect(read(graph.right)).toBe(9);
     expect(graph.runs).toEqual({
       bottom: 2,
       shared: 2,
@@ -3148,7 +2921,7 @@ describe('verification of diamonds below a Check node', () => {
       top: 1,
     });
     expect([graph.left.status, graph.top.status]).toEqual([DIRTY, DIRTY]);
-    expect(pull(graph.top)).toBe(15);
+    expect(read(graph.top)).toBe(15);
     expect(graph.runs).toEqual({
       bottom: 2,
       shared: 2,
@@ -3161,14 +2934,14 @@ describe('verification of diamonds below a Check node', () => {
   test('a pull of the node that read the shared node last leaves the other reader Check when the bottom node cuts off', () => {
     const graph = build(() => 1);
     writeSource(graph.source, 2);
-    expect(pull(graph.right)).toBe(6);
+    expect(read(graph.right)).toBe(6);
     expect([
       graph.shared.status,
       graph.left.status,
       graph.right.status,
       graph.top.status,
     ]).toEqual([CLEAN, CHECK, CLEAN, CHECK]);
-    expect(pull(graph.top)).toBe(10);
+    expect(read(graph.top)).toBe(10);
     expect(graph.runs).toEqual({
       bottom: 2,
       shared: 1,
@@ -3199,14 +2972,14 @@ describe('verification of diamonds below a Check node', () => {
         const baseValue = readDerived(callingNode, base);
         return `${readDerived(callingNode, parity)}:${baseValue}`;
       });
-      expect(pull(top)).toBe('1:1');
+      expect(read(top)).toBe('1:1');
       writeSource(source, 3);
       expect([base.status, parity.status, top.status]).toEqual([
         DIRTY,
         CHECK,
         CHECK,
       ]);
-      expect(pull(top)).toBe('1:3');
+      expect(read(top)).toBe('1:3');
       expect(runs).toEqual({ base: 2, parity: 2, top: 2 });
       expect([base.status, parity.status, top.status]).toEqual([
         CLEAN,
@@ -3230,33 +3003,12 @@ describe('marking breadth', () => {
       const top = middle.map((below) =>
         createDerivedNode((callingNode) => readDerived(callingNode, below)),
       );
-      top.forEach((node) => pull(node));
-      const calls: Array<string> = [];
-      direct.forEach((node, index) => {
-        node.onDirty = () => calls.push(`direct ${index}`);
-      });
-      middle.forEach((node, index) => {
-        node.onDirty = () => calls.push(`middle ${index}`);
-      });
-      top.forEach((node, index) => {
-        node.onDirty = () => calls.push(`top ${index}`);
-      });
+      top.forEach((node) => read(node));
       writeWith(a, 2);
       expect(direct.map((node) => node.status)).toEqual([DIRTY, DIRTY, DIRTY]);
       expect(middle.map((node) => node.status)).toEqual([CHECK, CHECK, CHECK]);
       expect(top.map((node) => node.status)).toEqual([CHECK, CHECK, CHECK]);
-      expect([...calls].sort()).toEqual([
-        'direct 0',
-        'direct 1',
-        'direct 2',
-        'middle 0',
-        'middle 1',
-        'middle 2',
-        'top 0',
-        'top 1',
-        'top 2',
-      ]);
-      expect(top.map((node) => pull(node))).toEqual([2, 3, 4]);
+      expect(top.map((node) => read(node))).toEqual([2, 3, 4]);
     });
 
     test(`${name} marks every node above a node with three readers that each have readers`, () => {
@@ -3275,11 +3027,7 @@ describe('marking breadth', () => {
       const third = second.map((below) =>
         createDerivedNode((callingNode) => readDerived(callingNode, below)),
       );
-      third.forEach((node) => pull(node));
-      const calls: Array<string> = [];
-      [...first, ...second, ...third].forEach((node, index) => {
-        node.onDirty = () => calls.push(`${index}`);
-      });
+      third.forEach((node) => read(node));
       writeWith(a, 2);
       expect(base.status).toBe(DIRTY);
       expect(
@@ -3295,23 +3043,11 @@ describe('marking breadth', () => {
         CHECK,
         CHECK,
       ]);
-      expect([...calls].sort()).toEqual([
-        '0',
-        '1',
-        '2',
-        '3',
-        '4',
-        '5',
-        '6',
-        '7',
-        '8',
-      ]);
-      expect(third.map((node) => pull(node))).toEqual([2, 3, 4]);
+      expect(third.map((node) => read(node))).toEqual([2, 3, 4]);
     });
   }
 
-  test('writeSource marks a Check direct reader Dirty, and calls its onDirty only when it left Clean', () => {
-    let calls = 0;
+  test('writeSource marks a Check direct reader Dirty, and the reader recomputes once', () => {
     let runs = 0;
     const a = createSourceNode(1);
     const b = createSourceNode(10);
@@ -3322,21 +3058,16 @@ describe('marking breadth', () => {
       runs += 1;
       return readDerived(callingNode, inner) ? readSource(callingNode, b) : 0;
     });
-    pull(node);
-    node.onDirty = () => {
-      calls += 1;
-    };
+    read(node);
     writeSource(a, 2);
     expect(node.status).toBe(CHECK);
     writeSource(b, 20);
     expect(node.status).toBe(DIRTY);
-    expect(calls).toBe(1);
-    expect(pull(node)).toBe(20);
+    expect(read(node)).toBe(20);
     expect(runs).toBe(2);
   });
 
-  test('writeSource does not call the onDirty of a Check node a second time when a second write reaches it', () => {
-    let calls = 0;
+  test('writeSource leaves a Check node and the Check node above it Check when a second write reaches them', () => {
     const a = createSourceNode(1);
     const b = createSourceNode(1);
     const left = createDerivedNode((callingNode) => readSource(callingNode, a));
@@ -3350,20 +3081,12 @@ describe('marking breadth', () => {
     const above = createDerivedNode((callingNode) =>
       readDerived(callingNode, top),
     );
-    pull(above);
-    top.onDirty = () => {
-      calls += 1;
-    };
-    above.onDirty = () => {
-      calls += 1;
-    };
+    read(above);
     writeSource(a, 2);
     expect([top.status, above.status]).toEqual([CHECK, CHECK]);
-    expect(calls).toBe(2);
     writeSource(b, 2);
     expect([top.status, above.status]).toEqual([CHECK, CHECK]);
-    expect(calls).toBe(2);
-    expect(pull(above)).toBe(4);
+    expect(read(above)).toBe(4);
   });
 
   test('writeSource queues an eager direct reader and an eager reader of a reader, and marks nothing above them', () => {
@@ -3386,19 +3109,13 @@ describe('marking breadth', () => {
     const aboveIndirect = createDerivedNode((callingNode) =>
       readDerived(callingNode, indirect),
     );
-    pull(aboveDirect);
-    pull(aboveIndirect);
+    read(aboveDirect);
+    read(aboveIndirect);
     let calls = 0;
-    aboveDirect.onDirty = () => {
+    direct.onChange = () => {
       calls += 1;
     };
-    aboveIndirect.onDirty = () => {
-      calls += 1;
-    };
-    direct.onDirty = () => {
-      calls += 1;
-    };
-    indirect.onDirty = () => {
+    indirect.onChange = () => {
       calls += 1;
     };
     writeSource(a, 2);
@@ -3429,7 +3146,7 @@ describe('marking breadth', () => {
         return readDerived(callingNode, lazy);
       }),
     );
-    [...direct, ...aboveLazy].forEach((node) => pull(node));
+    [...direct, ...aboveLazy].forEach((node) => read(node));
     refreshed.length = 0;
     writeSource(a, 2);
     expect(refreshed).toEqual(['direct 0', 'direct 1']);
@@ -3440,8 +3157,7 @@ describe('marking breadth', () => {
     ]);
   });
 
-  test('writeSource calls the onDirty of a chain of four observed nodes in the order they left Clean', () => {
-    const calls: Array<string> = [];
+  test('writeSource marks a chain of four nodes, the first Dirty and the rest Check', () => {
     const a = createSourceNode(1);
     const first = createDerivedNode((callingNode) =>
       readSource(callingNode, a),
@@ -3455,13 +3171,8 @@ describe('marking breadth', () => {
     const fourth = createDerivedNode((callingNode) =>
       readDerived(callingNode, third),
     );
-    pull(fourth);
-    first.onDirty = () => calls.push('first');
-    second.onDirty = () => calls.push('second');
-    third.onDirty = () => calls.push('third');
-    fourth.onDirty = () => calls.push('fourth');
+    read(fourth);
     writeSource(a, 2);
-    expect(calls).toEqual(['first', 'second', 'third', 'fourth']);
     expect([first.status, second.status, third.status, fourth.status]).toEqual([
       DIRTY,
       CHECK,
@@ -3483,10 +3194,10 @@ describe('writes', () => {
       runs.outer += 1;
       return readDerived(callingNode, reader) + 1;
     });
-    pull(outer);
+    read(outer);
     writeSource(a, 1);
     expect([reader.status, outer.status]).toEqual([DIRTY, CHECK]);
-    expect(pull(outer)).toBe(2);
+    expect(read(outer)).toBe(2);
     expect(runs).toEqual({ reader: 2, outer: 1 });
   });
 
@@ -3498,7 +3209,7 @@ describe('writes', () => {
     const first = createDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
-    expect(pull(first)).toBe(2);
+    expect(read(first)).toBe(2);
     expect(a.dependentsStatus).toBe(0);
     writeSource(a, 3);
     expect(a.dependentsStatus).toBe(1);
@@ -3506,13 +3217,36 @@ describe('writes', () => {
     const second = createDerivedNode((callingNode) =>
       readSource(callingNode, a),
     );
-    expect(pull(second)).toBe(3);
+    expect(read(second)).toBe(3);
     expect(a.dependentsStatus).toBe(0);
     startBatch((mutators) => mutators.writeSource(a, 4));
     expect(a.dependentsStatus).toBe(1);
     expect([first.status, second.status]).toEqual([DIRTY, DIRTY]);
-    expect([pull(first), pull(second)]).toEqual([4, 4]);
+    expect([read(first), read(second)]).toEqual([4, 4]);
   });
+  for (const [name, writeWith] of writers) {
+    test(`${name} that reaches a Dirty reader leaves it Dirty, marks the other reader, and the Dirty reader recomputes once`, () => {
+      const runs = { both: 0, onlyB: 0 };
+      const a = createSourceNode(1);
+      const b = createSourceNode(10);
+      const both = createDerivedNode((callingNode) => {
+        runs.both += 1;
+        return readSource(callingNode, a) + readSource(callingNode, b);
+      });
+      const onlyB = createDerivedNode((callingNode) => {
+        runs.onlyB += 1;
+        return readSource(callingNode, b) * 2;
+      });
+      read(both);
+      read(onlyB);
+      writeWith(a, 2);
+      expect([both.status, onlyB.status]).toEqual([DIRTY, CLEAN]);
+      writeWith(b, 20);
+      expect([both.status, onlyB.status]).toEqual([DIRTY, DIRTY]);
+      expect([read(both), read(onlyB)]).toEqual([22, 40]);
+      expect(runs).toEqual({ both: 2, onlyB: 2 });
+    });
+  }
 });
 
 describe('values', () => {
@@ -3526,11 +3260,11 @@ describe('values', () => {
       readerRuns += 1;
       return readDerived(callingNode, node);
     });
-    expect(Object.is(pull(reader), 0)).toBe(true);
+    expect(Object.is(read(reader), 0)).toBe(true);
     writeSource(a, -1);
-    expect(Object.is(pull(node), 0)).toBe(true);
+    expect(Object.is(read(node), 0)).toBe(true);
     expect(Object.is(node.value, 0)).toBe(true);
-    expect(Object.is(pull(reader), 0)).toBe(true);
+    expect(Object.is(read(reader), 0)).toBe(true);
     expect(readerRuns).toBe(1);
   });
 });
@@ -3551,13 +3285,13 @@ describe('dependency lists', () => {
       }
       return sum;
     });
-    expect(pull(node)).toBe(200);
+    expect(read(node)).toBe(200);
     expectSame(sourceDependenciesOf(node), [a]);
     expectSame(derivedDependenciesOf(node), [inner]);
     expectSame(dependentsOf(a), [node, inner]);
     expectSame(dependentsOf(inner), [node]);
     writeSource(a, 2);
-    expect(pull(node)).toBe(400);
+    expect(read(node)).toBe(400);
     expectSame(sourceDependenciesOf(node), [a]);
     expectSame(derivedDependenciesOf(node), [inner]);
     expectSame(dependentsOf(a), [node, inner]);
@@ -3578,13 +3312,13 @@ describe('dependency lists', () => {
         readDerived(callingNode, left) +
         readDerived(callingNode, right),
     );
-    pull(node);
+    read(node);
     const firstSourceEdge = node.firstSourceDependency;
     const lastSourceEdge = node.lastSourceDependency;
     const firstDerivedEdge = node.firstDerivedDependency;
     const lastDerivedEdge = node.lastDerivedDependency;
     writeSource(a, 3);
-    expect(pull(node)).toBe(10);
+    expect(read(node)).toBe(10);
     expect(node.firstSourceDependency === firstSourceEdge).toBe(true);
     expect(node.lastSourceDependency === lastSourceEdge).toBe(true);
     expect(node.firstDerivedDependency === firstDerivedEdge).toBe(true);
@@ -3612,10 +3346,10 @@ describe('dependency lists', () => {
         ? readDerived(callingNode, left)
         : readDerived(callingNode, right);
     });
-    expect(pull(pick)).toBe(1);
+    expect(read(pick)).toBe(1);
     const edge = pick.firstDerivedDependency;
     writeSource(useLeft, false);
-    expect(pull(pick)).toBe(10);
+    expect(read(pick)).toBe(10);
     expect(pick.firstDerivedDependency === edge).toBe(true);
     expectSame(derivedDependenciesOf(pick), [right]);
     expectSame(dependentsOf(left), []);
@@ -3624,7 +3358,7 @@ describe('dependency lists', () => {
     expect(pick.status).toBe(CLEAN);
     writeSource(rightInput, 20);
     expect(pick.status).toBe(CHECK);
-    expect(pull(pick)).toBe(20);
+    expect(read(pick)).toBe(20);
     expect(runs).toBe(3);
   });
 
@@ -3645,28 +3379,28 @@ describe('dependency lists', () => {
         .slice(0, readSource(callingNode, count))
         .reduce((sum, below) => sum + readDerived(callingNode, below), 0);
     });
-    expect(pull(node)).toBe(7);
+    expect(read(node)).toBe(7);
     expectSame(derivedDependenciesOf(node), derived);
     writeSource(count, 1);
-    expect(pull(node)).toBe(1);
+    expect(read(node)).toBe(1);
     expectSame(derivedDependenciesOf(node), [derived[0]]);
     expectSame(dependentsOf(derived[1]!), []);
     expectSame(dependentsOf(derived[2]!), []);
     writeSource(inputs[2]!, 8);
     expect(node.status).toBe(CLEAN);
     writeSource(count, 0);
-    expect(pull(node)).toBe(0);
+    expect(read(node)).toBe(0);
     expectSame(derivedDependenciesOf(node), []);
     expect(node.lastDerivedDependency === undefined).toBe(true);
     expectSame(dependentsOf(derived[0]!), []);
     writeSource(inputs[0]!, 16);
     expect(node.status).toBe(CLEAN);
     writeSource(count, 3);
-    expect(pull(node)).toBe(26);
+    expect(read(node)).toBe(26);
     expectSame(derivedDependenciesOf(node), derived);
     writeSource(inputs[2]!, 32);
     expect(node.status).toBe(CHECK);
-    expect(pull(node)).toBe(50);
+    expect(read(node)).toBe(50);
     expect(runs).toBe(5);
   });
 
@@ -3687,26 +3421,26 @@ describe('dependency lists', () => {
         .slice(0, readDerived(callingNode, count))
         .reduce((sum, source) => sum + readSource(callingNode, source), 0);
     });
-    expect(pull(node)).toBe(7);
+    expect(read(node)).toBe(7);
     expectSame(sourceDependenciesOf(node), sources);
     writeSource(countInput, 1);
-    expect(pull(node)).toBe(1);
+    expect(read(node)).toBe(1);
     expectSame(sourceDependenciesOf(node), [sources[0]]);
     expectSame(dependentsOf(sources[1]!), []);
     expectSame(dependentsOf(sources[2]!), []);
     writeSource(countInput, 0);
-    expect(pull(node)).toBe(0);
+    expect(read(node)).toBe(0);
     expectSame(sourceDependenciesOf(node), []);
     expect(node.lastSourceDependency === undefined).toBe(true);
     expectSame(dependentsOf(sources[0]!), []);
     writeSource(sources[0]!, 16);
     expect(node.status).toBe(CLEAN);
     writeSource(countInput, 3);
-    expect(pull(node)).toBe(22);
+    expect(read(node)).toBe(22);
     expectSame(sourceDependenciesOf(node), sources);
     writeSource(sources[1]!, 32);
     expect(node.status).toBe(DIRTY);
-    expect(pull(node)).toBe(52);
+    expect(read(node)).toBe(52);
     expect(runs).toBe(5);
   });
 
@@ -3722,18 +3456,18 @@ describe('dependency lists', () => {
       const first = readSource(callingNode, b);
       return first - readSource(callingNode, a);
     });
-    expect(pull(node)).toBe(-9);
+    expect(read(node)).toBe(-9);
     writeSource(forward, false);
-    expect(pull(node)).toBe(9);
+    expect(read(node)).toBe(9);
     expectSame(sourceDependenciesOf(node), [forward, b, a]);
     expectSame(dependentsOf(a), [node]);
     expectSame(dependentsOf(b), [node]);
     writeSource(a, 2);
     expect(node.status).toBe(DIRTY);
-    expect(pull(node)).toBe(8);
+    expect(read(node)).toBe(8);
     writeSource(b, 20);
     expect(node.status).toBe(DIRTY);
-    expect(pull(node)).toBe(18);
+    expect(read(node)).toBe(18);
   });
 
   test('removing the first, the middle, and the last reader of a source leaves the others in its dependents list in read order', () => {
@@ -3741,16 +3475,20 @@ describe('dependency lists', () => {
     const readers = [0, 1, 2, 3].map((offset) =>
       createDerivedNode((callingNode) => readSource(callingNode, a) + offset),
     );
-    readers.forEach((node) => pull(node));
+    readers.forEach((node) => {
+      retainDerivedNode(node);
+      readDerivedNode(node);
+    });
     expectSame(dependentsOf(a), readers);
-    disposeDerivedNode(readers[0]!);
+    releaseDerivedNode(readers[0]!);
     expectSame(dependentsOf(a), [readers[1], readers[2], readers[3]]);
-    disposeDerivedNode(readers[2]!);
+    releaseDerivedNode(readers[2]!);
     expectSame(dependentsOf(a), [readers[1], readers[3]]);
-    disposeDerivedNode(readers[3]!);
+    releaseDerivedNode(readers[3]!);
     expectSame(dependentsOf(a), [readers[1]]);
     expect(a.lastDependent?.dependent === readers[1]).toBe(true);
-    pull(readers[0]!);
+    retainDerivedNode(readers[0]!);
+    readDerivedNode(readers[0]!);
     expectSame(dependentsOf(a), [readers[1], readers[0]]);
     writeSource(a, 2);
     expect(readers.map((node) => node.status)).toEqual([
@@ -3759,16 +3497,16 @@ describe('dependency lists', () => {
       UNCOMPUTED,
       UNCOMPUTED,
     ]);
-    disposeDerivedNode(readers[1]!);
-    disposeDerivedNode(readers[0]!);
+    releaseDerivedNode(readers[1]!);
+    releaseDerivedNode(readers[0]!);
     expectSame(dependentsOf(a), []);
     expect(a.firstDependent === undefined).toBe(true);
     expect(a.lastDependent === undefined).toBe(true);
   });
 });
 
-describe('disposal of nodes in each status', () => {
-  test('a disposed node holds no value and no dependency, and leaves the dependents list of the derived node it read', () => {
+describe('release', () => {
+  test('a released node with no reader holds no value and no dependency, and the release cascades to the derived node it read', () => {
     const a = createSourceNode(1);
     const inner = createDerivedNode((callingNode) =>
       readSource(callingNode, a),
@@ -3777,104 +3515,280 @@ describe('disposal of nodes in each status', () => {
       (callingNode) =>
         readSource(callingNode, a) + readDerived(callingNode, inner),
     );
-    expect(pull(outer)).toBe(2);
+    retainDerivedNode(outer);
+    expect(readDerivedNode(outer)).toBe(2);
     expectSame(dependentsOf(inner), [outer]);
-    disposeDerivedNode(outer);
-    expect(outer.status).toBe(UNCOMPUTED);
-    expect(outer.value).toBeUndefined();
+    releaseDerivedNode(outer);
+    expect([outer.status, inner.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expect([outer.value, inner.value]).toEqual([undefined, undefined]);
     expectSame(dependentsOf(inner), []);
-    expectSame(dependentsOf(a), [inner]);
+    expectSame(dependentsOf(a), []);
     expect(
       [
         outer.firstSourceDependency,
         outer.lastSourceDependency,
         outer.firstDerivedDependency,
         outer.lastDerivedDependency,
+        inner.firstSourceDependency,
       ].map((edge) => edge === undefined),
-    ).toEqual([true, true, true, true]);
+    ).toEqual([true, true, true, true, true]);
   });
 
-  test('a node that was disposed and pulled again is marked by the source and the derived node it read', () => {
+  test('a release cascades through a chain, and a node the chain reads that another node still reads survives with its value', () => {
+    const runs = { shared: 0, left: 0, right: 0 };
     const a = createSourceNode(1);
-    const b = createSourceNode(10);
-    const inner = createDerivedNode((callingNode) =>
-      readSource(callingNode, b),
+    const shared = createDerivedNode((callingNode) => {
+      runs.shared += 1;
+      return readSource(callingNode, a);
+    });
+    const left = createDerivedNode((callingNode) => {
+      runs.left += 1;
+      return readDerived(callingNode, shared) + 1;
+    });
+    const leftTop = createDerivedNode(
+      (callingNode) => readDerived(callingNode, left) + 1,
     );
-    const node = createDerivedNode(
+    const right = createDerivedNode((callingNode) => {
+      runs.right += 1;
+      return readDerived(callingNode, shared) + 10;
+    });
+    retainDerivedNode(leftTop);
+    retainDerivedNode(right);
+    expect([readDerivedNode(leftTop), readDerivedNode(right)]).toEqual([3, 11]);
+    releaseDerivedNode(leftTop);
+    expect([leftTop.status, left.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expect([shared.status, right.status]).toEqual([CLEAN, CLEAN]);
+    expectSame(dependentsOf(shared), [right]);
+    expectSame(dependentsOf(a), [shared]);
+    write(a, 2);
+    expect(readDerivedNode(right)).toBe(12);
+    expect(runs).toEqual({ shared: 2, left: 1, right: 2 });
+  });
+
+  test('a recompute that switches from reading c to reading d disposes c and the node only c read, and switching back computes them again', () => {
+    const runs = { c: 0, belowC: 0, d: 0 };
+    const flag = createSourceNode(true);
+    const a = createSourceNode(1);
+    const b = createDerivedNode((callingNode) => readSource(callingNode, a));
+    const belowC = createDerivedNode((callingNode) => {
+      runs.belowC += 1;
+      return readSource(callingNode, a) * 100;
+    });
+    const c = createDerivedNode((callingNode) => {
+      runs.c += 1;
+      return readDerived(callingNode, belowC) + 1;
+    });
+    const d = createDerivedNode((callingNode) => {
+      runs.d += 1;
+      return readSource(callingNode, a) * 1000;
+    });
+    const top = createDerivedNode(
       (callingNode) =>
-        readSource(callingNode, a) + readDerived(callingNode, inner),
+        readDerived(callingNode, b) +
+        (readSource(callingNode, flag)
+          ? readDerived(callingNode, c)
+          : readDerived(callingNode, d)),
     );
-    expect(pull(node)).toBe(11);
-    disposeDerivedNode(node);
-    expect(pull(node)).toBe(11);
-    expectSame(sourceDependenciesOf(node), [a]);
-    expectSame(derivedDependenciesOf(node), [inner]);
-    writeSource(a, 2);
-    expect(node.status).toBe(DIRTY);
-    expect(pull(node)).toBe(12);
-    writeSource(b, 20);
-    expect(node.status).toBe(CHECK);
-    expect(pull(node)).toBe(22);
+    retainDerivedNode(top);
+    expect(readDerivedNode(top)).toBe(102);
+    write(flag, false);
+    expect(readDerivedNode(top)).toBe(1001);
+    expect([c.status, belowC.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expect([b.status, d.status]).toEqual([CLEAN, CLEAN]);
+    expectSame(derivedDependenciesOf(top), [b, d]);
+    expectSame(dependentsOf(a), [b, d]);
+    write(flag, true);
+    expect(readDerivedNode(top)).toBe(102);
+    expect(d.status).toBe(UNCOMPUTED);
+    expect(runs).toEqual({ c: 2, belowC: 2, d: 1 });
   });
 
-  test('disposing a Check node marks its Check reader Dirty, and the reader recomputes with the new value', () => {
-    const runs = { bottom: 0, middle: 0, top: 0 };
+  test('a branch that flips is disposed and recomputed on each flip, and retaining both branches keeps them computed', () => {
+    const runs = { left: 0, right: 0 };
+    const flag = createSourceNode(true);
     const a = createSourceNode(1);
-    const bottom = createDerivedNode((callingNode) => {
-      runs.bottom += 1;
+    const left = createDerivedNode((callingNode) => {
+      runs.left += 1;
       return readSource(callingNode, a);
     });
-    const middle = createDerivedNode((callingNode) => {
-      runs.middle += 1;
-      return readDerived(callingNode, bottom) + 1;
+    const right = createDerivedNode((callingNode) => {
+      runs.right += 1;
+      return readSource(callingNode, a) * 10;
     });
+    const top = createDerivedNode((callingNode) =>
+      readSource(callingNode, flag)
+        ? readDerived(callingNode, left)
+        : readDerived(callingNode, right),
+    );
+    retainDerivedNode(top);
+    readDerivedNode(top);
+    write(flag, false);
+    readDerivedNode(top);
+    write(flag, true);
+    readDerivedNode(top);
+    expect(runs).toEqual({ left: 2, right: 1 });
+    expect(right.status).toBe(UNCOMPUTED);
+
+    retainDerivedNode(left);
+    retainDerivedNode(right);
+    write(flag, false);
+    readDerivedNode(top);
+    write(flag, true);
+    expect(readDerivedNode(top)).toBe(1);
+    write(flag, false);
+    expect(readDerivedNode(top)).toBe(10);
+    expect(runs).toEqual({ left: 2, right: 2 });
+    expect([left.status, right.status]).toEqual([CLEAN, CLEAN]);
+  });
+
+  test('a recompute that reads fewer derived nodes disposes the nodes trim drops', () => {
+    const count = createSourceNode(3);
+    const a = createSourceNode(1);
+    const nodes = [0, 1, 2].map((offset) =>
+      createDerivedNode((callingNode) => readSource(callingNode, a) + offset),
+    );
+    const top = createDerivedNode((callingNode) =>
+      nodes
+        .slice(0, readSource(callingNode, count))
+        .reduce((sum, node) => sum + readDerived(callingNode, node), 0),
+    );
+    retainDerivedNode(top);
+    expect(readDerivedNode(top)).toBe(6);
+    write(count, 1);
+    expect(readDerivedNode(top)).toBe(1);
+    expect(nodes.map((node) => node.status)).toEqual([
+      CLEAN,
+      UNCOMPUTED,
+      UNCOMPUTED,
+    ]);
+    expectSame(dependentsOf(a), [nodes[0]]);
+    write(count, 0);
+    expect(readDerivedNode(top)).toBe(0);
+    expect(nodes[0]!.status).toBe(UNCOMPUTED);
+    expectSame(dependentsOf(a), []);
+  });
+
+  test('a trim that drops a node and the node it read disposes the chain, and a dropped node another dropped edge still reaches is disposed after that edge is dropped', () => {
+    const count = createSourceNode(3);
+    const a = createSourceNode(1);
+    const bottom = createDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const middle = createDerivedNode(
+      (callingNode) => readDerived(callingNode, bottom) + 1,
+    );
+    const reads = [middle, bottom];
+    const top = createDerivedNode((callingNode) =>
+      reads
+        .slice(0, readSource(callingNode, count) - 1)
+        .reduce((sum, node) => sum + readDerived(callingNode, node), 0),
+    );
+    retainDerivedNode(top);
+    expect(readDerivedNode(top)).toBe(3);
+    write(count, 1);
+    expect(readDerivedNode(top)).toBe(0);
+    expect([middle.status, bottom.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expectSame(dependentsOf(a), []);
+  });
+
+  test('a node that a recompute repoints away from and reads again later in the same run survives with its value and does not rerun', () => {
+    const runs = { x: 0, y: 0 };
+    const order = createSourceNode<'xy' | 'yx'>('xy');
+    const a = createSourceNode(1);
+    const x = createDerivedNode((callingNode) => {
+      runs.x += 1;
+      return readSource(callingNode, a);
+    });
+    const y = createDerivedNode((callingNode) => {
+      runs.y += 1;
+      return readSource(callingNode, a) * 10;
+    });
+    const top = createDerivedNode((callingNode) =>
+      readSource(callingNode, order) === 'xy'
+        ? readDerived(callingNode, x) * 100 + readDerived(callingNode, y)
+        : readDerived(callingNode, y) * 100 + readDerived(callingNode, x),
+    );
+    retainDerivedNode(top);
+    expect(readDerivedNode(top)).toBe(110);
+    write(order, 'yx');
+    // The first read repoints the edge from x to y, so x has no dependent
+    // until the second read relinks it.
+    expect(readDerivedNode(top)).toBe(1001);
+    expect([x.status, y.status]).toEqual([CLEAN, CLEAN]);
+    expectSame(derivedDependenciesOf(top), [y, x]);
+    expect(runs).toEqual({ x: 1, y: 1 });
+    expect(top.disposalCandidates).toBeUndefined();
+  });
+
+  test('a node that a recompute repoints away from and does not read again is disposed after the run, with the node only it read', () => {
+    const flag = createSourceNode(true);
+    const a = createSourceNode(1);
+    const below = createDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const x = createDerivedNode(
+      (callingNode) => readDerived(callingNode, below) + 1,
+    );
+    const y = createDerivedNode(
+      (callingNode) => readSource(callingNode, a) * 10,
+    );
+    let statusOfXDuringRun: number | undefined;
     const top = createDerivedNode((callingNode) => {
-      runs.top += 1;
-      return readDerived(callingNode, middle) + 1;
+      if (readSource(callingNode, flag)) {
+        return readDerived(callingNode, x);
+      }
+      const value = readDerived(callingNode, y);
+      statusOfXDuringRun = x.status;
+      return value;
     });
-    pull(top);
-    writeSource(a, 2);
-    expect([middle.status, top.status]).toEqual([CHECK, CHECK]);
-    disposeDerivedNode(middle);
-    expect([bottom.status, middle.status, top.status]).toEqual([
-      DIRTY,
+    retainDerivedNode(top);
+    expect(readDerivedNode(top)).toBe(2);
+    write(flag, false);
+    expect(readDerivedNode(top)).toBe(10);
+    expect(statusOfXDuringRun).toBe(CLEAN);
+    expect([x.status, below.status, y.status]).toEqual([
       UNCOMPUTED,
-      DIRTY,
+      UNCOMPUTED,
+      CLEAN,
     ]);
-    expectSame(dependentsOf(bottom), []);
-    expect(pull(top)).toBe(4);
-    expect(runs).toEqual({ bottom: 2, middle: 2, top: 2 });
+    expectSame(dependentsOf(a), [y]);
   });
 
-  test('disposing a node two levels below a reader leaves that reader Check, and it becomes Clean without running when the node between them recomputes to the same value', () => {
-    const runs = { inner: 0, middle: 0, outer: 0 };
+  test('a node retained several times is disposed only when the last retain is released', () => {
+    let runs = 0;
     const a = createSourceNode(1);
-    const inner = createDerivedNode((callingNode) => {
-      runs.inner += 1;
+    const node = createDerivedNode((callingNode) => {
+      runs += 1;
       return readSource(callingNode, a);
     });
-    const middle = createDerivedNode((callingNode) => {
-      runs.middle += 1;
-      return readDerived(callingNode, inner) + 1;
-    });
-    const outer = createDerivedNode((callingNode) => {
-      runs.outer += 1;
-      return readDerived(callingNode, middle) + 1;
-    });
-    expect(pull(outer)).toBe(3);
-    disposeDerivedNode(inner);
-    expect([inner.status, middle.status, outer.status]).toEqual([
-      UNCOMPUTED,
-      DIRTY,
-      CHECK,
-    ]);
-    expect(pull(outer)).toBe(3);
-    expect(runs).toEqual({ inner: 2, middle: 2, outer: 1 });
-    expect(outer.status).toBe(CLEAN);
+    [0, 1, 2].forEach(() => retainDerivedNode(node));
+    expect(node.retainCount).toBe(3);
+    expect([0, 1, 2].map(() => readDerivedNode(node))).toEqual([1, 1, 1]);
+    expect(runs).toBe(1);
+    releaseDerivedNode(node);
+    releaseDerivedNode(node);
+    expect(node.status).toBe(CLEAN);
+    expectSame(dependentsOf(a), [node]);
+    releaseDerivedNode(node);
+    expect(node.status).toBe(UNCOMPUTED);
+    expectSame(dependentsOf(a), []);
+    expect(node.retainCount).toBe(0);
   });
 
-  test('disposing a node twice changes nothing the second time', () => {
-    let calls = 0;
+  test('a second release of the same retain decrements again, so it disposes a node that another holder still counts on, as the contract states', () => {
+    const a = createSourceNode(1);
+    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
+    retainDerivedNode(node);
+    retainDerivedNode(node);
+    expect(readDerivedNode(node)).toBe(1);
+    releaseDerivedNode(node);
+    expect(node.status).toBe(CLEAN);
+    releaseDerivedNode(node);
+    expect(node.retainCount).toBe(0);
+    expect(node.status).toBe(UNCOMPUTED);
+  });
+
+  test('releasing a node that a reader reads keeps it, and releasing the reader disposes both', () => {
     const a = createSourceNode(1);
     const inner = createDerivedNode((callingNode) =>
       readSource(callingNode, a),
@@ -3882,16 +3796,193 @@ describe('disposal of nodes in each status', () => {
     const outer = createDerivedNode(
       (callingNode) => readDerived(callingNode, inner) + 1,
     );
-    pull(outer);
-    outer.onDirty = () => {
-      calls += 1;
+    retainDerivedNode(inner);
+    retainDerivedNode(outer);
+    expect([readDerivedNode(inner), readDerivedNode(outer)]).toEqual([1, 2]);
+    releaseDerivedNode(inner);
+    expect([inner.status, outer.status]).toEqual([CLEAN, CLEAN]);
+    write(a, 2);
+    expect(readDerivedNode(outer)).toBe(3);
+    releaseDerivedNode(outer);
+    expect([inner.status, outer.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expectSame(dependentsOf(a), []);
+  });
+
+  test('a disposed node that is retained again computes with previous undefined and is marked by what it read', () => {
+    const previousValues: Array<number | undefined> = [];
+    const a = createSourceNode(1);
+    const b = createSourceNode(10);
+    const inner = createDerivedNode((callingNode) =>
+      readSource(callingNode, b),
+    );
+    const node = createDerivedNode<number>((callingNode, previous) => {
+      previousValues.push(previous);
+      return readSource(callingNode, a) + readDerived(callingNode, inner);
+    });
+    retainDerivedNode(node);
+    expect(readDerivedNode(node)).toBe(11);
+    releaseDerivedNode(node);
+    write(a, 2);
+    retainDerivedNode(node);
+    expect(readDerivedNode(node)).toBe(12);
+    expectSame(sourceDependenciesOf(node), [a]);
+    expectSame(derivedDependenciesOf(node), [inner]);
+    write(a, 3);
+    expect(node.status).toBe(DIRTY);
+    expect(readDerivedNode(node)).toBe(13);
+    write(b, 20);
+    expect(node.status).toBe(CHECK);
+    expect(readDerivedNode(node)).toBe(23);
+    expect(previousValues).toEqual([undefined, undefined, 12, 13]);
+  });
+
+  test('releasing a Check node disposes it and the Dirty node it read', () => {
+    const a = createSourceNode(1);
+    const bottom = createDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const top = createDerivedNode(
+      (callingNode) => readDerived(callingNode, bottom) + 1,
+    );
+    retainDerivedNode(top);
+    readDerivedNode(top);
+    write(a, 2);
+    expect([bottom.status, top.status]).toEqual([DIRTY, CHECK]);
+    releaseDerivedNode(top);
+    expect([bottom.status, top.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expectSame(dependentsOf(a), []);
+  });
+
+  test('retaining a node that was never computed holds nothing, and releasing it changes nothing', () => {
+    const previousValues: Array<number | undefined> = [];
+    const a = createSourceNode(1);
+    const node = createDerivedNode<number>((callingNode, previous) => {
+      previousValues.push(previous);
+      return readSource(callingNode, a);
+    });
+    retainDerivedNode(node);
+    expect(node.status).toBe(UNCOMPUTED);
+    expectSame(dependentsOf(a), []);
+    releaseDerivedNode(node);
+    expect(node.status).toBe(UNCOMPUTED);
+    retainDerivedNode(node);
+    expect(readDerivedNode(node)).toBe(1);
+    expect(previousValues).toEqual([undefined]);
+  });
+
+  test('an eager node whose eager reader stops reading it in a flush is disposed, and a queued eager node released before the flush stays Uncomputed', () => {
+    let runs = 0;
+    const a = createSourceNode(1);
+    const flag = createSourceNode(true);
+    const eager = createEagerDerivedNode((callingNode) => {
+      runs += 1;
+      return readSource(callingNode, a) * 2;
+    });
+    const reader = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, flag) ? readDerived(callingNode, eager) : 0,
+    );
+    retainDerivedNode(reader);
+    expect(readDerivedNode(reader)).toBe(2);
+    write(flag, false);
+    expect(reader.status).toBe(CLEAN);
+    expect(reader.value).toBe(0);
+    expect(eager.status).toBe(UNCOMPUTED);
+    expectSame(dependentsOf(a), []);
+
+    const queued = createEagerDerivedNode((callingNode) => {
+      runs += 1;
+      return readSource(callingNode, a);
+    });
+    retainDerivedNode(queued);
+    readDerivedNode(queued);
+    startBatch((mutators) => {
+      mutators.writeSource(a, 2);
+      expect(queued.status).toBe(DIRTY);
+      releaseDerivedNode(queued);
+    });
+    expect(queued.status).toBe(UNCOMPUTED);
+    expect(hasDependent(a, queued)).toBe(false);
+    expect(runs).toBe(2);
+  });
+
+  test('a subscriber retains an eager node and sets onChange on it, which the flush calls when the value changed, and after the release a write calls nothing and visits nothing', () => {
+    const calls: Array<number> = [];
+    const a = createSourceNode(1);
+    const inner = createDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const node = createEagerDerivedNode(
+      (callingNode) => Math.floor(readDerived(callingNode, inner) / 2) + 1,
+    );
+    retainDerivedNode(node);
+    node.onChange = () => calls.push(readDerivedNode(node));
+    expect(readDerivedNode(node)).toBe(1);
+    write(a, 2);
+    write(a, 3);
+    write(a, 4);
+    expect(calls).toEqual([2, 3]);
+    releaseDerivedNode(node);
+    expect([inner.status, node.status]).toEqual([UNCOMPUTED, UNCOMPUTED]);
+    expectSame(dependentsOf(a), []);
+    write(a, 6);
+    expect(calls).toEqual([2, 3]);
+    expect(a.dependentsStatus).toBe(1);
+  });
+
+  test('two subscribers of one node each retain an eager node, and releasing one leaves the node read by the other', () => {
+    const calls: Array<string> = [];
+    const a = createSourceNode(1);
+    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
+    const subscribe = (name: string): DerivedNode<number> => {
+      const subscriber = createEagerDerivedNode((callingNode) =>
+        readDerived(callingNode, node),
+      );
+      retainDerivedNode(subscriber);
+      subscriber.onChange = () =>
+        calls.push(`${name} ${readDerivedNode(subscriber)}`);
+      readDerivedNode(subscriber);
+      return subscriber;
     };
-    disposeDerivedNode(inner);
-    disposeDerivedNode(inner);
-    startBatch((mutators) => mutators.disposeDerivedNode(inner));
-    expect(calls).toBe(1);
-    expect(inner.status).toBe(UNCOMPUTED);
-    expect(pull(outer)).toBe(2);
+    const first = subscribe('first');
+    subscribe('second');
+    write(a, 2);
+    releaseDerivedNode(first);
+    expect(first.status).toBe(UNCOMPUTED);
+    expect(node.status).toBe(CLEAN);
+    write(a, 3);
+    expect(calls).toEqual(['first 2', 'second 2', 'second 3']);
+  });
+
+  test('a release cascades through a chain of 100,000 nodes without overflowing the call stack', () => {
+    const a = createSourceNode(0);
+    let previous = createDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const bottom = previous;
+    const nodes: Array<DerivedNode<number>> = [previous];
+    for (let i = 0; i < 100_000; i++) {
+      const below = previous;
+      previous = createDerivedNode(
+        (callingNode) => readDerived(callingNode, below) + 1,
+      );
+      nodes.push(previous);
+    }
+    // Computing the chain top-down would overflow, so each node is computed
+    // bottom-up while it is retained, and every retain but the top one is
+    // released once the node above holds it.
+    nodes.forEach((node) => {
+      retainDerivedNode(node);
+      readDerivedNode(node);
+    });
+    nodes.forEach((node, index) => {
+      if (index !== nodes.length - 1) {
+        releaseDerivedNode(node);
+      }
+    });
+    expect(bottom.status).toBe(CLEAN);
+    releaseDerivedNode(previous);
+    expect(nodes.every((node) => node.status === UNCOMPUTED)).toBe(true);
+    expectSame(dependentsOf(a), []);
   });
 });
 
@@ -3910,18 +4001,18 @@ describe('eager nodes outside the flush', () => {
     const reader = createDerivedNode(
       (callingNode) => readDerived(callingNode, eager) + 1,
     );
-    expect(pull(reader)).toBe(3);
+    expect(read(reader)).toBe(3);
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       expect(eager.status).toBe(CHECK);
-      expect(pull(eager)).toBe(2);
-      expect(pull(reader)).toBe(3);
+      expect(read(eager)).toBe(2);
+      expect(read(reader)).toBe(3);
       expect(eager.status).toBe(CHECK);
       expect(runs).toEqual({ inner: 1, eager: 1 });
     });
     expect(runs).toEqual({ inner: 2, eager: 2 });
     expect([eager.status, reader.status]).toEqual([CLEAN, DIRTY]);
-    expect(pull(reader)).toBe(5);
+    expect(read(reader)).toBe(5);
   });
 
   test('a lazy Check node above a queued Check eager node becomes Clean with its previous value without running the eager node, and the flush marks it again', () => {
@@ -3942,23 +4033,23 @@ describe('eager nodes outside the flush', () => {
     const top = createDerivedNode((callingNode) =>
       readDerived(callingNode, middle) ? readDerived(callingNode, eager) : 0,
     );
-    expect(pull(top)).toBe(2);
+    expect(read(top)).toBe(2);
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       mutators.writeSource(b, 2);
       expect([eager.status, top.status]).toEqual([CHECK, CHECK]);
-      expect(pull(top)).toBe(2);
+      expect(read(top)).toBe(2);
       expect([eager.status, top.status]).toEqual([CHECK, CLEAN]);
       expect(eagerRuns).toBe(1);
     });
     expect(eagerRuns).toBe(2);
     expect(top.status).toBe(DIRTY);
-    expect(pull(top)).toBe(4);
+    expect(read(top)).toBe(4);
   });
 });
 
 describe('setDerivedNodeEvaluation as a single call', () => {
-  test('a queued eager node set lazy by the single call marks its readers Check and calls its onDirty and theirs before the call returns', () => {
+  test('a queued eager node set lazy by the single call marks its readers Check before the call returns and calls no onChange', () => {
     let runs = 0;
     const calls: Array<string> = [];
     const a = createSourceNode(1);
@@ -3972,10 +4063,8 @@ describe('setDerivedNodeEvaluation as a single call', () => {
     const outer = createDerivedNode(
       (callingNode) => readDerived(callingNode, reader) + 1,
     );
-    pull(outer);
-    eager.onDirty = () => calls.push('eager');
-    reader.onDirty = () => calls.push('reader');
-    outer.onDirty = () => calls.push('outer');
+    read(outer);
+    eager.onChange = () => calls.push('eager');
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       expect([eager.status, reader.status, outer.status]).toEqual([
@@ -3984,21 +4073,20 @@ describe('setDerivedNodeEvaluation as a single call', () => {
         CLEAN,
       ]);
       setDerivedNodeEvaluation(eager, LAZY);
-      expect(calls).toEqual(['eager', 'reader', 'outer']);
       expect([eager.status, reader.status, outer.status]).toEqual([
         DIRTY,
         CHECK,
         CHECK,
       ]);
     });
-    expect(calls).toEqual(['eager', 'reader', 'outer']);
+    expect(calls).toEqual([]);
     expect(eager.evaluation).toBe(LAZY);
     expect(runs).toBe(1);
-    expect(pull(outer)).toBe(6);
+    expect(read(outer)).toBe(6);
     expect(runs).toBe(2);
   });
 
-  test('a queued eager node without onDirty set lazy by the single call marks its readers Check, calls their onDirty, and refreshes an eager reader of a reader', () => {
+  test('a queued eager node set lazy by the single call marks its readers Check, and refreshes an eager reader of a reader and calls its onChange', () => {
     const runs = { eager: 0, above: 0 };
     const calls: Array<string> = [];
     const a = createSourceNode(1);
@@ -4016,16 +4104,14 @@ describe('setDerivedNodeEvaluation as a single call', () => {
     const sibling = createDerivedNode(
       (callingNode) => readDerived(callingNode, eager) + 100,
     );
-    pull(above);
-    pull(sibling);
-    reader.onDirty = () => calls.push('reader');
-    sibling.onDirty = () => calls.push('sibling');
-    above.onDirty = () => calls.push('above');
+    read(above);
+    read(sibling);
+    above.onChange = () => calls.push(`above ${readDerivedNode(above)}`);
     startBatch((mutators) => {
       mutators.writeSource(a, 2);
       setDerivedNodeEvaluation(eager, LAZY);
       expect(runs).toEqual({ eager: 2, above: 2 });
-      expect(calls).toEqual(['reader', 'sibling', 'above']);
+      expect(calls).toEqual(['above 6']);
       expect([
         eager.status,
         reader.status,
@@ -4033,8 +4119,8 @@ describe('setDerivedNodeEvaluation as a single call', () => {
         sibling.status,
       ]).toEqual([CLEAN, CLEAN, CLEAN, DIRTY]);
     });
-    expect(pull(above)).toBe(6);
-    expect(pull(sibling)).toBe(104);
+    expect(read(above)).toBe(6);
+    expect(read(sibling)).toBe(104);
     expect(runs).toEqual({ eager: 2, above: 2 });
   });
 
@@ -4053,8 +4139,8 @@ describe('setDerivedNodeEvaluation as a single call', () => {
       runs.dirty += 1;
       return readSource(callingNode, a) * 10;
     });
-    pull(check);
-    pull(dirty);
+    read(check);
+    read(dirty);
     writeSource(a, 3);
     expect([check.status, dirty.status]).toEqual([CHECK, DIRTY]);
     setDerivedNodeEvaluation(check, EAGER);
@@ -4062,26 +4148,232 @@ describe('setDerivedNodeEvaluation as a single call', () => {
     expect([check.evaluation, dirty.evaluation]).toEqual([EAGER, EAGER]);
     expect([check.status, dirty.status]).toEqual([CLEAN, CLEAN]);
     expect(runs).toEqual({ inner: 2, check: 1, dirty: 2 });
-    expect([pull(check), pull(dirty)]).toEqual([10, 30]);
+    expect([read(check), read(dirty)]).toEqual([10, 30]);
   });
 });
 
 describe('setDerivedNodeEvaluation with the evaluation the node has', () => {
-  test('setting a Dirty lazy node lazy, by the single call and by the batch method, calls nothing and marks nothing', () => {
-    let calls = 0;
+  test('setting a Dirty lazy node lazy, by the single call and by the batch method, runs nothing and marks nothing', () => {
+    let runs = 0;
     const a = createSourceNode(1);
-    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
-    pull(node);
-    node.onDirty = () => {
-      calls += 1;
-    };
+    const node = createDerivedNode((callingNode) => {
+      runs += 1;
+      return readSource(callingNode, a);
+    });
+    const reader = createDerivedNode((callingNode) =>
+      readDerived(callingNode, node),
+    );
+    read(reader);
     writeSource(a, 2);
-    expect(calls).toBe(1);
     setDerivedNodeEvaluation(node, LAZY);
     startBatch((mutators) => mutators.setDerivedNodeEvaluation(node, LAZY));
-    expect(calls).toBe(1);
-    expect(node.status).toBe(DIRTY);
+    expect([node.status, reader.status]).toEqual([DIRTY, CHECK]);
+    expect(runs).toBe(1);
   });
+});
+
+describe('onChange', () => {
+  test('the flush calls onChange after every queued eager node is refreshed, in the order of each node first changed recompute', () => {
+    const calls: Array<string> = [];
+    const a = createSourceNode(1);
+    const b = createSourceNode(1);
+    const first = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, a),
+    );
+    const second = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, b),
+    );
+    read(first);
+    read(second);
+    first.onChange = () =>
+      calls.push(`first, second ${second.status} ${second.value}`);
+    second.onChange = () => calls.push(`second, first ${first.value}`);
+    startBatch((mutators) => {
+      mutators.writeSource(b, 2);
+      mutators.writeSource(a, 2);
+    });
+    expect(calls).toEqual(['second, first 2', `first, second ${CLEAN} 2`]);
+  });
+
+  test('a node that the flush recomputes twice calls onChange once, with the value of its last recompute', () => {
+    const runs = { first: 0, late: 0 };
+    const calls: Array<string> = [];
+    const a = createSourceNode(1);
+    const late = createEagerDerivedNode((callingNode) => {
+      runs.late += 1;
+      return readSource(callingNode, a) * 10;
+    });
+    const first = createEagerDerivedNode((callingNode) => {
+      runs.first += 1;
+      return readSource(callingNode, a) + readDerived(callingNode, late);
+    });
+    read(first);
+    first.onChange = () => calls.push(`first ${readDerivedNode(first)}`);
+    late.onChange = () => calls.push(`late ${readDerivedNode(late)}`);
+    expectSame(dependentsOf(a), [first, late]);
+    write(a, 2);
+    expect(runs).toEqual({ first: 3, late: 2 });
+    expect(calls).toEqual(['first 22', 'late 20']);
+    expect(first.onChangeStatus).toBe(0);
+    write(a, 3);
+    expect(calls).toEqual(['first 22', 'late 20', 'first 33', 'late 30']);
+  });
+
+  test('a first computation calls no onChange, outside or inside a flush', () => {
+    const calls: Array<string> = [];
+    const a = createSourceNode(0);
+    const b = createSourceNode(5);
+    const late = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, b),
+    );
+    late.onChange = () => calls.push('late');
+    const top = createEagerDerivedNode((callingNode) =>
+      readSource(callingNode, a) > 0 ? readDerived(callingNode, late) : 0,
+    );
+    top.onChange = () => calls.push(`top ${readDerivedNode(top)}`);
+    expect(read(top)).toBe(0);
+    expect(calls).toEqual([]);
+    write(a, 1);
+    expect(late.status).toBe(CLEAN);
+    expect(calls).toEqual(['top 5']);
+    write(b, 6);
+    expect(calls).toEqual(['top 5', 'late', 'top 6']);
+  });
+
+  test('an onChange reads current values of lazy and eager nodes through readDerivedNode, and leaves them Clean', () => {
+    const seen: Array<ReadonlyArray<number>> = [];
+    const a = createSourceNode(1);
+    const eager = createEagerDerivedNode(
+      (callingNode) => readSource(callingNode, a) * 2,
+    );
+    const lazy = createDerivedNode(
+      (callingNode) => readSource(callingNode, a) + 1,
+    );
+    const lazyAbove = createDerivedNode(
+      (callingNode) => readDerived(callingNode, eager) + 100,
+    );
+    read(eager);
+    read(lazy);
+    read(lazyAbove);
+    eager.onChange = () =>
+      seen.push([
+        readDerivedNode(eager),
+        readDerivedNode(lazy),
+        readDerivedNode(lazyAbove),
+        a.value,
+      ]);
+    write(a, 5);
+    expect(seen).toEqual([[10, 6, 110, 5]]);
+    expect([eager.status, lazy.status, lazyAbove.status]).toEqual([
+      CLEAN,
+      CLEAN,
+      CLEAN,
+    ]);
+  });
+
+  test('onChange on a lazy node is unused until the node is set eager, and then the flush calls it when it changes the value', () => {
+    const calls: Array<number> = [];
+    const a = createSourceNode(1);
+    const node = createDerivedNode((callingNode) => readSource(callingNode, a));
+    node.onChange = () => calls.push(readDerivedNode(node));
+    read(node);
+    write(a, 2);
+    expect(read(node)).toBe(2);
+    startBatch((mutators) => {
+      mutators.writeSource(a, 3);
+      expect(read(node)).toBe(3);
+    });
+    write(a, 4);
+    expect(calls).toEqual([]);
+    setDerivedNodeEvaluation(node, EAGER);
+    expect(calls).toEqual([4]);
+    write(a, 5);
+    expect(calls).toEqual([4, 5]);
+    setDerivedNodeEvaluation(node, LAZY);
+    write(a, 6);
+    expect(read(node)).toBe(6);
+    expect(calls).toEqual([4, 5]);
+  });
+});
+
+describe('untracked reads', () => {
+  test('readDerivedNode and source.value inside a computation record no dependency, so the result is stale until a tracked read changes', () => {
+    let runs = 0;
+    const a = createSourceNode(1);
+    const b = createSourceNode(100);
+    const inner = createDerivedNode(
+      (callingNode) => readSource(callingNode, a) * 10,
+    );
+    read(inner);
+    const node = createDerivedNode((callingNode) => {
+      runs += 1;
+      return a.value + readDerivedNode(inner) + readSource(callingNode, b);
+    });
+    expect(read(node)).toBe(111);
+    expectSame(sourceDependenciesOf(node), [b]);
+    expectSame(derivedDependenciesOf(node), []);
+    expectSame(dependentsOf(inner), []);
+    write(a, 2);
+    expect(node.status).toBe(CLEAN);
+    expect(read(node)).toBe(111);
+    expect(inner.status).toBe(DIRTY);
+    write(b, 200);
+    expect(read(node)).toBe(222);
+    expect(runs).toBe(2);
+    expect(inner.status).toBe(CLEAN);
+  });
+});
+
+describe('queues', () => {
+  for (const [name, writeWith] of writers) {
+    test(`${name} refreshes every eager node it queues in queue order, and eager nodes that changed recomputes queue join the same walk`, () => {
+      const refreshed: Array<string> = [];
+      const calls: Array<string> = [];
+      const a = createSourceNode(1);
+      const direct = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) =>
+        createEagerDerivedNode((callingNode) => {
+          refreshed.push(`direct ${index}`);
+          return readSource(callingNode, a) + index;
+        }),
+      );
+      const above = [0, 9].map((index) =>
+        createEagerDerivedNode((callingNode) => {
+          refreshed.push(`above ${index}`);
+          return readDerived(callingNode, direct[index]!) * 10;
+        }),
+      );
+      [...direct, ...above].forEach((node) => read(node));
+      [...direct, ...above].forEach((node, index) => {
+        node.onChange = () => calls.push(`${index}`);
+      });
+      refreshed.length = 0;
+      writeWith(a, 2);
+      expect(refreshed).toEqual([
+        ...direct.map((_, index) => `direct ${index}`),
+        'above 0',
+        'above 9',
+      ]);
+      expect(calls).toEqual([
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+        '10',
+        '11',
+      ]);
+      expect(above.map((node) => node.value)).toEqual([20, 110]);
+      refreshed.length = 0;
+      writeWith(a, 3);
+      expect(refreshed.length).toBe(12);
+      expect(calls.length).toBe(24);
+    });
+  }
 });
 
 describe('README example', () => {
@@ -4108,17 +4400,32 @@ describe('README example', () => {
       const { first, last } = readDerived(callingNode, name);
       return `Hello, ${first} ${last}`;
     });
-    expect(pull(greeting)).toBe('Hello, Ada Lovelace');
+    retainDerivedNode(greeting);
+    expect(readDerivedNode(greeting)).toBe('Hello, Ada Lovelace');
     expect(greetingRuns).toBe(1);
     writeSource(person, { first: 'Ada', last: 'Lovelace', age: 37 });
-    expect(pull(greeting)).toBe('Hello, Ada Lovelace');
+    expect(readDerivedNode(greeting)).toBe('Hello, Ada Lovelace');
     expect(greetingRuns).toBe(1);
     startBatch((mutators) => {
       mutators.writeSource(person, { first: 'Ada', last: 'Lovelace', age: 38 });
       mutators.writeSource(person, { first: 'Ada', last: 'King', age: 38 });
     });
-    expect(pull(greeting)).toBe('Hello, Ada King');
+    expect(readDerivedNode(greeting)).toBe('Hello, Ada King');
     expect(greetingRuns).toBe(2);
+    const rendered: Array<string> = [];
+    const view = createEagerDerivedNode((callingNode) =>
+      readDerived(callingNode, greeting),
+    );
+    retainDerivedNode(view);
+    readDerivedNode(view);
+    view.onChange = () => rendered.push(readDerivedNode(view));
+    writeSource(person, { first: 'Augusta', last: 'King', age: 38 });
+    expect(rendered).toEqual(['Hello, Augusta King']);
+    releaseDerivedNode(view);
+    releaseDerivedNode(greeting);
+    expect(view.status).toBe(UNCOMPUTED);
+    expect(greeting.status).toBe(UNCOMPUTED);
+    expect(name.status).toBe(UNCOMPUTED);
   });
 });
 
@@ -4183,15 +4490,18 @@ import {
   type DIRTY,
   type EAGER,
   type LAZY,
-  pull,
   readDerived,
+  readDerivedNode,
   readSource,
+  releaseDerivedNode,
+  retainDerivedNode,
   startBatch,
   type UNCOMPUTED,
   writeSource,
   type DependentsStatus,
   type DerivedNode,
   type DerivedNodeEvaluation,
+  type OnChangeStatus,
   type SourceNode,
   type Status,
 } from '../src/index';
@@ -4204,7 +4514,7 @@ test('a derived node that reads another derived node has the type of the value i
   expectTypeOf(label).toEqualTypeOf<DerivedNode<string>>();
 });
 
-test('the constructors, reads, and pull carry the value type, and the exported types name the node fields', () => {
+test('the constructors and reads carry the value type, and the exported types name the node fields', () => {
   const source = createSourceNode(1);
   expectTypeOf(source).toEqualTypeOf<SourceNode<number>>();
   expectTypeOf(source.dependentsStatus).toEqualTypeOf<DependentsStatus>();
@@ -4216,7 +4526,7 @@ test('the constructors, reads, and pull carry the value type, and the exported t
   );
   expectTypeOf(lazy).toEqualTypeOf<DerivedNode<number>>();
   expectTypeOf(eager).toEqualTypeOf<DerivedNode<string>>();
-  expectTypeOf(pull(eager)).toEqualTypeOf<string>();
+  expectTypeOf(readDerivedNode(eager)).toEqualTypeOf<string>();
   expectTypeOf(lazy.status).toEqualTypeOf<Status>();
   expectTypeOf(lazy.evaluation).toEqualTypeOf<DerivedNodeEvaluation>();
   expectTypeOf<Status>().toEqualTypeOf<
@@ -4226,6 +4536,23 @@ test('the constructors, reads, and pull carry the value type, and the exported t
     typeof LAZY | typeof EAGER
   >();
   expectTypeOf<DependentsStatus>().toEqualTypeOf<0 | 1>();
+  expectTypeOf(lazy.onChangeStatus).toEqualTypeOf<OnChangeStatus>();
+  expectTypeOf<OnChangeStatus>().toEqualTypeOf<0 | 1>();
+  expectTypeOf(lazy.retainCount).toEqualTypeOf<number>();
+  expectTypeOf(lazy.onChange).toEqualTypeOf<(() => void) | undefined>();
+});
+
+test('retain and release take any derived node and return nothing, and readDerivedNode returns the value type', () => {
+  expectTypeOf(retainDerivedNode).toEqualTypeOf<
+    (node: DerivedNode<unknown>) => void
+  >();
+  expectTypeOf(releaseDerivedNode).toEqualTypeOf<
+    (node: DerivedNode<unknown>) => void
+  >();
+  const node = createDerivedNode(() => 'value');
+  retainDerivedNode(node);
+  expectTypeOf(readDerivedNode(node)).toEqualTypeOf<string>();
+  releaseDerivedNode(node);
 });
 
 test('a computation receives its previous value as the value type or undefined', () => {
@@ -4249,7 +4576,7 @@ test('a write takes a value of the source type, in the single call and in the ba
   });
 });
 
-test('a caller cannot write a node field except onDirty', () => {
+test('a caller cannot write a node field except onChange', () => {
   const source = createSourceNode(1);
   const node = createDerivedNode((callingNode) =>
     readSource(callingNode, source),
@@ -4266,40 +4593,45 @@ test('a caller cannot write a node field except onDirty', () => {
   node.evaluation = 1;
   // @ts-expect-error a derived node's edge lists are read-only
   node.firstDependent = undefined;
-  node.onDirty = () => {};
+  // @ts-expect-error a derived node's retain count changes only through retain and release
+  node.retainCount = 1;
+  // @ts-expect-error a derived node's onChange status is read-only
+  node.onChangeStatus = 1;
+  // @ts-expect-error a derived node's disposal candidates are read-only
+  node.disposalCandidates = undefined;
+  node.onChange = () => {};
 });
 ```
 
-All 59 tests and the type test pass under vitest 2.1.9, and `tsc -b` reports no errors.
+All 108 runtime tests and 6 type tests pass under vitest 2.1.9, `tsc -b` reports no errors, and the runtime tests cover every line and branch of `src/graph.ts` (`@vitest/coverage-v8` 2.1.9). Reads outside computations go through a test-local `read(node)`, which retains the node on its first call and never releases it, so a test that does not test lifetime keeps every node it reads.
 
 ### Random differential test
 
 `test-random/random.ts` generates a random case for each seed and runs it through pico-js three times. `pnpm test:random` reads the seed count from `PICO_JS_RANDOM_SEEDS` (default 2,000) and the first seed from `PICO_JS_RANDOM_BASE_SEED` (default 1). Environment variables carry them because vitest reads positional arguments as file filters.
 
-A case is a graph and a list of operations, generated from the seed by mulberry32. The graph has 2 to 5 sources with values 0 to 3 and 3 to 14 derived nodes, 30% of them eager. Each derived node reads a selector, then one of three branches of up to three reads that the selector's value picks, so its reads change from run to run. A derived node reads only sources and derived nodes of a lower index, so the graph is acyclic. It returns the sum of its reads modulo 2, 3, or 1000, as a number, as an object it reuses from `previous` when the number is unchanged, or as a fresh object, so that cutoff applies to the first two and never to the third. An operation is a write, a disposal, an evaluation change, a pull, an `onDirty` assignment, or a batch. A batch holds mutations, pulls, nested batches, and single calls. An `onDirty` callback runs its steps, which are mutations and pulls, on each of its first one or two calls, so callbacks write, dispose, and pull inside flushes and stop writing. A write of the value a source already holds is skipped, because the contract allows only changing writes.
+A case is a graph and a list of operations, generated from the seed by mulberry32. The graph has 2 to 5 sources with values 0 to 3 and 3 to 14 derived nodes, 30% of them eager. Each derived node reads a selector, then one of three branches of up to three reads that the selector's value picks, so its reads change from run to run. A derived node reads only sources and derived nodes of a lower index, so the graph is acyclic, and 20% of derived nodes also make an untracked `readDerivedNode` of a lower node when that node is retained, and discard the value. A node returns the sum of its reads modulo 2, 3, or 1000, as a number, as an object it reuses from `previous` when the number is unchanged, or as a fresh object, so that cutoff applies to the first two and never to the third. An operation is a write, an evaluation change, a retain, a release of an outstanding retain, a read of a retained node, an `onChange` assignment, or a batch. A batch holds mutations, retains, releases, reads, nested batches, and single calls. An `onChange` callback reads up to two retained nodes. After the operations, the case releases every outstanding retain. A write of the value a source already holds is skipped, because the contract allows only changing writes, and a read or release of a node the run does not hold is skipped and logged, so a shrunk case keeps the contracts.
 
 The three runs are:
 
-- `single`: every mutation, at top level, in a batch, or in a callback, is a single call (`writeSource`, `disposeDerivedNode`, `setDerivedNodeEvaluation`).
+- `single`: every mutation, at top level or in a batch, is a single call (`writeSource`, `setDerivedNodeEvaluation`).
 - `one-op-batch`: every mutation is a `startBatch` whose body makes that one mutator call.
-- `grouped`: each batch is one `startBatch`, its nested batches are nested `startBatch` calls, its single items are single calls inside the body, and each callback runs its steps in one `startBatch`.
+- `grouped`: each batch is one `startBatch`, its nested batches are nested `startBatch` calls, and its single items are single calls inside the body.
 
-The `single` and `one-op-batch` runs log every computation run, callback call, pulled value, and, after each operation, every node's status and value. The two logs must be equal entry for entry, which compares the single-call marking code (`markDirtyQueue`, `markCheckQueue`) with the batched code (`markDirty`, `markCheck`) on order and count of `onDirty` calls and of computation runs.
+The `single` and `one-op-batch` runs log every computation run, `onChange` call, read value, and, after each operation, every node's status and value. The two logs must be equal entry for entry, which compares the single-call marking code (`markDirtyQueue`, `markCheckQueue`) with the batched code (`markDirty`, `markCheck`).
 
-Each run also checks itself against `Model`, a model that keeps statuses, values, and read lists in arrays and follows the README's Model section and Guarantees step by step:
+Each run also checks itself against `Model`, a model that keeps statuses, values, retain counts, and derived dependency lists in arrays and follows the README's Model section and Guarantees step by step. The model edits each node's derived dependency list by position, as the engine edits its edge list, and disposes a node that is computed, has retain count 0, and is in no list, then repeats the check on its dependencies. A release, a trim at the end of a run, and a repoint trigger the check, and the check for a repoint runs after the run, so a node read again in the same run survives.
 
-- After every mutator call, every status, value, and read list equals the model's. A mutator call runs no computation and calls no callback, and a disposed node is `Uncomputed`.
-- Each pull returns the model's value and runs exactly the computations the model runs, in the same order, and leaves every status equal to the model's. A pull made while no eager node is `Dirty` or `Check` returns the value recomputed from the sources alone and runs each computation at most once. A second pull runs nothing.
-- The first callbacks a flush calls are the callbacks its batch's mutator calls collected, mutation by mutation, in any order within one mutation. A flush that refreshes no eager node calls no other callback. A flush that refreshes calls the `onDirty` of each eager node it recomputed to a changed value, and its other callbacks belong to nodes that read one of those eager nodes.
-- Every recompute has a reason: a source its latest computation read was written, or a derived node it read was disposed or recomputed to a value that is not `===` its previous one.
-- A callback called while no `startBatch` body is running finds every eager node `Clean` or `Uncomputed`.
-- After each operation, every eager node is `Clean` or `Uncomputed`, every `Clean` node holds the value recomputed from the sources, each node that is not `Uncomputed` is in the dependents list of exactly the nodes its latest computation read, an `Uncomputed` node is in no dependents list, and a source whose `dependentsStatus` is 1 has only `Dirty` readers.
+- After every mutator call and every release, every status, value, retain count, and derived dependency list equals the model's. A mutator call runs no computation and calls no `onChange`.
+- Each read returns the model's value and runs exactly the computations the model runs, in the same order. A read made while no eager node is `Dirty` or `Check` returns the value recomputed from the sources alone. A second read runs nothing.
+- Every recompute has a reason: a source its latest computation read was written, or a derived node it read recomputed to a value that is not `===` its previous one.
+- Each flush calls exactly the `onChange` of the eager nodes it recomputed to a changed value, once per node, in the order of each node's first changed recompute, and none for a first computation or a lazy node, and it recomputes no eager node after its first `onChange`.
+- After each operation, every eager node is `Clean` or `Uncomputed`, every `Clean` node holds the value recomputed from the sources, each node that is not `Uncomputed` is in the dependents list of exactly the nodes its latest computation read, an `Uncomputed` node holds no value, no dependency, and no dependent, no computed node has retain count 0 and no dependent, and a source whose `dependentsStatus` is 1 has only `Dirty` readers. After the final releases, every node is `Uncomputed` and no source has a dependent.
 
-A flush that refreshes an eager node recomputes in the order of its eager queue, which the guarantees leave open, so the model stops predicting statuses at that flush. At the end of the operation, after the checks above pass, the model adopts the engine's statuses and the observed values and read lists. Over seeds 1 to 2,000, 87% of pulls run while the model predicts.
+A flush that refreshes an eager node recomputes in the order of its eager queue, which the guarantees leave open, so the model stops predicting statuses at that flush. At the end of the operation, after the checks above pass, the model adopts the engine's statuses and the observed values and dependency lists.
 
-A failing case shrinks by removing runs of operations (halves, then quarters, down to single operations), then single batch items and callback steps, while any check still fails. The thrown error names the seed, the first failed check, the shrunk case's failed check, and the shrunk case as JSON.
+A failing case shrinks by removing runs of operations (halves, then quarters, down to single operations), then single batch items and callback reads, while any check still fails. The thrown error names the seed, the first failed check, the shrunk case's failed check, and the shrunk case as JSON.
 
-Each of these changes to `graph.ts` makes seeds 1 to 300 fail, and each shrinks to a case of 1 to 4 operations: dropping the lazy `onDirty` collection in `markDirtyQueue`; marking `Check` dependents `Dirty` in `markCheckQueue`; dropping `markCheckDependentsDirty` from `recompute`; dropping the node's own `onDirty` from `setDerivedNodeEvaluation(node, LAZY)`; dropping the `onDirty` collection from `recomputeEager`; leaving a `Check` reader of a written source `Check` in `markDirty`; disabling cutoff in `recompute`; and recomputing a `Check` eager node in `refreshEager` without verifying it. Seeds 1 to 20,000 pass.
+Each of these changes to `graph.ts` fails on one of seeds 1 to 34: disposing a repointed dependency during the run instead of after it; dropping the disposal in `unlinkDropped`; dropping the `onChangeStatus` check in `flush`; counting a refresh of an `Uncomputed` node as changed; dropping the cascade into dependencies in `disposeUnneeded`; and dropping the disposal candidates in `rerun`. Seeds 1 to 20,000 pass.
 
 ```ts
 // from libs/pico-js/test-random/random.ts
@@ -4311,12 +4643,13 @@ import {
   createEagerDerivedNode,
   createSourceNode,
   DIRTY,
-  disposeDerivedNode,
   EAGER,
   LAZY,
-  pull,
   readDerived,
+  readDerivedNode,
   readSource,
+  releaseDerivedNode,
+  retainDerivedNode,
   setDerivedNodeEvaluation,
   startBatch,
   UNCOMPUTED,
@@ -4336,9 +4669,15 @@ type Read =
 /** How a computation turns its number into the value it returns. */
 type ResultShape = 'number' | 'reused-object' | 'fresh-object';
 
+/**
+ * `untracked` is a derived node of a lower index that the computation reads
+ * through `readDerivedNode` before its tracked reads, when the node is
+ * retained. The computation discards that value.
+ */
 type NodeSpec = {
   readonly selector: Read;
   readonly branches: ReadonlyArray<ReadonlyArray<Read>>;
+  readonly untracked: number | undefined;
   readonly modulus: number;
   readonly shape: ResultShape;
   readonly evaluation: DerivedNodeEvaluation;
@@ -4352,22 +4691,25 @@ type GraphSpec = {
 
 type Mutation =
   | { readonly kind: 'write'; readonly source: number; readonly value: number }
-  | { readonly kind: 'dispose'; readonly node: number }
   | {
       readonly kind: 'setEvaluation';
       readonly node: number;
       readonly evaluation: DerivedNodeEvaluation;
     };
 
-type PullStep = { readonly kind: 'pull'; readonly node: number };
+/** A read, retain, or release of a node the run does not hold is skipped. */
+type ReadStep = { readonly kind: 'read'; readonly node: number };
 
-type Step = Mutation | PullStep;
+type RetainStep = { readonly kind: 'retain'; readonly node: number };
 
-/** A callback runs its steps on each of its first `budget` calls. */
+type ReleaseStep = { readonly kind: 'release'; readonly node: number };
+
+type Step = Mutation | ReadStep | RetainStep | ReleaseStep;
+
+/** A callback reads each node of `reads` that the run holds. */
 type CallbackSpec = {
   readonly id: number;
-  readonly budget: number;
-  readonly steps: ReadonlyArray<Step>;
+  readonly reads: ReadonlyArray<number>;
 };
 
 type Batch = {
@@ -4380,22 +4722,21 @@ type BatchItem =
   | Batch
   | { readonly kind: 'single'; readonly mutation: Mutation };
 
-type SetOnDirty = {
-  readonly kind: 'setOnDirty';
+type SetOnChange = {
+  readonly kind: 'setOnChange';
   readonly node: number;
   readonly callback: CallbackSpec | undefined;
 };
 
-type Op = Step | Batch | SetOnDirty;
+type Op = Step | Batch | SetOnChange;
 
 type Case = { readonly graph: GraphSpec; readonly ops: ReadonlyArray<Op> };
 
 /**
  * `single` makes every mutation a single call, and `one-op-batch` makes every
  * mutation a `startBatch` of one mutator call, so the two runs must log the
- * same events. `grouped` runs each `Batch` as one `startBatch`, its `single`
- * items as single calls inside the body, and each callback's steps as one
- * `startBatch`.
+ * same events. `grouped` runs each `Batch` as one `startBatch` and its
+ * `single` items as single calls inside the body.
  */
 type Mode = 'single' | 'one-op-batch' | 'grouped';
 
@@ -4414,26 +4755,19 @@ type ReadRecord =
       readonly kind: 'derived';
       readonly node: number;
       readonly changes: number;
-      readonly disposals: number;
     };
 
 /**
- * `complete` when the model predicted the callbacks of every mutator call of
- * the batch.
+ * `queue` holds the eager nodes the model queued in the batch. `expected` holds
+ * the callbacks of the eager nodes that the flush recomputed to a changed
+ * value, once per node, in the order of their first changed recompute, and
+ * `invoked` the callbacks the flush called.
  */
-type Collection = 'complete' | 'incomplete';
-
-/** Whether the flush refreshes an eager node, as the model predicts. */
-type Refresh = 'none' | 'some' | 'unknown';
-
 type Frame = {
-  readonly segments: Array<ReadonlyArray<number>>;
   readonly queue: Array<number>;
   readonly invoked: Array<number>;
-  readonly eagerChangeCallbacks: Array<number>;
-  readonly changedEagerNodes: Array<number>;
-  collection: Collection;
-  refresh: Refresh;
+  readonly expected: Array<number>;
+  readonly expectedNodes: Array<number>;
 };
 
 type LinkedEdge = {
@@ -4465,34 +4799,6 @@ function sameRead(left: Read, right: Read): boolean {
     case 'derived':
       return right.kind === 'derived' && right.node === left.node;
   }
-}
-
-function sameMultiset(
-  left: ReadonlyArray<number>,
-  right: ReadonlyArray<number>,
-): boolean {
-  const sortedLeft = [...left].sort((a, b) => a - b);
-  const sortedRight = [...right].sort((a, b) => a - b);
-  return (
-    sortedLeft.length === sortedRight.length &&
-    sortedLeft.every((element, index) => element === sortedRight[index])
-  );
-}
-
-/** Each element of `part` occurs in `whole` at least as often. */
-function containsMultiset(
-  whole: ReadonlyArray<number>,
-  part: ReadonlyArray<number>,
-): boolean {
-  const counts = new Map<number, number>();
-  whole.forEach((element) =>
-    counts.set(element, (counts.get(element) ?? 0) + 1),
-  );
-  return part.every((element) => {
-    const count = counts.get(element) ?? 0;
-    counts.set(element, count - 1);
-    return count > 0;
-  });
 }
 
 function evaluate(spec: NodeSpec, read: (read: Read) => number): number {
@@ -4540,11 +4846,14 @@ function scratchValues(
 }
 
 /**
- * A naive model of the README's model and guarantees. Marking and pulls follow
- * the README step by step over arrays. A flush that refreshes an eager node
- * depends on the order of the eager queue, which the guarantees leave open, so
- * the model goes out of sync there and the run adopts the engine's statuses at
- * the end of the operation, after checking them against the guarantees.
+ * A naive model of the README's model and guarantees over arrays. Each node's
+ * derived dependency list is an array of node indices that a run edits by
+ * position, as the engine edits its edge list, and a node is needed while its
+ * retain count is above 0 or another node's list holds it. A flush that
+ * refreshes an eager node depends on the order of the eager queue, which the
+ * guarantees leave open, so the model goes out of sync there and the run
+ * adopts the engine's state at the end of the operation, after checking it
+ * against the guarantees.
  */
 class Model {
   readonly #graph: GraphSpec;
@@ -4554,7 +4863,8 @@ class Model {
   readonly #evaluation: Array<DerivedNodeEvaluation>;
   readonly #value: Array<number | undefined>;
   readonly #reads: Array<ReadonlyArray<Read>>;
-  readonly #callbackOf: Array<number | undefined>;
+  readonly #derivedEdges: Array<Array<number>>;
+  readonly #retainCount: Array<number>;
   readonly predictedRuns: Array<number> = [];
 
   constructor(graph: GraphSpec) {
@@ -4564,7 +4874,8 @@ class Model {
     this.#evaluation = graph.nodes.map((spec) => spec.evaluation);
     this.#value = graph.nodes.map(() => undefined);
     this.#reads = graph.nodes.map(() => []);
-    this.#callbackOf = graph.nodes.map(() => undefined);
+    this.#derivedEdges = graph.nodes.map(() => []);
+    this.#retainCount = graph.nodes.map(() => 0);
   }
 
   get synchronization(): Synchronization {
@@ -4587,6 +4898,14 @@ class Model {
     return at(this.#reads, node);
   }
 
+  derivedEdges(node: number): ReadonlyArray<number> {
+    return at(this.#derivedEdges, node);
+  }
+
+  retainCount(node: number): number {
+    return at(this.#retainCount, node);
+  }
+
   desynchronize(): void {
     this.#synchronization = 'out-of-sync';
   }
@@ -4595,45 +4914,44 @@ class Model {
     status: ReadonlyArray<Status>,
     value: ReadonlyArray<number | undefined>,
     reads: ReadonlyArray<ReadonlyArray<Read>>,
+    derivedEdges: ReadonlyArray<ReadonlyArray<number>>,
   ): void {
     status.forEach((nodeStatus, node) => {
       this.#status[node] = nodeStatus;
       this.#value[node] = value[node];
       this.#reads[node] = at(reads, node);
+      this.#derivedEdges[node] = [...at(derivedEdges, node)];
     });
     this.#synchronization = 'in-sync';
   }
 
-  setCallback(node: number, callback: number | undefined): void {
-    this.#callbackOf[node] = callback;
-  }
-
-  /**
-   * Applies `mutation` and returns the callbacks it collects, in no
-   * particular order. Out of sync, it records only the source value and the
-   * evaluation.
-   */
-  mutate(mutation: Mutation, queue: Array<number>): ReadonlyArray<number> {
+  /** Out of sync, it records only the source value and the evaluation. */
+  mutate(mutation: Mutation, queue: Array<number>): void {
     switch (mutation.kind) {
       case 'write':
         this.#sourceValues[mutation.source] = mutation.value;
-        return this.#synchronization === 'in-sync'
-          ? this.#markDirty(
-              this.#readers({ kind: 'source', source: mutation.source }),
-              queue,
-            )
-          : [];
-      case 'dispose': {
-        const readers = this.#readers({ kind: 'derived', node: mutation.node });
-        this.#status[mutation.node] = UNCOMPUTED;
-        this.#value[mutation.node] = undefined;
-        this.#reads[mutation.node] = [];
-        return this.#synchronization === 'in-sync'
-          ? this.#markDirty(readers, queue)
-          : [];
-      }
+        if (this.#synchronization === 'in-sync') {
+          this.#markDirty(
+            this.#readers({ kind: 'source', source: mutation.source }),
+            queue,
+          );
+        }
+        break;
       case 'setEvaluation':
-        return this.#setEvaluation(mutation.node, mutation.evaluation, queue);
+        this.#setEvaluation(mutation.node, mutation.evaluation, queue);
+        break;
+    }
+  }
+
+  retain(node: number): void {
+    this.#retainCount[node] = at(this.#retainCount, node) + 1;
+  }
+
+  /** Out of sync, it records only the retain count. */
+  release(node: number): void {
+    this.#retainCount[node] = at(this.#retainCount, node) - 1;
+    if (this.#synchronization === 'in-sync') {
+      this.#dispose([node]);
     }
   }
 
@@ -4670,63 +4988,77 @@ class Model {
     node: number,
     evaluation: DerivedNodeEvaluation,
     queue: Array<number>,
-  ): ReadonlyArray<number> {
+  ): void {
     if (at(this.#evaluation, node) === evaluation) {
-      return [];
+      return;
     }
     this.#evaluation[node] = evaluation;
     if (this.#synchronization === 'out-of-sync') {
-      return [];
+      return;
     }
     switch (at(this.#status, node)) {
       case DIRTY:
       case CHECK:
-        return this.#setEvaluationOutOfClean(node, evaluation, queue);
+        switch (evaluation) {
+          case EAGER:
+            queue.push(node);
+            break;
+          case LAZY:
+            this.#markCheck([node], queue);
+            break;
+        }
+        break;
       case CLEAN:
       case UNCOMPUTED:
-        return [];
-    }
-  }
-
-  #setEvaluationOutOfClean(
-    node: number,
-    evaluation: DerivedNodeEvaluation,
-    queue: Array<number>,
-  ): ReadonlyArray<number> {
-    switch (evaluation) {
-      case EAGER:
-        queue.push(node);
-        return [];
-      case LAZY: {
-        const collected: Array<number> = [];
-        this.#collect(node, collected);
-        this.#markCheck([node], queue, collected);
-        return collected;
-      }
+        break;
     }
   }
 
   #readers(target: Read): ReadonlyArray<number> {
-    return this.#reads.flatMap((reads, node) =>
-      at(this.#status, node) !== UNCOMPUTED &&
-      reads.some((read) => sameRead(read, target))
-        ? [node]
-        : [],
-    );
-  }
-
-  #collect(node: number, collected: Array<number>): void {
-    const callback = this.#callbackOf[node];
-    if (callback !== undefined) {
-      collected.push(callback);
+    switch (target.kind) {
+      case 'source':
+        return this.#reads.flatMap((reads, node) =>
+          at(this.#status, node) !== UNCOMPUTED &&
+          reads.some((read) => sameRead(read, target))
+            ? [node]
+            : [],
+        );
+      case 'derived':
+        return this.#derivedEdges.flatMap((edges, node) =>
+          edges.includes(target.node) ? [node] : [],
+        );
     }
   }
 
-  #markDirty(
-    readers: ReadonlyArray<number>,
-    queue: Array<number>,
-  ): ReadonlyArray<number> {
-    const collected: Array<number> = [];
+  #hasDependents(node: number): boolean {
+    return this.#derivedEdges.some((edges) => edges.includes(node));
+  }
+
+  #unneeded(node: number): boolean {
+    return (
+      at(this.#status, node) !== UNCOMPUTED &&
+      at(this.#retainCount, node) === 0 &&
+      !this.#hasDependents(node)
+    );
+  }
+
+  /** Disposes each unneeded node of `start`, and then its dependencies. */
+  #dispose(start: ReadonlyArray<number>): void {
+    const stack = [...start];
+    let node = stack.pop();
+    while (node !== undefined) {
+      if (this.#unneeded(node)) {
+        stack.push(...at(this.#derivedEdges, node));
+        this.#derivedEdges[node] = [];
+        this.#reads[node] = [];
+        this.#status[node] = UNCOMPUTED;
+        this.#value[node] = undefined;
+      }
+      node = stack.pop();
+    }
+  }
+
+  #markDirty(readers: ReadonlyArray<number>, queue: Array<number>): void {
     const takenOut: Array<number> = [];
     readers.forEach((node) => {
       switch (at(this.#status, node)) {
@@ -4735,7 +5067,6 @@ class Model {
           if (at(this.#evaluation, node) === EAGER) {
             queue.push(node);
           } else {
-            this.#collect(node, collected);
             takenOut.push(node);
           }
           break;
@@ -4747,15 +5078,10 @@ class Model {
           break;
       }
     });
-    this.#markCheck(takenOut, queue, collected);
-    return collected;
+    this.#markCheck(takenOut, queue);
   }
 
-  #markCheck(
-    stack: Array<number>,
-    queue: Array<number>,
-    collected: Array<number>,
-  ): void {
+  #markCheck(stack: Array<number>, queue: Array<number>): void {
     let marked = stack.pop();
     while (marked !== undefined) {
       this.#readers({ kind: 'derived', node: marked }).forEach((reader) => {
@@ -4766,7 +5092,6 @@ class Model {
         if (at(this.#evaluation, reader) === EAGER) {
           queue.push(reader);
         } else {
-          this.#collect(reader, collected);
           stack.push(reader);
         }
       });
@@ -4783,29 +5108,61 @@ class Model {
   }
 
   #verify(node: number): typeof DIRTY | typeof CLEAN {
-    for (const read of at(this.#reads, node)) {
-      if (read.kind === 'derived') {
-        this.pull(read.node);
-        if (at(this.#status, node) === DIRTY) {
-          return DIRTY;
-        }
+    for (const dependency of [...at(this.#derivedEdges, node)]) {
+      this.pull(dependency);
+      if (at(this.#status, node) === DIRTY) {
+        return DIRTY;
       }
     }
     this.#status[node] = CLEAN;
     return CLEAN;
   }
 
+  /**
+   * Each `readDerived` reuses the entry at its position, repoints it, or
+   * appends one unless it repeats the previous `readDerived` past the end of
+   * the list. A node repointed away from is checked after the run, and the
+   * entries past the last read are dropped and checked at the end of the run.
+   */
   #run(node: number): number {
     this.predictedRuns.push(node);
+    const spec = at(this.#graph.nodes, node);
+    const edges = at(this.#derivedEdges, node);
+    const candidates: Array<number> = [];
     const reads: Array<Read> = [];
-    const value = evaluate(at(this.#graph.nodes, node), (read) => {
+    let cursor = 0;
+    if (
+      spec.untracked !== undefined &&
+      at(this.#retainCount, spec.untracked) > 0
+    ) {
+      this.pull(spec.untracked);
+    }
+    const value = evaluate(spec, (read) => {
       reads.push(read);
-      return read.kind === 'source'
-        ? at(this.#sourceValues, read.source)
-        : this.pull(read.node);
+      if (read.kind === 'source') {
+        return at(this.#sourceValues, read.source);
+      }
+      const readValue = this.pull(read.node);
+      const next = edges[cursor];
+      if (next !== undefined) {
+        if (next !== read.node) {
+          edges[cursor] = read.node;
+          if (at(this.#retainCount, next) === 0 && !this.#hasDependents(next)) {
+            candidates.push(next);
+          }
+        }
+        cursor += 1;
+      } else if (cursor === 0 || edges[cursor - 1] !== read.node) {
+        edges.push(read.node);
+        cursor += 1;
+      }
+      return readValue;
     });
+    const dropped = edges.splice(cursor);
     this.#reads[node] = reads;
     this.#status[node] = CLEAN;
+    this.#dispose(dropped);
+    this.#dispose(candidates);
     return value;
   }
 
@@ -4845,15 +5202,11 @@ class Run {
   readonly log: Array<string> = [];
   readonly #frames: Array<Frame> = [];
   readonly #observedReads: Array<ReadonlyArray<Read>>;
-  readonly #observedValue: Array<number | undefined>;
-  readonly #everRead: Array<Set<number>>;
   readonly #lastReads: Array<ReadonlyArray<ReadRecord> | undefined>;
   readonly #writeCount: Array<number>;
   readonly #changeCount: Array<number>;
-  readonly #disposeCount: Array<number>;
   readonly #callbackOf: Array<number | undefined>;
-  readonly #ownerOf = new Map<number, number>();
-  readonly #budget = new Map<number, number>();
+  readonly #retained: Array<number>;
   readonly #actualRuns: Array<number> = [];
   #totalRuns = 0;
   #bodyDepth = 0;
@@ -4880,13 +5233,11 @@ class Run {
       this.#indexOf.set(node, { kind: 'derived', node: index }),
     );
     this.#observedReads = graph.nodes.map(() => []);
-    this.#observedValue = graph.nodes.map(() => undefined);
-    this.#everRead = graph.nodes.map(() => new Set());
     this.#lastReads = graph.nodes.map(() => undefined);
     this.#writeCount = graph.sourceValues.map(() => 0);
     this.#changeCount = graph.nodes.map(() => 0);
-    this.#disposeCount = graph.nodes.map(() => 0);
     this.#callbackOf = graph.nodes.map(() => undefined);
+    this.#retained = graph.nodes.map(() => 0);
   }
 
   execute(op: Op, index: number): void {
@@ -4894,15 +5245,20 @@ class Run {
     this.log.push(`op ${index}`);
     switch (op.kind) {
       case 'write':
-      case 'dispose':
       case 'setEvaluation':
         this.#topLevelMutation(op);
         break;
-      case 'pull':
-        this.#pull(op.node);
+      case 'read':
+        this.#read(op.node);
         break;
-      case 'setOnDirty':
-        this.#setOnDirty(op);
+      case 'retain':
+        this.#retain(op.node);
+        break;
+      case 'release':
+        this.#release(op.node);
+        break;
+      case 'setOnChange':
+        this.#setOnChange(op);
         break;
       case 'batch':
         switch (this.#mode) {
@@ -4919,6 +5275,31 @@ class Run {
     this.#endOp();
   }
 
+  /**
+   * When every retain is released, every derived node is disposed, and no
+   * source has a dependent.
+   */
+  finish(): void {
+    this.#where = 'after the last operation';
+    if (this.#retained.some((count) => count !== 0)) {
+      return;
+    }
+    this.#nodes.forEach((node, index) => {
+      if (node.status !== UNCOMPUTED || node.firstDependent !== undefined) {
+        this.#fail(
+          `every retain is released, and node ${index} has status ${node.status}`,
+        );
+      }
+    });
+    this.#sources.forEach((source, index) => {
+      if (source.firstDependent !== undefined) {
+        this.#fail(
+          `every retain is released, and source ${index} has a dependent`,
+        );
+      }
+    });
+  }
+
   #fail(message: string): never {
     throw new Error(`${this.#mode} mode, ${this.#where}: ${message}`);
   }
@@ -4927,12 +5308,17 @@ class Run {
     items.forEach((item) => {
       switch (item.kind) {
         case 'write':
-        case 'dispose':
         case 'setEvaluation':
           this.#topLevelMutation(item);
           break;
-        case 'pull':
-          this.#pull(item.node);
+        case 'read':
+          this.#read(item.node);
+          break;
+        case 'retain':
+          this.#retain(item.node);
+          break;
+        case 'release':
+          this.#release(item.node);
           break;
         case 'batch':
           this.#flattened(item.items);
@@ -4956,19 +5342,16 @@ class Run {
     }
   }
 
-  #setOnDirty(op: SetOnDirty): void {
+  #setOnChange(op: SetOnChange): void {
     const node = at(this.#nodes, op.node);
     const callback = op.callback;
     if (callback === undefined) {
-      node.onDirty = undefined;
+      node.onChange = undefined;
       this.#callbackOf[op.node] = undefined;
-      this.#model.setCallback(op.node, undefined);
       return;
     }
-    node.onDirty = () => this.#invoke(callback);
+    node.onChange = () => this.#invoke(callback);
     this.#callbackOf[op.node] = callback.id;
-    this.#ownerOf.set(callback.id, op.node);
-    this.#model.setCallback(op.node, callback.id);
   }
 
   #invoke(callback: CallbackSpec): void {
@@ -4981,30 +5364,33 @@ class Run {
     if (this.#bodyDepth === 0) {
       this.#checkEagerSettled(`in callback ${callback.id}`);
     }
-    const budget = this.#budget.get(callback.id) ?? callback.budget;
-    if (budget === 0 || callback.steps.length === 0) {
+    callback.reads.forEach((node) => this.#read(node));
+  }
+
+  #retain(node: number): void {
+    retainDerivedNode(at(this.#nodes, node));
+    this.#retained[node] = at(this.#retained, node) + 1;
+    this.#model.retain(node);
+    this.log.push(`retain ${node}`);
+  }
+
+  /** Releases only a retain the run holds, so each retain is released once. */
+  #release(node: number): void {
+    if (at(this.#retained, node) === 0) {
+      this.log.push(`skip release ${node}`);
       return;
     }
-    this.#budget.set(callback.id, budget - 1);
-    switch (this.#mode) {
-      case 'single':
-      case 'one-op-batch':
-        callback.steps.forEach((step) => {
-          switch (step.kind) {
-            case 'pull':
-              this.#pull(step.node);
-              break;
-            case 'write':
-            case 'dispose':
-            case 'setEvaluation':
-              this.#topLevelMutation(step);
-              break;
-          }
-        });
-        break;
-      case 'grouped':
-        this.#batch(callback.steps);
-        break;
+    const runs = this.#actualRuns.length;
+    const synchronization = this.#model.synchronization;
+    releaseDerivedNode(at(this.#nodes, node));
+    this.#retained[node] = at(this.#retained, node) - 1;
+    this.#model.release(node);
+    this.log.push(`release ${node}`);
+    if (this.#actualRuns.length !== runs) {
+      this.#fail(`releaseDerivedNode(${node}) ran a computation`);
+    }
+    if (synchronization === 'in-sync') {
+      this.#compareModel(`after releaseDerivedNode(${node})`);
     }
   }
 
@@ -5020,13 +5406,10 @@ class Run {
 
   #pushFrame(): Frame {
     const frame: Frame = {
-      segments: [],
       queue: [],
       invoked: [],
-      eagerChangeCallbacks: [],
-      changedEagerNodes: [],
-      collection: 'complete',
-      refresh: 'unknown',
+      expected: [],
+      expectedNodes: [],
     };
     this.#frames.push(frame);
     return frame;
@@ -5035,26 +5418,11 @@ class Run {
   /** Records the mutation in the model and in the run's counters. */
   #predictMutation(frame: Frame, mutation: Mutation): Synchronization {
     const synchronization = this.#model.synchronization;
-    const collected = this.#model.mutate(mutation, frame.queue);
-    switch (synchronization) {
-      case 'in-sync':
-        frame.segments.push(collected);
-        break;
-      case 'out-of-sync':
-        frame.collection = 'incomplete';
-        break;
-    }
+    this.#model.mutate(mutation, frame.queue);
     switch (mutation.kind) {
       case 'write':
         this.#writeCount[mutation.source] =
           at(this.#writeCount, mutation.source) + 1;
-        break;
-      case 'dispose':
-        this.#disposeCount[mutation.node] =
-          at(this.#disposeCount, mutation.node) + 1;
-        this.#observedReads[mutation.node] = [];
-        this.#observedValue[mutation.node] = undefined;
-        this.#lastReads[mutation.node] = undefined;
         break;
       case 'setEvaluation':
         break;
@@ -5065,17 +5433,10 @@ class Run {
   /** Called when the batch acted and before its flush starts. */
   #predictFlush(frame: Frame): void {
     if (
-      frame.collection === 'incomplete' ||
-      this.#model.synchronization === 'out-of-sync'
+      this.#model.synchronization === 'in-sync' &&
+      this.#model.refreshes(frame.queue)
     ) {
-      frame.collection = 'incomplete';
-      return;
-    }
-    if (this.#model.refreshes(frame.queue)) {
-      frame.refresh = 'some';
       this.#model.desynchronize();
-    } else {
-      frame.refresh = 'none';
     }
   }
 
@@ -5089,9 +5450,6 @@ class Run {
     switch (mutation.kind) {
       case 'write':
         writeSource(at(this.#sources, mutation.source), mutation.value);
-        break;
-      case 'dispose':
-        disposeDerivedNode(at(this.#nodes, mutation.node));
         break;
       case 'setEvaluation':
         setDerivedNodeEvaluation(
@@ -5117,12 +5475,17 @@ class Run {
   #bodyItem(mutators: Mutators, frame: Frame, item: BatchItem): void {
     switch (item.kind) {
       case 'write':
-      case 'dispose':
       case 'setEvaluation':
         this.#mutator(mutators, frame, item);
         break;
-      case 'pull':
-        this.#pull(item.node);
+      case 'read':
+        this.#read(item.node);
+        break;
+      case 'retain':
+        this.#retain(item.node);
+        break;
+      case 'release':
+        this.#release(item.node);
         break;
       case 'batch':
         this.#batch(item.items);
@@ -5147,12 +5510,6 @@ class Run {
           mutation.value,
         );
         break;
-      case 'dispose':
-        mutators.disposeDerivedNode(at(this.#nodes, mutation.node));
-        if (at(this.#nodes, mutation.node).status !== UNCOMPUTED) {
-          this.#fail(`node ${mutation.node} is not Uncomputed after disposal`);
-        }
-        break;
       case 'setEvaluation':
         mutators.setDerivedNodeEvaluation(
           at(this.#nodes, mutation.node),
@@ -5168,92 +5525,50 @@ class Run {
     }
   }
 
+  /**
+   * The flush calls the `onChange` of each eager node that it recomputed to a
+   * changed value, once per node, in the order of their first changed
+   * recompute, and no other callback.
+   */
   #popFrame(frame: Frame): void {
     if (this.#frames.pop() !== frame) {
       this.#fail('the batch frames are unbalanced');
     }
-    if (!containsMultiset(frame.invoked, frame.eagerChangeCallbacks)) {
+    if (frame.invoked.join(',') !== frame.expected.join(',')) {
       this.#fail(
-        `an eager node changed with callbacks [${frame.eagerChangeCallbacks.join(', ')}], and the flush called [${frame.invoked.join(', ')}]`,
+        `the flush recomputed eager nodes [${frame.expectedNodes.join(', ')}] to changed values, whose callbacks are [${frame.expected.join(', ')}], and called [${frame.invoked.join(', ')}]`,
       );
     }
-    if (frame.collection === 'incomplete') {
+  }
+
+  /** Reads only a node the run holds, as the `readDerivedNode` contract says. */
+  #read(node: number): void {
+    if (at(this.#retained, node) === 0) {
+      this.log.push(`skip read ${node}`);
       return;
     }
-    let offset = 0;
-    frame.segments.forEach((segment) => {
-      const slice = frame.invoked.slice(offset, offset + segment.length);
-      if (!sameMultiset(slice, segment)) {
-        this.#fail(
-          `the mutation collected callbacks [${segment.join(', ')}], and the flush called [${slice.join(', ')}] for them (all calls: [${frame.invoked.join(', ')}])`,
-        );
-      }
-      offset += segment.length;
-    });
-    const remainder = frame.invoked.slice(offset);
-    switch (frame.refresh) {
-      case 'none':
-        if (remainder.length !== 0) {
-          this.#fail(
-            `a flush that refreshes no eager node called the extra callbacks [${remainder.join(', ')}]`,
-          );
-        }
-        break;
-      case 'some':
-      case 'unknown':
-        this.#checkRefreshCallbacks(frame, remainder);
-        break;
-    }
-  }
-
-  /**
-   * The callbacks a flush collects while it refreshes eager nodes belong to
-   * the eager nodes whose value changed and to lazy nodes that read one of
-   * them.
-   */
-  #checkRefreshCallbacks(frame: Frame, remainder: ReadonlyArray<number>): void {
-    if (!containsMultiset(remainder, frame.eagerChangeCallbacks)) {
-      this.#fail(
-        `the refresh changed eager nodes with callbacks [${frame.eagerChangeCallbacks.join(', ')}], and the flush called [${remainder.join(', ')}] after the collected ones`,
-      );
-    }
-    const reached = new Set(frame.changedEagerNodes);
-    this.#everRead.forEach((reads, node) => {
-      if ([...reads].some((read) => reached.has(read))) {
-        reached.add(node);
-      }
-    });
-    remainder.forEach((callback) => {
-      const owner = this.#ownerOf.get(callback);
-      if (owner === undefined || !reached.has(owner)) {
-        this.#fail(
-          `the flush called callback ${callback} of node ${owner}, which reads no eager node the refresh changed`,
-        );
-      }
-    });
-  }
-
-  #pull(node: number): void {
     const settled = this.#eagerSettled();
     const synchronization = this.#model.synchronization;
     const predictedStart = this.#model.predictedRuns.length;
     const actualStart = this.#actualRuns.length;
     const predicted =
       synchronization === 'in-sync' ? this.#model.pull(node) : undefined;
-    const value = valueNumber(pull(at(this.#nodes, node)));
-    this.log.push(`pull ${node} ${value}`);
+    const value = valueNumber(readDerivedNode(at(this.#nodes, node)));
+    this.log.push(`read ${node} ${value}`);
     const runs = this.#actualRuns.slice(actualStart);
     if (synchronization === 'in-sync') {
       const predictedRuns = this.#model.predictedRuns.slice(predictedStart);
       if (value !== predicted) {
-        this.#fail(`pull(${node}) returned ${value}, the model ${predicted}`);
+        this.#fail(
+          `readDerivedNode(${node}) returned ${value}, the model ${predicted}`,
+        );
       }
       if (runs.join(',') !== predictedRuns.join(',')) {
         this.#fail(
-          `pull(${node}) ran [${runs.join(', ')}], the model [${predictedRuns.join(', ')}]`,
+          `readDerivedNode(${node}) ran [${runs.join(', ')}], the model [${predictedRuns.join(', ')}]`,
         );
       }
-      this.#compareModel(`after pull(${node})`);
+      this.#compareModel(`after readDerivedNode(${node})`);
     }
     if (settled) {
       const expected = at(
@@ -5262,17 +5577,16 @@ class Run {
       );
       if (value !== expected) {
         this.#fail(
-          `pull(${node}) returned ${value} with no eager node queued, and recomputing from the sources gives ${expected}`,
+          `readDerivedNode(${node}) returned ${value} with no eager node queued, and recomputing from the sources gives ${expected}`,
         );
-      }
-      if (new Set(runs).size !== runs.length) {
-        this.#fail(`pull(${node}) ran a node twice: [${runs.join(', ')}]`);
       }
     }
     const runsBefore = this.#actualRuns.length;
-    const again = valueNumber(pull(at(this.#nodes, node)));
+    const again = valueNumber(readDerivedNode(at(this.#nodes, node)));
     if (again !== value || this.#actualRuns.length !== runsBefore) {
-      this.#fail(`a second pull(${node}) ran a computation or changed value`);
+      this.#fail(
+        `a second readDerivedNode(${node}) ran a computation or changed value`,
+      );
     }
   }
 
@@ -5292,6 +5606,15 @@ class Run {
       this.#checkJustified(index);
     }
     const spec = at(this.#graph.nodes, index);
+    if (
+      spec.untracked !== undefined &&
+      at(this.#retained, spec.untracked) > 0
+    ) {
+      const untracked = valueNumber(
+        readDerivedNode(at(this.#nodes, spec.untracked)),
+      );
+      this.log.push(`untracked ${spec.untracked} ${untracked}`);
+    }
     const reads: Array<Read> = [];
     const records: Array<ReadRecord> = [];
     const n = evaluate(spec, (read) => {
@@ -5312,9 +5635,7 @@ class Run {
             kind: 'derived',
             node: read.node,
             changes: at(this.#changeCount, read.node),
-            disposals: at(this.#disposeCount, read.node),
           });
-          this.#everRead[index]?.add(read.node);
           return value;
         }
       }
@@ -5324,29 +5645,36 @@ class Run {
     if (changed) {
       this.#changeCount[index] = at(this.#changeCount, index) + 1;
     }
-    // Only the flush recomputes an eager node that is not Uncomputed.
+    // Only the flush recomputes an eager node that is not Uncomputed, and it
+    // refreshes every queued eager node before it calls the first callback.
     if (callingNode.evaluation === EAGER && status !== UNCOMPUTED) {
       const frame = this.#frames.at(-1);
       if (frame === undefined) {
         this.#fail(`eager node ${index} recomputed outside a flush`);
       }
+      if (frame.invoked.length !== 0) {
+        this.#fail(
+          `eager node ${index} recomputed after the flush called a callback`,
+        );
+      }
       const callback = this.#callbackOf[index];
-      if (changed) {
-        frame.changedEagerNodes.push(index);
-        if (callback !== undefined) {
-          frame.eagerChangeCallbacks.push(callback);
-        }
+      if (
+        changed &&
+        callback !== undefined &&
+        !frame.expectedNodes.includes(index)
+      ) {
+        frame.expectedNodes.push(index);
+        frame.expected.push(callback);
       }
     }
     this.#observedReads[index] = reads;
-    this.#observedValue[index] = n;
     this.#lastReads[index] = records;
     return result;
   }
 
   /**
    * A recompute runs only when a source its latest computation read was
-   * written, or a derived node it read was disposed or changed value.
+   * written, or a derived node it read changed value.
    */
   #checkJustified(index: number): void {
     const records = this.#lastReads[index];
@@ -5356,8 +5684,7 @@ class Run {
     const justified = records.some((record) =>
       record.kind === 'source'
         ? at(this.#writeCount, record.source) > record.writes
-        : at(this.#changeCount, record.node) > record.changes ||
-          at(this.#disposeCount, record.node) > record.disposals,
+        : at(this.#changeCount, record.node) > record.changes,
     );
     if (!justified) {
       this.#fail(
@@ -5387,6 +5714,20 @@ class Run {
     });
   }
 
+  #engineDerivedEdges(node: DerivedNode<Value>): ReadonlyArray<number> {
+    const edges: Array<number> = [];
+    let edge = node.firstDerivedDependency;
+    while (edge !== undefined) {
+      const dependency = this.#indexOf.get(edge.dependency);
+      if (dependency === undefined || dependency.kind !== 'derived') {
+        this.#fail('a derived dependency list holds an edge to no node');
+      }
+      edges.push(dependency.node);
+      edge = edge.nextDependency;
+    }
+    return edges;
+  }
+
   #compareModel(where: string): void {
     if (this.#model.synchronization === 'out-of-sync') {
       return;
@@ -5396,6 +5737,12 @@ class Run {
       if (node.status !== status) {
         this.#fail(
           `${where}, node ${index} has status ${node.status}, the model ${status}`,
+        );
+      }
+      const edges = this.#engineDerivedEdges(node);
+      if (edges.join(',') !== this.#model.derivedEdges(index).join(',')) {
+        this.#fail(
+          `${where}, node ${index} has derived edges [${edges.join(', ')}], the model [${this.#model.derivedEdges(index).join(', ')}]`,
         );
       }
       if (status === UNCOMPUTED) {
@@ -5493,6 +5840,48 @@ class Run {
     });
   }
 
+  /**
+   * Each node's `retainCount` is the run's count of its unreleased retains. A
+   * node that is not `Uncomputed` is retained or has a dependent, and an
+   * `Uncomputed` node holds no value, no dependency, and no dependent.
+   */
+  #checkLifetimes(): void {
+    this.#nodes.forEach((node, index) => {
+      if (node.retainCount !== at(this.#retained, index)) {
+        this.#fail(
+          `node ${index} has retainCount ${node.retainCount}, and the run holds ${at(this.#retained, index)} retains`,
+        );
+      }
+      if (node.retainCount !== this.#model.retainCount(index)) {
+        this.#fail(
+          `node ${index} has retainCount ${node.retainCount}, the model ${this.#model.retainCount(index)}`,
+        );
+      }
+      if (node.onChangeStatus !== 0) {
+        this.#fail(`node ${index} has onChangeStatus ${node.onChangeStatus}`);
+      }
+      if (node.disposalCandidates !== undefined) {
+        this.#fail(`node ${index} holds disposal candidates after its run`);
+      }
+      if (node.status === UNCOMPUTED) {
+        if (
+          node.value !== undefined ||
+          node.firstSourceDependency !== undefined ||
+          node.firstDerivedDependency !== undefined ||
+          node.firstDependent !== undefined
+        ) {
+          this.#fail(
+            `Uncomputed node ${index} holds a value, a dependency, or a dependent`,
+          );
+        }
+      } else if (node.retainCount === 0 && node.firstDependent === undefined) {
+        this.#fail(
+          `node ${index} has status ${node.status}, retainCount 0, and no dependent`,
+        );
+      }
+    });
+  }
+
   #endOp(): void {
     if (this.#bodyDepth !== 0 || this.#frames.length !== 0) {
       this.#fail('a batch is still open after the operation');
@@ -5510,6 +5899,7 @@ class Run {
       }
     });
     this.#checkDependents();
+    this.#checkLifetimes();
     switch (this.#model.synchronization) {
       case 'in-sync':
         this.#compareModel('after the operation');
@@ -5524,10 +5914,13 @@ class Run {
       case 'out-of-sync':
         this.#model.resynchronize(
           this.#nodes.map((node) => node.status),
-          this.#observedValue,
+          this.#nodes.map((node) =>
+            node.status === UNCOMPUTED ? undefined : valueNumber(node.value),
+          ),
           this.#nodes.map((node, index) =>
             node.status === UNCOMPUTED ? [] : at(this.#observedReads, index),
           ),
+          this.#nodes.map((node) => this.#engineDerivedEdges(node)),
         );
         break;
     }
@@ -5537,7 +5930,7 @@ class Run {
       this.#nodes
         .map(
           (node) =>
-            `${node.status}:${node.status === UNCOMPUTED ? '-' : valueNumber(node.value)}`,
+            `${node.status}:${node.status === UNCOMPUTED ? '-' : valueNumber(node.value)}:${node.retainCount}`,
         )
         .join(' '),
     );
@@ -5556,6 +5949,11 @@ function prng(seed: number): () => number {
   };
 }
 
+/**
+ * The generator holds the retains it has generated and not released, reads
+ * only those nodes, and releases each of them once, the outstanding ones at
+ * the end of the case.
+ */
 function generateCase(seed: number): Case {
   const random = prng(seed);
   const integer = (bound: number): number => Math.floor(random() * bound);
@@ -5574,37 +5972,53 @@ function generateCase(seed: number): Case {
       branches: Array.from({ length: 3 }, () =>
         Array.from({ length: integer(4) }, () => readFor(node)),
       ),
+      untracked: node > 0 && random() < 0.2 ? integer(node) : undefined,
       modulus: pick([2, 3, 1000]),
       shape: pick<ResultShape>(['number', 'reused-object', 'fresh-object']),
       evaluation: random() < 0.3 ? EAGER : LAZY,
     })),
   };
+  const retained: Array<number> = [];
   let nextCallbackId = 0;
-  const mutation = (): Mutation => {
-    const roll = random();
-    if (roll < 0.7) {
-      return { kind: 'write', source: integer(sourceCount), value: integer(4) };
-    }
-    if (roll < 0.85) {
-      return { kind: 'dispose', node: integer(nodeCount) };
-    }
-    return {
-      kind: 'setEvaluation',
-      node: integer(nodeCount),
-      evaluation: random() < 0.5 ? EAGER : LAZY,
-    };
+  const retain = (): RetainStep => {
+    const node = integer(nodeCount);
+    retained.push(node);
+    return { kind: 'retain', node };
   };
-  const step = (): Step =>
-    random() < 0.7 ? mutation() : { kind: 'pull', node: integer(nodeCount) };
+  const release = (): ReleaseStep | RetainStep => {
+    if (retained.length === 0) {
+      return retain();
+    }
+    const index = integer(retained.length);
+    const node = at(retained, index);
+    retained.splice(index, 1);
+    return { kind: 'release', node };
+  };
+  const read = (): ReadStep | RetainStep =>
+    retained.length === 0 ? retain() : { kind: 'read', node: pick(retained) };
+  const mutation = (): Mutation =>
+    random() < 0.8
+      ? { kind: 'write', source: integer(sourceCount), value: integer(4) }
+      : {
+          kind: 'setEvaluation',
+          node: integer(nodeCount),
+          evaluation: random() < 0.5 ? EAGER : LAZY,
+        };
   const batch = (depth: number): Batch => ({
     kind: 'batch',
-    items: Array.from({ length: 1 + integer(4) }, (): BatchItem => {
+    items: Array.from({ length: 1 + integer(5) }, (): BatchItem => {
       const roll = random();
-      if (roll < 0.6) {
+      if (roll < 0.45) {
         return mutation();
       }
+      if (roll < 0.6) {
+        return read();
+      }
+      if (roll < 0.7) {
+        return retain();
+      }
       if (roll < 0.8) {
-        return { kind: 'pull', node: integer(nodeCount) };
+        return release();
       }
       if (roll < 0.9 && depth < 2) {
         return batch(depth + 1);
@@ -5614,47 +6028,57 @@ function generateCase(seed: number): Case {
   });
   const op = (): Op => {
     const roll = random();
-    if (roll < 0.3) {
+    if (roll < 0.22) {
       return { kind: 'write', source: integer(sourceCount), value: integer(4) };
     }
-    if (roll < 0.6) {
-      return { kind: 'pull', node: integer(nodeCount) };
+    if (roll < 0.4) {
+      return read();
     }
-    if (roll < 0.66) {
-      return { kind: 'dispose', node: integer(nodeCount) };
+    if (roll < 0.52) {
+      return retain();
     }
-    if (roll < 0.74) {
+    if (roll < 0.62) {
+      return release();
+    }
+    if (roll < 0.7) {
       return {
         kind: 'setEvaluation',
         node: integer(nodeCount),
         evaluation: random() < 0.5 ? EAGER : LAZY,
       };
     }
-    if (roll < 0.86) {
+    if (roll < 0.82) {
       const node = integer(nodeCount);
       if (random() < 0.15) {
-        return { kind: 'setOnDirty', node, callback: undefined };
+        return { kind: 'setOnChange', node, callback: undefined };
       }
       const id = nextCallbackId;
       nextCallbackId += 1;
       return {
-        kind: 'setOnDirty',
+        kind: 'setOnChange',
         node,
         callback: {
           id,
-          budget: 1 + integer(2),
-          steps: Array.from({ length: integer(3) }, step),
+          reads: Array.from({ length: integer(3) }, () =>
+            retained.length === 0 ? integer(nodeCount) : pick(retained),
+          ),
         },
       };
     }
     return batch(0);
   };
-  return { graph, ops: Array.from({ length: 40 + integer(80) }, op) };
+  const ops = Array.from({ length: 40 + integer(80) }, op);
+  const releases: Array<Op> = [];
+  while (retained.length !== 0) {
+    releases.push(release());
+  }
+  return { graph, ops: [...ops, ...releases] };
 }
 
 function runCase(testCase: Case, mode: Mode): ReadonlyArray<string> {
   const run = new Run(testCase.graph, mode);
   testCase.ops.forEach((op, index) => run.execute(op, index));
+  run.finish();
   return run.log;
 }
 
@@ -5710,19 +6134,19 @@ function* simplerOps(op: Op): Generator<Op> {
         yield { kind: 'batch', items };
       }
       break;
-    case 'setOnDirty': {
+    case 'setOnChange': {
       const callback = op.callback;
       if (callback === undefined) {
         break;
       }
-      for (let index = 0; index < callback.steps.length; index += 1) {
+      for (let index = 0; index < callback.reads.length; index += 1) {
         yield {
           ...op,
           callback: {
             ...callback,
-            steps: [
-              ...callback.steps.slice(0, index),
-              ...callback.steps.slice(index + 1),
+            reads: [
+              ...callback.reads.slice(0, index),
+              ...callback.reads.slice(index + 1),
             ],
           },
         };
@@ -5730,9 +6154,10 @@ function* simplerOps(op: Op): Generator<Op> {
       break;
     }
     case 'write':
-    case 'dispose':
     case 'setEvaluation':
-    case 'pull':
+    case 'read':
+    case 'retain':
+    case 'release':
       break;
   }
 }
@@ -5757,7 +6182,7 @@ function* candidates(testCase: Case): Generator<Case> {
   }
 }
 
-/** Removes operations, batch items, and callback steps while the case fails. */
+/** Removes operations, batch items, and callback reads while the case fails. */
 function shrink(
   testCase: Case,
   message: string,
