@@ -41,3 +41,7 @@ Delete those commented-out variants and the TODO on the skip regex. The commente
 ## `deleteRecord` drops source nodes that still have dependents
 
 pico-runtime.md's `deleteRecord` removes a deleted record's source nodes from the store. A derived node that read one of them while it held `MISSING` keeps depending on the removed node, so a later write of that key goes to a new source node and never marks the reader, which returns `MissingData` from then on. The store's key-to-node map must keep resolving a key to the same node while the node has dependents, as pico's `id_for_key` does: `deleteRecord` writes `MISSING` to a present source and keeps any node with dependents, and the sweep removes it once its dependents are gone. Upstream does not have this bug: its store holds plain values and a subscription re-reads after every write (`libs/isograph-react/src/core/subscribe.ts`).
+
+## Independently toggled pico-js features
+
+runtime/pico-js-feature-flags.md. A Rust generator emits the pico-js engine once per configuration, so each contract check, such as a double release or a read of an unretained node, turns on or off by itself and costs nothing when off.
