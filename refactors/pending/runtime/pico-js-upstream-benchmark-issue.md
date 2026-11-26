@@ -15,9 +15,7 @@ The suite has no case for the ten operations below, and each of them occurs in l
 | 9 | A computed returns its previous object, so its readers should not rerun | - |
 | 10 | One batch writes the same input many times | - |
 
-## Interface
-
-The only extension is that `effect` returns its disposer, which cases 2 and 3 need. `cleanup()` ends every effect at once, so it cannot dispose one effect while others that read the same computed stay alive. An adapter whose library cannot dispose a single effect skips these two cases.
+Cases 2 and 3 need `effect` to return its disposer.
 
 ## Cases
 
@@ -209,11 +207,11 @@ framework.withBatch(() => {
 
 ## Harness
 
-- Memory: the suite calls `gc()` between runs and reads no heap figure. We propose reading the heap after a forced GC before and after building `count` inputs, computeds, and effects, and again after `cleanup` and dropping every reference, and reporting bytes per node and bytes retained after the drop. Case 3 would also report heap retained after many iterations.
-- Processes: every library runs in one process, and every case is warmed up under every library before any is timed, so one library's timings depend on which ran before it. We propose an option that runs each library in its own process.
-- Statistics: only the fastest run is reported, which leaves out GC pauses and slow runs. We propose reporting the median and a high percentile next to the minimum, and GC time per test, which the README lists as a feature but no code measures today.
-- `--expose-gc`: the Node runner does not pass the flag, so the `gc()` calls, which check that `gc` exists, do nothing. We propose adding the flag to the run script.
-- Counts: computation counts are asserted in some cases but never reported. We propose reporting them next to the time, because most cases above are about how many times something runs.
-- First run: every case is warmed up before it is timed, so no result shows a first run. We propose recording the first iteration of each case in a fresh process as its own result.
+- Report retained heap per node and after dropping everything.
+- Run each library in its own process.
+- Report the median and a high percentile, not only the minimum.
+- Pass `--expose-gc` in the Node runner; the `gc()` calls currently do nothing.
+- Report computation counts next to times.
+- Report the first, unwarmed run.
 
-We can open one PR with the cases that need no interface change (1 and 4 to 10), one PR with the disposer extension and cases 2 and 3, and one PR per harness change. Which of these would you accept?
+Happy to open PRs for any of these.
