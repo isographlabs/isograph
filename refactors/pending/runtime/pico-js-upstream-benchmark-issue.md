@@ -21,8 +21,6 @@ The only extension is that `effect` returns its disposer, which cases 2 and 3 ne
 
 ## Cases
 
-Each case is a minimal demonstration of the operation, written against the suite's `ReactiveFramework`. `work(value)` stands for a computation of tunable cost. A benchmark repeats the operation and scales `count`.
-
 ### 1. A computed moves from one effect to another in one batch
 
 `derived` moves from the first effect to the second. `input` did not change, so `derived` should not be recomputed.
@@ -32,7 +30,7 @@ Failure mode: the first effect reruns and stops reading `derived`, so for a mome
 ```js
 const input = framework.signal(1);
 const inFirst = framework.signal(true);
-const derived = framework.computed(() => work(input.read()));
+const derived = framework.computed(() => input.read() * 2);
 framework.effect(() => {
   if (inFirst.read()) derived.read();
 });
@@ -52,7 +50,7 @@ Failure mode: once the old effect is disposed, `derived` has no reader. An imple
 
 ```js
 const input = framework.signal(1);
-const derived = framework.computed(() => work(input.read()));
+const derived = framework.computed(() => input.read() * 2);
 const dispose = framework.effect(() => derived.read());
 
 dispose();
@@ -68,7 +66,7 @@ Failure mode: an implementation that tears `shared` down when its last effect is
 
 ```js
 const input = framework.signal(0);
-const shared = framework.computed(() => work(input.read()));
+const shared = framework.computed(() => input.read() * 2);
 
 const disposers = [];
 for (let i = 0; i < count; i++) disposers.push(framework.effect(() => shared.read()));
@@ -109,8 +107,8 @@ Failure mode: an implementation that keeps every computed it has read up to date
 
 ```js
 const input = framework.signal(0);
-const observed = framework.computed(() => work(input.read()));
-const unobserved = framework.computed(() => work(input.read()));
+const observed = framework.computed(() => input.read() * 2);
+const unobserved = framework.computed(() => input.read() * 2);
 framework.effect(() => observed.read());
 unobserved.read();
 
@@ -126,7 +124,7 @@ Failure mode: an implementation that recomputes on each write does `count` round
 
 ```js
 const input = framework.signal(0);
-const derived = framework.computed(() => work(input.read()));
+const derived = framework.computed(() => input.read() * 2);
 derived.read();
 
 for (let i = 1; i <= count; i++) framework.withBatch(() => input.write(i));
@@ -141,8 +139,8 @@ derived.read();
 Failure mode: an implementation that matches what a computed read last time by position sees both positions change, relinks both items, and may tear them down and recompute them. With `count` items, a reversal pays for all of them.
 
 ```js
-const first = framework.computed(() => work(1));
-const second = framework.computed(() => work(2));
+const first = framework.computed(() => 1);
+const second = framework.computed(() => 2);
 const order = framework.signal([first, second]);
 const list = framework.computed(() => order.read().map((item) => item.read()));
 framework.effect(() => list.read());
@@ -160,7 +158,7 @@ Failure mode: while hidden, `derived` has no reader. An implementation that tear
 ```js
 const input = framework.signal(1);
 const visible = framework.signal(true);
-const derived = framework.computed(() => work(input.read()));
+const derived = framework.computed(() => input.read() * 2);
 framework.effect(() => {
   if (visible.read()) derived.read();
 });
@@ -185,7 +183,7 @@ const view = framework.computed(() => {
   previous = { even };
   return previous;
 });
-const reader = framework.computed(() => work(view.read().even));
+const reader = framework.computed(() => view.read().even);
 framework.effect(() => reader.read());
 
 framework.withBatch(() => input.write(2));
@@ -200,7 +198,7 @@ Failure mode: an implementation that propagates on every write walks the graph `
 
 ```js
 const input = framework.signal(0);
-const derived = framework.computed(() => work(input.read()));
+const derived = framework.computed(() => input.read() * 2);
 framework.effect(() => derived.read());
 
 framework.withBatch(() => {
