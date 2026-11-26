@@ -1,6 +1,22 @@
 # pico-js: implementation
 
-This doc is the complete source and package of `@isograph/pico-js` in `libs/pico-js`. PR #1027 holds it as commit `d3a2e03ff`: the engine of the prototype commit `f0b001a9d` with the API deltas listed under "Deltas from the prototype", split into seven source files. Every source block below is `git show d3a2e03ff:libs/pico-js/src/<file>` byte for byte.
+This doc is the complete source and package of `@isograph/pico-js` in `libs/pico-js`. PR #1027 contains it as commit `225f893e5`: the engine of the prototype commit `f0b001a9d` with the API deltas listed under "Deltas from the prototype", split into seven source files. Every source block below is `git show 225f893e5:libs/pico-js/src/<file>` byte for byte.
+
+## Terms
+
+- A source node stores a value that the caller writes. A derived node stores a computation and the value that computation last returned.
+- An edge connects a dependent (a derived node) to a dependency (a source node or a derived node that the dependent's computation read).
+- A tracked read is a call to `readSource` or `readDerived` inside a computation. A top-level read is a call to `readDerivedNode` or `readUnretained`.
+- A retain is the `Retain` object that `retainDerivedNode` returns. A node is retained while it has at least one retain. `releaseRetain` releases a retain.
+- A node is needed while it has a retain or a dependent, and unneeded otherwise.
+- To mark is to set a node `Dirty` or `MaybeDirty` in a write. To recompute is to run a node's computation, including the first run of an `Uncomputed` node. To verify is to walk a `MaybeDirty` node's derived dependencies to find whether one changed. To refresh is for the flush to recompute or verify a node on the flush queue.
+- A node behaves eagerly while it is retained and was created `EAGER`, or while it has a retain with an `onChange`. Every other node is lazy.
+- The flush queue contains the nodes that behave eagerly and that marking put there. The cleanup queue contains the nodes that became unneeded and await disposal.
+- To dispose a node is to unlink every edge to its dependencies, drop its value, and set it `Uncomputed`. To unlink an edge is to remove it from both of its lists.
+- An outermost operation is a call to `writeSource`, `endBatch`, `retainDerivedNode`, `releaseRetain`, `readDerivedNode`, or `readUnretained` made with no batch open and no flush running, or the `endBatch` that closes the outermost batch.
+- The flush is the refresh of every node on the flush queue followed by the `onChange` calls. A `writeSource` outside a batch runs the flush, and so does the outermost `endBatch`.
+- A node is maybe-dirty (status `MaybeDirty`) when a dependency may have changed, and whether the node's value changed is not yet known.
+- Direction is always named by dependency and dependent: marking moves from a source toward its dependents, and verification moves from a node toward its dependencies.
 
 ## Model
 
@@ -8,15 +24,15 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 - `createDerivedNode(computation, evaluation)` fixes the node's evaluation, `LAZY` (the default) or `EAGER`, for its lifetime.
 - Marking stops at a node that behaves eagerly and puts it on the flush queue, and the flush refreshes it. A lazy node recomputes when a tracked read or a top-level read reaches it.
 - A write runs no computation. It marks the dependents of the source `Dirty`, and the nodes that depend on those through lazy nodes `MaybeDirty`. Marking continues through a lazy node and stops at a node that behaves eagerly, which it puts on the flush queue.
-- A tracked read or a top-level read of a `Dirty` lazy node recomputes it. The same read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order its computation read them, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. If no dependency changed, the node becomes `Clean` and does not recompute.
+- A tracked read or a top-level read of a `Dirty` lazy node recomputes it. The same read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order in which the node's latest recompute read the dependencies, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. If no dependency changed, the node becomes `Clean` and does not recompute.
 - A recompute receives `previous`, the node's last value. A recompute whose value is `===` to `previous` keeps `previous` and marks nothing. A computation whose result is structurally equal to `previous` returns `previous`.
 - `startBatch()` and `endBatch()` open and close a batch. Batches nest, and a nested batch joins the open one. A write inside a batch marks at once, and the outermost `endBatch` flushes. A `writeSource` outside a batch flushes before it returns. The flush refreshes every node on the flush queue, then calls the `onChange` of each retain of each node whose value the flush changed.
-- `retainDerivedNode(node, onChange?)` brings the node up to date and returns a `Retain`, which joins the node's retain list. `releaseRetain(retain)` removes it. `onChange` exists only on a retain.
-- `readDerivedNode(node)` is the top-level read of a retained node. `readUnretained(node)` is a top-level read of any node that has no retain of its own: it links edges as a tracked read does, and puts the node on the cleanup queue if the node is unneeded.
+- `retainDerivedNode(node, onChange?)` brings the node up to date and returns a `Retain`, which joins the node's retain list. `releaseRetain(retain)` removes that retain from the node's retain list. `onChange` exists only on a retain.
+- `readDerivedNode(node)` is the top-level read of a retained node. `readUnretained(node)` is a top-level read of any node, and `readUnretained` adds no retain. `readUnretained` links edges as a tracked read does, and puts the node on the cleanup queue if the node is unneeded.
 - A derived node that becomes unneeded keeps its value and its edges and joins the cleanup queue. `disposeNext()` and `disposeAll()` dispose the nodes on the cleanup queue that are still unneeded. A disposed node becomes `Uncomputed`, drops its value, and has none of its edges to dependencies. Each derived dependency that the disposal leaves unneeded joins the cleanup queue. A source node is never disposed.
 - At the end of the outermost operation that put a node on an empty cleanup queue, the engine calls `scheduler.schedule()`. The default disposes during idle time. A scheduler that calls `disposeAll` disposes when the outermost operation ends.
 - When marking reaches an unneeded node, the engine disposes the node when the write, or the outermost batch, ends. A write therefore never leaves an unneeded node `Dirty` or `MaybeDirty` with its edges linked. A `Clean` dependency that this disposal leaves unneeded joins the cleanup queue with its value.
-- The engine keeps one graph per process in module state: the batch depth, the batch's queue, the flush state, the cleanup queue, and the scheduler. The calling node is a parameter of each tracked read.
+- The engine keeps one graph per process in module state: the batch depth, the flush queue of the open batch, the flush state, the cleanup queue, and the scheduler. The calling node is a parameter of each tracked read.
 
 ### Contracts
 
@@ -31,24 +47,24 @@ These are the caller's obligations. pico-js checks none of them at run time, and
 - The derived nodes form a directed acyclic graph, counting the edges that a node keeps from its previous recompute.
 - `readDerivedNode` is called only on a retained node, and only outside computations.
 - `readUnretained` is a one-off top-level read. A caller that needs the node's value to stay current until a later point, such as a render until its commit, retains the node until then, because a scheduler may dispose an unretained node as soon as `readUnretained` returns.
-- Each `retainDerivedNode` is matched by exactly one `releaseRetain` of the retain it returned. A second release of the same retain unlinks it again and corrupts the node's retain list.
+- Each `retainDerivedNode` is matched by exactly one `releaseRetain` of the retain it returned. A second release of the same retain unlinks that retain again and corrupts the node's retain list.
 - Each `startBatch` is matched by exactly one `endBatch`. Both are called outside computations and `onChange` callbacks. A caller whose code between them can throw calls `endBatch` in a `finally`.
 - `startBatch` and its `endBatch` run in one synchronous stretch of code and never span an `await`. On a server that serves several requests in one process, the batch is module state, so another request's writes made during the `await` would join the open batch.
 - `disposeNext` and `disposeAll` are called outside computations, batches, and `onChange` callbacks. After a call to `scheduler.schedule()`, the scheduler calls `disposeNext` until it returns `false`, or calls `disposeAll`.
 - A chain of derived nodes that the first recompute of `Uncomputed` nodes, or the recompute of `Dirty` nodes, goes through stays within the call stack limit, because each node adds frames. In Node 24.12 with its default stack and one-line computations, the first recompute of a chain overflows at about 2,000 derived nodes, and the recompute of a chain of `Dirty` nodes at about 2,200.
 - A caller does not mutate a value that a tracked read or a top-level read returns, or a value it passed to `createSourceNode` or `writeSource`.
-- A caller creates nodes only through `createSourceNode` and `createDerivedNode`, and writes no field of a node or a retain, except through `scheduler.schedule`. The types enforce this.
+- A caller creates nodes only through `createSourceNode` and `createDerivedNode`, and writes no field of a node or a retain, except through `scheduler.schedule`. The types make a write to a field a type error.
 - A caller that needs current values makes its top-level reads after the batch flushes. Until the flush, a top-level read of a node on the flush queue, or of a node that depends on it, returns the previous value.
 
 ### Guarantees
 
-pico-js upholds these while every contract holds.
+pico-js upholds these while the caller meets every contract.
 
 - A top-level read made while no batch is open returns the value that the node's latest recompute returned, or `previous` when that recompute returned a value `===` to `previous`. Each tracked read in that recompute returned the current value of its dependency.
 - A node recomputes only when it is `Uncomputed`, or when a source dependency was written, or when a derived dependency recomputed to a value not `===` to its previous value.
 - A tracked read or a top-level read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order that the latest recompute read them, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. The same read of a `Dirty` lazy node recomputes it without first visiting its dependencies.
 - A recompute whose value is `===` to its previous value keeps the previous value and marks nothing. `NaN` counts as changed, and `-0` over a stored `0` keeps `0`.
-- `retainDerivedNode` brings the node up to date before it returns. A node that starts to behave eagerly is `Clean` when it starts.
+- `retainDerivedNode` brings the node up to date before it returns. A node that starts to behave eagerly is `Clean` at that moment.
 - For each node that the flush recomputed to a value not `===` to the previous value, the flush calls the `onChange` of each of the node's retains once, most recent retain first, even when the node recomputed more than once. The flush orders the nodes by each node's first recompute that changed its value. It makes these calls after it has refreshed every node on the flush queue and after it has disposed the unneeded nodes that marking reached. The first recompute of a node, a recompute that returns a value `===` to `previous`, and a lazy node cause no `onChange` call.
 - The flush skips a node on the flush queue that a release in the same batch made lazy. The node stays `Dirty` or `MaybeDirty`, its dependents are `MaybeDirty` or `Dirty`, and a tracked read or a top-level read recomputes it as a lazy node.
 - When a flush returns, every node that the flush refreshed is `Clean`. Inside a batch, a top-level read of a `Dirty` or `MaybeDirty` node that behaves eagerly returns its previous value and recomputes nothing.
@@ -57,7 +73,7 @@ pico-js upholds these while every contract holds.
 - When an outermost operation returns, every derived node that is unneeded and not `Uncomputed` is on the cleanup queue. After `disposeAll` returns, every unneeded derived node is `Uncomputed`.
 - When a write outside a batch, or the outermost `endBatch`, returns, no node that its marking took out of `Clean` is both unneeded and `Dirty` or `MaybeDirty`. Each such node is `Uncomputed`, or `Clean` because a tracked read or a top-level read inside the batch recomputed it.
 - A disposed node is `Uncomputed`, has the value `undefined`, and has no edges. Disposal marks nothing and calls nothing. `disposeNext` and `disposeAll` skip an entry of the cleanup queue whose node is needed again or already `Uncomputed`.
-- A derived node that becomes unneeded and then receives a tracked read or a top-level read before a disposal reaches it keeps its value and does not recompute for that read. This holds whether the read comes from a later recompute in the same operation or from a later operation.
+- A derived node that becomes unneeded and then receives a tracked read or a top-level read before a disposal reaches it keeps its value and does not recompute for that read. This applies whether the read comes from a later recompute in the same operation or from a later operation.
 - The engine calls `scheduler.schedule()` only when an outermost operation returns, and only once for each time the cleanup queue went from empty to non-empty since the previous call. A scheduler that calls `disposeAll` therefore disposes every unneeded node when each outermost operation returns.
 - A recompute whose tracked reads match, in order, the edges of the node's previous recompute allocates no edge and links or unlinks none.
 - Marking, verification of `MaybeDirty` nodes, and disposal keep their stacks in arrays. In Node 24.12, the verification of a chain of 200,000 `MaybeDirty` nodes, and a release followed by `disposeAll` of a chain of 100,000 nodes, do not overflow.
@@ -139,7 +155,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
 }
 ```
 
-This is `d3a2e03ff`'s file. Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`; `scripts` adds `test:random`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned. The one export is `.`, built from `src/index.ts` by the root `tsdown.config.ts` (`entry: ['src/index.ts']`, `format: ['commonjs', 'esm']`).
+This is `225f893e5`'s file. Deltas from `libs/isograph-runtime/package.json`: `name`, `description`, and `repository.directory`; `dependencies` is empty; `devDependencies` drops `@babel/core` and `@isograph/babel-plugin`; `scripts` adds `test:random`. `private: true` stays, as the runtime's and `@isograph/disposable-types`'s do: publishing to npm is distribution, which `IN_PROGRESS.md` lists as not planned. The one export is `.`, built from `src/index.ts` by the root `tsdown.config.ts` (`entry: ['src/index.ts']`, `format: ['commonjs', 'esm']`).
 
 `"sideEffects": false` holds although the engine has module state: evaluating the modules allocates two empty arrays and assigns constants, and runs no code with an effect outside the package.
 
@@ -219,11 +235,11 @@ Delta of `vitest.random.config.ts` from the prototype's: `include` names `test-r
 
 `vitest.config.ts` keeps vitest's default `include`, which matches `*.test.ts` and `*.spec.ts`, so `pnpm test` and the `pico-js-test` hook do not run the random test. `tsconfig.test.json` includes `test-random/**/*.ts`, so `tsc -b` and the `pico-js-typecheck` hook type-check it without running it. vitest runs each test file in its own module instance, so the module state of one file does not reach another.
 
-TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. The engine has no class and no private field. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) holds for every condition. oxlint's `switch-exhaustiveness-check` holds for every `switch`, and no `switch` has a `default` arm.
+TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. The engine has no class and no private field. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) applies to every condition. oxlint's `switch-exhaustiveness-check` applies to every `switch`, and no `switch` has a `default` arm.
 
 ### Pre-commit hooks
 
-`.pre-commit-config.yaml` gains two hooks, after `disposable-types-typecheck`. `d3a2e03ff` has them.
+`.pre-commit-config.yaml` gains two hooks, after `disposable-types-typecheck`. `225f893e5` has them.
 
 ```yaml
 # from .pre-commit-config.yaml
@@ -302,12 +318,13 @@ pico-js is a push-pull memoization engine. A write to a source node eagerly mark
 - A retain is the `Retain` object that `retainDerivedNode` returns. A node is retained while it has at least one retain. `releaseRetain` releases a retain.
 - A node is needed while it has a retain or a dependent, and unneeded otherwise.
 - To mark is to set a node `Dirty` or `MaybeDirty` in a write. To recompute is to run a node's computation, including the first run of an `Uncomputed` node. To verify is to walk a `MaybeDirty` node's derived dependencies to find whether one changed. To refresh is for the flush to recompute or verify a node on the flush queue.
-- The flush queue holds the nodes that behave eagerly that marking put there. The cleanup queue holds the nodes that became unneeded and await disposal.
+- A node behaves eagerly while it is retained and was created `EAGER`, or while it has a retain with an `onChange`. Every other node is lazy.
+- The flush queue contains the nodes that behave eagerly and that marking put there. The cleanup queue contains the nodes that became unneeded and await disposal.
 - To dispose a node is to unlink every edge to its dependencies, drop its value, and set it `Uncomputed`. To unlink an edge is to remove it from both of its lists.
-- An outermost operation is a call to `writeSource`, `endBatch`, `retainDerivedNode`, `releaseRetain`, `readDerivedNode`, or `readUnretained` made with no batch open and no flush running, or the `endBatch` that closes the outermost batch. The flush is the refresh of the flush queue followed by the `onChange` calls, run by a write outside a batch or by the outermost `endBatch`.
+- An outermost operation is a call to `writeSource`, `endBatch`, `retainDerivedNode`, `releaseRetain`, `readDerivedNode`, or `readUnretained` made with no batch open and no flush running, or the `endBatch` that closes the outermost batch.
+- The flush is the refresh of every node on the flush queue followed by the `onChange` calls. A `writeSource` outside a batch runs the flush, and so does the outermost `endBatch`.
 - A node is maybe-dirty (status `MaybeDirty`) when a dependency may have changed, and whether the node's value changed is not yet known.
 - Direction is always named by dependency and dependent: marking moves from a source toward its dependents, and verification moves from a node toward its dependencies.
-- A node behaves eagerly while it is retained and was created `EAGER`, or while it has a retain with an `onChange`. Every other node is lazy.
 
 ## Goals
 
@@ -319,15 +336,15 @@ pico-js aims for correctness first and performance second. Where a rule can be t
 - `createDerivedNode(computation, evaluation)` fixes the node's evaluation, `LAZY` (the default) or `EAGER`, for its lifetime.
 - Marking stops at a node that behaves eagerly and puts it on the flush queue, and the flush refreshes it. A lazy node recomputes when a tracked read or a top-level read reaches it.
 - A write runs no computation. It marks the dependents of the source `Dirty`, and the nodes that depend on those through lazy nodes `MaybeDirty`. Marking continues through a lazy node and stops at a node that behaves eagerly, which it puts on the flush queue.
-- A tracked read or a top-level read of a `Dirty` lazy node recomputes it. The same read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order its computation read them, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. If no dependency changed, the node becomes `Clean` and does not recompute.
+- A tracked read or a top-level read of a `Dirty` lazy node recomputes it. The same read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order in which the node's latest recompute read the dependencies, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. If no dependency changed, the node becomes `Clean` and does not recompute.
 - A recompute receives `previous`, the node's last value. A recompute whose value is `===` to `previous` keeps `previous` and marks nothing. A computation whose result is structurally equal to `previous` returns `previous`.
 - `startBatch()` and `endBatch()` open and close a batch. Batches nest, and a nested batch joins the open one. A write inside a batch marks at once, and the outermost `endBatch` flushes. A `writeSource` outside a batch flushes before it returns. The flush refreshes every node on the flush queue, then calls the `onChange` of each retain of each node whose value the flush changed.
-- `retainDerivedNode(node, onChange?)` brings the node up to date and returns a `Retain`, which joins the node's retain list. `releaseRetain(retain)` removes it. `onChange` exists only on a retain.
-- `readDerivedNode(node)` is the top-level read of a retained node. `readUnretained(node)` is a top-level read of any node that has no retain of its own: it links edges as a tracked read does, and puts the node on the cleanup queue if the node is unneeded.
+- `retainDerivedNode(node, onChange?)` brings the node up to date and returns a `Retain`, which joins the node's retain list. `releaseRetain(retain)` removes that retain from the node's retain list. `onChange` exists only on a retain.
+- `readDerivedNode(node)` is the top-level read of a retained node. `readUnretained(node)` is a top-level read of any node, and `readUnretained` adds no retain. `readUnretained` links edges as a tracked read does, and puts the node on the cleanup queue if the node is unneeded.
 - A derived node that becomes unneeded keeps its value and its edges and joins the cleanup queue. `disposeNext()` and `disposeAll()` dispose the nodes on the cleanup queue that are still unneeded. A disposed node becomes `Uncomputed`, drops its value, and has none of its edges to dependencies. Each derived dependency that the disposal leaves unneeded joins the cleanup queue. A source node is never disposed.
 - At the end of the outermost operation that put a node on an empty cleanup queue, the engine calls `scheduler.schedule()`. The default disposes during idle time. A scheduler that calls `disposeAll` disposes when the outermost operation ends.
 - When marking reaches an unneeded node, the engine disposes the node when the write, or the outermost batch, ends. A write therefore never leaves an unneeded node `Dirty` or `MaybeDirty` with its edges linked. A `Clean` dependency that this disposal leaves unneeded joins the cleanup queue with its value.
-- The engine keeps one graph per process in module state: the batch depth, the batch's queue, the flush state, the cleanup queue, and the scheduler. The calling node is a parameter of each tracked read.
+- The engine keeps one graph per process in module state: the batch depth, the flush queue of the open batch, the flush state, the cleanup queue, and the scheduler. The calling node is a parameter of each tracked read.
 
 ## API
 
@@ -364,7 +381,7 @@ import {
   writeSource,
 } from '@isograph/pico-js';
 
-// Dispose at the end of each operation, so the statuses in the comments hold at once.
+// Dispose at the end of each operation, so the statuses in the comments are true at once.
 scheduler.schedule = disposeAll;
 
 const person = createSourceNode({ first: 'Ada', last: 'Lovelace', age: 36 });
@@ -436,24 +453,24 @@ These are the caller's obligations. pico-js checks none of them at run time, and
 - The derived nodes form a directed acyclic graph, counting the edges that a node keeps from its previous recompute.
 - `readDerivedNode` is called only on a retained node, and only outside computations.
 - `readUnretained` is a one-off top-level read. A caller that needs the node's value to stay current until a later point, such as a render until its commit, retains the node until then, because a scheduler may dispose an unretained node as soon as `readUnretained` returns.
-- Each `retainDerivedNode` is matched by exactly one `releaseRetain` of the retain it returned. A second release of the same retain unlinks it again and corrupts the node's retain list.
+- Each `retainDerivedNode` is matched by exactly one `releaseRetain` of the retain it returned. A second release of the same retain unlinks that retain again and corrupts the node's retain list.
 - Each `startBatch` is matched by exactly one `endBatch`. Both are called outside computations and `onChange` callbacks. A caller whose code between them can throw calls `endBatch` in a `finally`.
 - `startBatch` and its `endBatch` run in one synchronous stretch of code and never span an `await`. On a server that serves several requests in one process, the batch is module state, so another request's writes made during the `await` would join the open batch.
 - `disposeNext` and `disposeAll` are called outside computations, batches, and `onChange` callbacks. After a call to `scheduler.schedule()`, the scheduler calls `disposeNext` until it returns `false`, or calls `disposeAll`.
 - A chain of derived nodes that the first recompute of `Uncomputed` nodes, or the recompute of `Dirty` nodes, goes through stays within the call stack limit, because each node adds frames. In Node 24.12 with its default stack and one-line computations, the first recompute of a chain overflows at about 2,000 derived nodes, and the recompute of a chain of `Dirty` nodes at about 2,200.
 - A caller does not mutate a value that a tracked read or a top-level read returns, or a value it passed to `createSourceNode` or `writeSource`.
-- A caller creates nodes only through `createSourceNode` and `createDerivedNode`, and writes no field of a node or a retain, except through `scheduler.schedule`. The types enforce this.
+- A caller creates nodes only through `createSourceNode` and `createDerivedNode`, and writes no field of a node or a retain, except through `scheduler.schedule`. The types make a write to a field a type error.
 - A caller that needs current values makes its top-level reads after the batch flushes. Until the flush, a top-level read of a node on the flush queue, or of a node that depends on it, returns the previous value.
 
 ## Guarantees
 
-pico-js upholds these while every contract holds.
+pico-js upholds these while the caller meets every contract.
 
 - A top-level read made while no batch is open returns the value that the node's latest recompute returned, or `previous` when that recompute returned a value `===` to `previous`. Each tracked read in that recompute returned the current value of its dependency.
 - A node recomputes only when it is `Uncomputed`, or when a source dependency was written, or when a derived dependency recomputed to a value not `===` to its previous value.
 - A tracked read or a top-level read of a `MaybeDirty` lazy node verifies it: it brings each derived dependency up to date in the order that the latest recompute read them, and recomputes the node as soon as one dependency changed, without visiting the remaining dependencies. The same read of a `Dirty` lazy node recomputes it without first visiting its dependencies.
 - A recompute whose value is `===` to its previous value keeps the previous value and marks nothing. `NaN` counts as changed, and `-0` over a stored `0` keeps `0`.
-- `retainDerivedNode` brings the node up to date before it returns. A node that starts to behave eagerly is `Clean` when it starts.
+- `retainDerivedNode` brings the node up to date before it returns. A node that starts to behave eagerly is `Clean` at that moment.
 - For each node that the flush recomputed to a value not `===` to the previous value, the flush calls the `onChange` of each of the node's retains once, most recent retain first, even when the node recomputed more than once. The flush orders the nodes by each node's first recompute that changed its value. It makes these calls after it has refreshed every node on the flush queue and after it has disposed the unneeded nodes that marking reached. The first recompute of a node, a recompute that returns a value `===` to `previous`, and a lazy node cause no `onChange` call.
 - The flush skips a node on the flush queue that a release in the same batch made lazy. The node stays `Dirty` or `MaybeDirty`, its dependents are `MaybeDirty` or `Dirty`, and a tracked read or a top-level read recomputes it as a lazy node.
 - When a flush returns, every node that the flush refreshed is `Clean`. Inside a batch, a top-level read of a `Dirty` or `MaybeDirty` node that behaves eagerly returns its previous value and recomputes nothing.
@@ -462,7 +479,7 @@ pico-js upholds these while every contract holds.
 - When an outermost operation returns, every derived node that is unneeded and not `Uncomputed` is on the cleanup queue. After `disposeAll` returns, every unneeded derived node is `Uncomputed`.
 - When a write outside a batch, or the outermost `endBatch`, returns, no node that its marking took out of `Clean` is both unneeded and `Dirty` or `MaybeDirty`. Each such node is `Uncomputed`, or `Clean` because a tracked read or a top-level read inside the batch recomputed it.
 - A disposed node is `Uncomputed`, has the value `undefined`, and has no edges. Disposal marks nothing and calls nothing. `disposeNext` and `disposeAll` skip an entry of the cleanup queue whose node is needed again or already `Uncomputed`.
-- A derived node that becomes unneeded and then receives a tracked read or a top-level read before a disposal reaches it keeps its value and does not recompute for that read. This holds whether the read comes from a later recompute in the same operation or from a later operation.
+- A derived node that becomes unneeded and then receives a tracked read or a top-level read before a disposal reaches it keeps its value and does not recompute for that read. This applies whether the read comes from a later recompute in the same operation or from a later operation.
 - The engine calls `scheduler.schedule()` only when an outermost operation returns, and only once for each time the cleanup queue went from empty to non-empty since the previous call. A scheduler that calls `disposeAll` therefore disposes every unneeded node when each outermost operation returns.
 - A recompute whose tracked reads match, in order, the edges of the node's previous recompute allocates no edge and links or unlinks none.
 - Marking, verification of `MaybeDirty` nodes, and disposal keep their stacks in arrays. In Node 24.12, the verification of a chain of 200,000 `MaybeDirty` nodes, and a release followed by `disposeAll` of a chain of 100,000 nodes, do not overflow.
@@ -477,7 +494,7 @@ pico-js upholds these while every contract holds.
 - A `Dirty` node keeps its edges linked, so a second write that reaches the node finds it `Dirty` and stops, and the node's recompute reuses the edges.
 - A source's `dependentsStatus` records that a write left every dependent of the source `Dirty`, so the next write skips the list of dependents until a computation calls `readSource` on the source again.
 - Marking, verification, and disposal walk explicit stacks, so the depth of the graph costs no call-stack frames there.
-- A computation receives an explicit `callingNode` and passes it to every read, instead of the engine tracking the running computation in module state.
+- A computation receives an explicit `callingNode` and passes `callingNode` to every tracked read, instead of the engine tracking the running computation in module state.
 - The engine keeps one graph per process in module state: the batch, the flush state, and the cleanup queue. A batch allocates no object, and no node carries a pointer to its graph.
 - A retain is an object in its node's retain list, and the list replaces a retain count. A node is retained while its retain list is not empty, and the flush finds the `onChange` callbacks by walking the list.
 - Whether a node behaves eagerly is encoded in its `evaluation` field, so marking, tracked reads, top-level reads, and verification test one field.
@@ -491,10 +508,10 @@ pico-js upholds these while every contract holds.
 - The engine keeps its batch depth, its flush state, its cleanup queue, and its scheduler in module state that the whole process shares. There is one graph per process.
 - On a server, every request shares that state. A batch therefore must not span an `await`, because another request's writes would join the batch.
 - A computation or an `onChange` that throws leaves the graph that the operation was updating partially updated. The engine restores the shared state before the exception reaches the caller, so other requests are unaffected.
-- On a server, `requestIdleCallback` does not exist, so the default scheduler disposes in `setTimeout` tasks. The cleanup queue can hold nodes of several requests at once, and each disposal checks again that its node is still unneeded before it disposes the node.
+- On a server, `requestIdleCallback` does not exist, so the default scheduler disposes in `setTimeout` tasks. The cleanup queue can contain nodes of several requests at once, and each disposal checks again that its node is still unneeded before it disposes the node.
 ````
 
-The Model, Contracts, and Guarantees sections at the top of this doc copy the README's sections word for word.
+The Terms, Model, Contracts, and Guarantees sections at the top of this doc copy the README's sections word for word.
 
 ### Readers before the Isograph runtime depends on it
 
@@ -529,17 +546,17 @@ let changedCount = 0;
 ```
 
 - `createDerivedNode` takes the evaluation as an optional second parameter, `LAZY` by default, and `createEagerDerivedNode` is removed. `newDerivedNode` folds into `createDerivedNode`.
-- `setDerivedNodeEvaluation` is removed, so the creation choice is fixed. The low bit of `evaluation` still holds it, and `evaluationState(node)` reads it from there instead of taking a `choice` parameter. The queue path of `setDerivedNodeEvaluation` that queued a `Dirty` or `MaybeDirty` node made eager has no other caller and goes with it: a node that starts to refresh in the flush starts through a retain, which pulls it first, so it is `Clean`.
+- `setDerivedNodeEvaluation` is removed, so the creation choice is fixed. The low bit of `evaluation` still holds it, and `evaluationState(node)` reads it from there instead of taking a `choice` parameter. The path of `setDerivedNodeEvaluation` that put a `Dirty` or `MaybeDirty` node on the flush queue when the node became eager has no other caller and goes with it. A node starts to behave eagerly through a retain, which brings the node up to date first, so the node is `Clean`.
 - `batch(body)` is removed. `startBatch()` and `endBatch()` remain.
-- `readRetained(retain)` is removed. `readDerivedNode(node)` is the top-level read of a retained node, and a computation no longer calls it, so there are no untracked reads. This choice is open: `readRetained(retain)` makes "the node is retained" a fact of the argument's type instead of a contract, at the cost of every reader holding the `Retain` it reads through. The engine code is the same either way (`pull(retain.node)` against `pull(node)`).
+- `readRetained(retain)` is removed. `readDerivedNode(node)` is the top-level read of a retained node, and a computation no longer calls it, so a computation makes no read outside `readSource` and `readDerived`. This choice is open: `readRetained(retain)` makes "the node is retained" a fact of the argument's type instead of a contract, at the cost that every caller of `readRetained` keeps the `Retain` that it passes. The engine code is the same either way (`pull(retain.node)` against `pull(node)`).
 - `resetForTests` and `collectorContents` are removed, because only tests call them (AGENTS.md, Tests: an API only tests call should not exist). Tests observe the cleanup queue through `disposeNext`'s return value and node statuses, and the random test gets fresh module state per case (Tests).
-- `schedulePending: boolean` becomes `scheduleStatus: ScheduleStatus`, and the counter `flushing` becomes `flushState: FlushState`, a two-value union. A flush cannot run inside another, because an `onChange` does not write or end a batch (contract), so the count is never above 1.
+- `schedulePending: boolean` becomes `scheduleStatus: ScheduleStatus`, and the counter `flushing` becomes `flushState: FlushState`, a two-value union. A flush cannot run inside another, because an `onChange` does not write or end a batch (contract), so the count never exceeds 1.
 - The flush's list of changed nodes, which the prototype allocated per flush on the first changed node, is the module-level `changedNodes` with `changedCount`. Each entry is set to `undefined` before its node's `onChange` calls run, so the array keeps no node reachable after the flush.
-- `flush` wraps `flushQueue` in `try`/`finally`, which sets `flushState` to `FLUSH_IDLE`, empties `markedUnneeded`, and clears the entries of `changedNodes` that a throw left, resetting their `onChangeStatus`. A computation or an `onChange` that throws therefore leaves the module state clean for the next operation. The prototype restored nothing and needed `resetForTests` after a throw.
+- `flush` wraps `flushQueue` in `try`/`finally`, which sets `flushState` to `FLUSH_IDLE`, empties `markedUnneeded`, and clears the entries of `changedNodes` that a throw left, resetting their `onChangeStatus`. A computation or an `onChange` that throws therefore leaves the module state of an idle engine for the next operation. The prototype restored nothing and needed `resetForTests` after a throw.
 - `collectorStack` is renamed `cleanupQueue`, and `addToCollector` is renamed `addToCleanupQueue`.
 - The public API drops `Status` and the `status` field with `UNCOMPUTED`, `DIRTY`, `MAYBE_DIRTY`, and `CLEAN`, the encoded evaluation constants `EAGER_INACTIVE`, `LAZY_OBSERVED`, and `EAGER_ACTIVE`, and the types `EvaluationState` and `DependentsStatus`. `index.ts` exports `LAZY` and `EAGER` as the creation choices. `computation` is not a field of the public `DerivedNode`; it is a method of the internal `MutableDerivedNode`, which keeps `MutableDerivedNode<TValue>` assignable to `MutableDerivedNode<unknown>`. Tests read a node's status through the test helper `test/status.ts` (`statusOf(node)`), which casts to `MutableDerivedNode`.
 - The public `SourceNode`, `DerivedNode`, `Retain`, and `Edge` are `readonly`. The engine works on separate internal types written out field by field: `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, whose link fields (`dependency`, `nextDependency`, `previousDependent`, `nextDependent`) are mutable and whose `dependent` is `readonly`. Each exported function casts its public arguments to the internal type once, and the internal types reference each other, so edge walks need no casts. The generic `Mutable<T>` and the aliases `SourceEdge`, `DerivedEdge`, and `Queue` are removed.
-- `disposeNext` returning `false` and `disposeAll` set `scheduleStatus` to `SCHEDULE_NOT_PENDING`, because the queue they leave is empty, so a later push onto it schedules again.
+- `disposeNext` returning `false` and `disposeAll` set `scheduleStatus` to `SCHEDULE_NOT_PENDING`, because the cleanup queue they leave is empty, so a later push onto the cleanup queue schedules again.
 - `endBatch`'s and `flushOrQueue`'s shared tail is the function `flushOrDisposeMarked`.
 - `scheduleIfOutermost` tests the batch depth and the flush state in `batch.ts`, and calls `scheduleIfPending` in `cleanup.ts`, which owns `scheduleStatus`.
 - Comments that named `setDerivedNodeEvaluation`, `readRetained`, or untracked reads are rewritten. A comment states a contract, a guarantee, or an internal invariant, and comments that restated the code are removed.
@@ -596,7 +613,7 @@ markedUnneeded         marking.ts     markDirty, markCheck, their queue copies  
  * - only s1: e2 is removed from d1's dependencies and from s2's dependents.
  *
  * A write to s2 walks s2's dependents to mark them. s2's list of dependents
- * holds one edge for every derived node whose computation read s2, so many
+ * contains one edge for every derived node whose computation read s2, so many
  * dependents share it, the list can be long, and e2 can be anywhere in it. The
  * list is doubly linked through the edges, so removing e2 takes two pointer
  * updates and no search through s2's other dependents. A list of dependencies
@@ -692,7 +709,7 @@ export type DependentsStatus =
  * A node leaves `Dirty` only by a recompute, and a node joins the source's list
  * of dependents only through `readSource`.
  *
- * Contract: a caller writes no field. The type enforces it.
+ * Contract: a caller writes no field. The type enforces the contract.
  */
 export type SourceNode<TValue> = {
   readonly value: TValue;
@@ -705,8 +722,8 @@ export type SourceNode<TValue> = {
 export const LAZY = 0;
 /**
  * The creation choice of a derived node that behaves eagerly while it is
- * retained: the flush recomputes it after a write or a batch changed one of
- * its dependencies.
+ * retained: the flush recomputes the node after a write or a batch changed one
+ * of its dependencies.
  */
 export const EAGER = 1;
 export const EAGER_INACTIVE = EAGER;
@@ -752,7 +769,7 @@ type OnChangeStatus = typeof ON_CHANGE_NOT_QUEUED | typeof ON_CHANGE_QUEUED;
  * running write, except a node that `readDerived` has brought up to date but
  * has not yet linked to the calling node by an edge.
  *
- * Contract: a caller writes no field. The type enforces it.
+ * Contract: a caller writes no field. The type enforces the contract.
  */
 export type DerivedNode<TValue> = {
   readonly value: TValue;
@@ -768,15 +785,16 @@ export type DerivedNode<TValue> = {
 };
 
 /**
- * A retain of a node. `retainDerivedNode` returns it and `releaseRetain`
- * releases it. It is in its node's retain list.
+ * A retain of a node. `retainDerivedNode` returns a retain and
+ * `releaseRetain` releases a retain. A retain is in the retain list of its
+ * node.
  */
 export type Retain<TValue> = {
   readonly node: DerivedNode<TValue>;
   /**
-   * Guarantee: the flush calls it once for each change of the node's value
-   * that the flush made, after the flush has refreshed every node on the flush
-   * queue. The first recompute of a node does not call it.
+   * Guarantee: the flush calls `onChange` once for each change of the node's
+   * value that the flush made, after the flush has refreshed every node on the
+   * flush queue. The first recompute of a node does not call `onChange`.
    *
    * Contract: the callback does not write, start or end a batch, retain,
    * release, dispose, or call `readUnretained`. It may call `readDerivedNode`
@@ -801,9 +819,9 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
  * Returns an `Uncomputed` derived node. `evaluation` is fixed for the node's
  * lifetime.
  *
- * Contract: `computation` is synchronous. It reads other nodes only through
- * `readSource` and `readDerived`, called with the `callingNode` it receives.
- * It does not write, start or end a batch, retain, release, dispose,
+ * Contract: `computation` is synchronous. `computation` reads other nodes
+ * only through `readSource` and `readDerived`, called with the `callingNode`
+ * that `computation` receives. `computation` does not write, start or end a batch, retain, release, dispose,
  * or call `readDerivedNode` or `readUnretained`.
  */
 export function createDerivedNode<TValue>(
@@ -903,9 +921,9 @@ import {
 } from './nodes';
 
 /**
- * Internal invariant: it holds the nodes that marking took out of `Clean`
- * while they were unneeded, and it is empty when an outermost operation
- * returns.
+ * Internal invariant: `markedUnneeded` contains the nodes that marking took out
+ * of `Clean` while they were unneeded. `markedUnneeded` is empty when an
+ * outermost operation returns.
  */
 export const markedUnneeded: Array<MutableDerivedNode<unknown>> = [];
 
@@ -926,7 +944,7 @@ export function markDirty<TDependency>(
   first: MutableEdge<TDependency>,
 ): void {
   let stack: Array<MutableDerivedNode<unknown>> | undefined;
-  let held: MutableDerivedNode<unknown> | undefined;
+  let nextToMark: MutableDerivedNode<unknown> | undefined;
   let edge: MutableEdge<TDependency> | undefined = first;
   while (edge !== undefined) {
     const node = edge.dependent;
@@ -939,16 +957,16 @@ export function markDirty<TDependency>(
           break;
         }
         if (node.firstDependent !== undefined) {
-          if (held !== undefined) {
-            (stack ??= []).push(held);
+          if (nextToMark !== undefined) {
+            (stack ??= []).push(nextToMark);
           }
-          held = node;
+          nextToMark = node;
         } else if (node.firstRetain === undefined) {
           markedUnneeded.push(node);
         }
         break;
-      // Internal invariant: a MaybeDirty node marked its dependents when it left
-      // Clean, or it behaves eagerly and went on the flush queue then.
+      // Internal invariant: a MaybeDirty node either marked its dependents when
+      // it left Clean, or behaves eagerly and went on the flush queue then.
       case MAYBE_DIRTY:
         node.status = DIRTY;
         break;
@@ -959,18 +977,18 @@ export function markDirty<TDependency>(
         break;
     }
   }
-  if (held !== undefined) {
-    markMaybeDirty(eagerNodes, held, stack);
+  if (nextToMark !== undefined) {
+    markMaybeDirty(eagerNodes, nextToMark, stack);
   }
 }
 
 function markMaybeDirty(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
-  held: MutableDerivedNode<unknown>,
+  nextToMark: MutableDerivedNode<unknown>,
   initialStack: Array<MutableDerivedNode<unknown>> | undefined,
 ): void {
   let stack = initialStack;
-  let marked: MutableDerivedNode<unknown> | undefined = held;
+  let marked: MutableDerivedNode<unknown> | undefined = nextToMark;
   while (marked !== undefined) {
     let dependentEdge = marked.firstDependent;
     while (dependentEdge !== undefined) {
@@ -1011,7 +1029,7 @@ export function markDirtyQueue<TDependency>(
 ): Array<MutableDerivedNode<unknown>> | undefined {
   let queue = initialQueue;
   let stack: Array<MutableDerivedNode<unknown>> | undefined;
-  let held: MutableDerivedNode<unknown> | undefined;
+  let nextToMark: MutableDerivedNode<unknown> | undefined;
   let edge: MutableEdge<TDependency> | undefined = first;
   while (edge !== undefined) {
     const node = edge.dependent;
@@ -1024,16 +1042,16 @@ export function markDirtyQueue<TDependency>(
           break;
         }
         if (node.firstDependent !== undefined) {
-          if (held !== undefined) {
-            (stack ??= []).push(held);
+          if (nextToMark !== undefined) {
+            (stack ??= []).push(nextToMark);
           }
-          held = node;
+          nextToMark = node;
         } else if (node.firstRetain === undefined) {
           markedUnneeded.push(node);
         }
         break;
-      // Internal invariant: a MaybeDirty node marked its dependents when it left
-      // Clean, or it behaves eagerly and went on the flush queue then.
+      // Internal invariant: a MaybeDirty node either marked its dependents when
+      // it left Clean, or behaves eagerly and went on the flush queue then.
       case MAYBE_DIRTY:
         node.status = DIRTY;
         break;
@@ -1044,17 +1062,19 @@ export function markDirtyQueue<TDependency>(
         break;
     }
   }
-  return held === undefined ? queue : markMaybeDirtyQueue(queue, held, stack);
+  return nextToMark === undefined
+    ? queue
+    : markMaybeDirtyQueue(queue, nextToMark, stack);
 }
 
 export function markMaybeDirtyQueue(
   initialQueue: Array<MutableDerivedNode<unknown>> | undefined,
-  held: MutableDerivedNode<unknown>,
+  nextToMark: MutableDerivedNode<unknown>,
   initialStack: Array<MutableDerivedNode<unknown>> | undefined,
 ): Array<MutableDerivedNode<unknown>> | undefined {
   let queue = initialQueue;
   let stack = initialStack;
-  let marked: MutableDerivedNode<unknown> | undefined = held;
+  let marked: MutableDerivedNode<unknown> | undefined = nextToMark;
   while (marked !== undefined) {
     let dependentEdge = marked.firstDependent;
     while (dependentEdge !== undefined) {
@@ -1130,10 +1150,11 @@ import { markedUnneeded } from './marking';
 import { CLEAN, UNCOMPUTED, type MutableDerivedNode } from './nodes';
 
 /**
- * Internal invariant: the cleanup queue holds a derived node once for each
+ * Internal invariant: the cleanup queue contains a derived node once for each
  * time the node became unneeded while it was not `Uncomputed`, until
  * `disposeNext` or `disposeAll` pops that entry. An entry whose node became
- * needed again stays until it is popped.
+ * needed again stays on the cleanup queue until `disposeNext` or `disposeAll`
+ * pops the entry.
  */
 const cleanupQueue: Array<MutableDerivedNode<unknown>> = [];
 
@@ -1473,9 +1494,9 @@ export function verify(
         dependency.status === MAYBE_DIRTY &&
         dependency.evaluation < LAZY_OBSERVED
       ) {
-        // Internal invariant: a dependency with one dependent leads back to
-        // its dependent through that edge, so only an edge into a dependency
-        // with several dependents is pushed onto the verify stack.
+        // Internal invariant: a dependency with one dependent has one edge back
+        // to that dependent, so only an edge into a dependency with several
+        // dependents is pushed onto the verify stack.
         if (
           edge.previousDependent !== undefined ||
           edge.nextDependent !== undefined
@@ -1536,8 +1557,8 @@ function recompute<TValue>(node: MutableDerivedNode<TValue>): TValue {
   }
   node.value = value;
   // Internal invariant: the dependents of a lazy node are already MaybeDirty or
-  // Dirty. A MaybeDirty dependent now has a dependency whose value changed, so it
-  // becomes Dirty.
+  // Dirty. A MaybeDirty dependent now has a dependency whose value changed, so
+  // markMaybeDirtyDependentsDirty makes that dependent Dirty.
   markMaybeDirtyDependentsDirty(node.firstDependent);
   return value;
 }
@@ -1726,9 +1747,10 @@ export function scheduleIfOutermost(): void {
 
 /**
  * Internal invariant: no flush runs inside another, because no `onChange`
- * writes or ends a batch, so one module-level array serves every flush. Each
- * entry is cleared before the `onChange` callbacks of its node run, and
- * `changedCount` is 0 outside a flush.
+ * writes or ends a batch. One module-level array therefore serves every
+ * flush. The flush clears each entry of the array before it calls the
+ * `onChange` callbacks of the entry's node, and `changedCount` is 0 outside a
+ * flush.
  */
 const changedNodes: Array<MutableDerivedNode<unknown> | undefined> = [];
 let changedCount = 0;
@@ -1738,15 +1760,17 @@ let changedCount = 0;
  * on the flush queue, in the order of each node's first recompute that
  * changed its value. A computation or an `onChange` that throws leaves the
  * flush state idle, the marked-unneeded list empty, and no node waiting for
- * its `onChange` callbacks, so later operations, including another request's,
- * start from the module state of an idle engine.
+ * its `onChange` callbacks. Later operations, including another request's,
+ * therefore start from the module state of an idle engine.
  *
- * Internal invariant: marking puts a node on the flush queue only when it
- * takes the node out of `Clean`, so the flush queue holds a node again only
- * after a refresh made it `Clean`, and the flush needs no deduplication. An
- * `onChange` writes nothing, so it puts no node on the flush queue. The nodes
- * left on the marked-unneeded list after a throw are on the cleanup queue
- * already.
+ * Internal invariant: marking puts a node on the flush queue each time it
+ * takes the node out of `Clean`. A node is on the flush queue twice when a
+ * recompute made it `Clean` after its first entry and a later write marked it
+ * again. `refreshEager` skips the second entry because the node is `Clean`.
+ * The list of changed nodes has no duplicates, because a node on it has
+ * `onChangeStatus` `ON_CHANGE_QUEUED`. An `onChange` writes nothing, so it
+ * puts no node on the flush queue. The nodes left on the marked-unneeded list
+ * after a throw are on the cleanup queue already.
  */
 function flush(eagerNodes: Array<MutableDerivedNode<unknown>>): void {
   flushState = FLUSH_RUNNING;
@@ -1818,9 +1842,9 @@ type RefreshResult = typeof CHANGED | typeof UNCHANGED;
 
 /**
  * Internal invariant: a node whose evaluation dropped to a value less than `LAZY_OBSERVED`
- * after marking put it on the flush queue stays `Dirty` or `MaybeDirty`, and the
- * drop marked its dependents. A tracked read or a top-level read recomputes
- * the node as a lazy node, so the flush skips it.
+ * after marking put it on the flush queue is skipped by the flush. The node
+ * stays `Dirty` or `MaybeDirty`, and the drop marked its dependents, so a
+ * tracked read or a top-level read recomputes the node as a lazy node.
  */
 function refreshEager(
   eagerNodes: Array<MutableDerivedNode<unknown>>,
@@ -1836,10 +1860,10 @@ function refreshEager(
       return verify(node) === DIRTY
         ? recomputeEager(eagerNodes, node)
         : UNCHANGED;
-    // Internal invariant: a Clean node is on the flush queue twice, or a
-    // tracked read or a top-level read recomputed it before the flush reached
-    // it. An Uncomputed node was disposed after marking put it on the flush
-    // queue, and recomputing it would link its edges again.
+    // Internal invariant: a Clean node on the flush queue was recomputed after
+    // marking put it there, by a tracked read, a top-level read, or an earlier
+    // entry of the same node. An Uncomputed node was disposed after marking put
+    // it on the flush queue, and recomputing it would link its edges again.
     case CLEAN:
     case UNCOMPUTED:
       return UNCHANGED;
@@ -2001,7 +2025,7 @@ function evaluationState(node: MutableDerivedNode<unknown>): EvaluationState {
   if ((node.evaluation & EAGER) === EAGER) {
     return node.firstRetain !== undefined ? EAGER_ACTIVE : EAGER_INACTIVE;
   }
-  return hasObserver(node) ? LAZY_OBSERVED : LAZY;
+  return hasOnChangeRetain(node) ? LAZY_OBSERVED : LAZY;
 }
 
 /**
@@ -2026,7 +2050,7 @@ function updateEvaluation(node: MutableDerivedNode<unknown>): void {
   }
 }
 
-function hasObserver(node: MutableDerivedNode<unknown>): boolean {
+function hasOnChangeRetain(node: MutableDerivedNode<unknown>): boolean {
   let retain = node.firstRetain;
   while (retain !== undefined) {
     if (retain.onChange !== undefined) {
@@ -2063,21 +2087,21 @@ export {
 ## Implementation notes
 
 - `Status` is a union of four numbers with a constant for each, so the hot path compares small integers and each value has a name in the code. `DependentsStatus`, `OnChangeStatus`, `ScheduleStatus`, `FlushState`, and `RefreshResult` follow the same pattern. `ScheduleStatus` and `FlushState` replace the prototype's `boolean` and counter (AGENTS.md, Booleans).
-- `evaluation` holds four states. Bit 0 is the creation choice (`LAZY` 0, `EAGER` 1). The node behaves eagerly at 2 or more: `LAZY_OBSERVED` 2 (created lazy, a retain has an `onChange`) and `EAGER_ACTIVE` 3 (created eager, retained). Marking, `pull`, `verify`, and `refreshEager` test `evaluation >= LAZY_OBSERVED`. `updateEvaluation` recomputes the state after the first retain, the last release, and any retain or release that carries an `onChange`, and `evaluationState` reads the creation choice from bit 0. A release of an `onChange` retain walks the retain list in `hasObserver`, because there is no count of `onChange` retains. `hasObserver` returns a `boolean`: it answers whether one exists, with no domain names for the two answers.
-- Marking pushes a node onto its stack only when the node leaves `Clean` and its dependents list is not empty, so a write visits each node's dependents at most once. Marking holds the last node whose dependents it must mark in a local and allocates its stack on the first push, and it continues into a dependent that is the last entry of its list without pushing it, so a chain, or a fan-out whose dependents have no dependents, allocates no stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack.
-- Marking pushes a lazy node it takes out of `Clean` onto `markedUnneeded` when the node has no dependent and no retain. `disposeMarked` runs at the end of the outermost write or batch: after the flush's refreshes and before its `onChange` calls, or alone when the write put nothing on the flush queue. It disposes each listed node that is still unneeded and not `Clean`, and walks its derived dependencies with a stack allocated on the first push: a dependency left unneeded that is not `Clean` is disposed too, because the write marked it, and a `Clean` one is pushed onto the cleanup queue with its value. A listed node that a top-level read inside the batch recomputed is `Clean` and is kept, and it is on the cleanup queue already, because it became unneeded before the write.
-- A node becomes unneeded in five places, and each pushes it onto the cleanup queue: `releaseRetain`, `readUnretained`, the repoint in `readDerived`, `unlinkDropped` (the drop in `trim`), and the cascade in `disposeNode` and `disposeMarked`, all through `addToCleanupQueue`. A push onto an empty queue sets `scheduleStatus` to `SCHEDULE_PENDING`. The queue holds one entry per push and no flag on the node, so a node can be on it more than once, and `disposeNext` and `disposeAll` re-check each entry: an entry whose node has a retain, a dependent, or is `Uncomputed` is dropped.
-- Every public operation ends with `scheduleIfOutermost`. It calls `scheduleIfPending` only when `batchDepth === 0` and `flushState === FLUSH_IDLE`. A top-level read never runs inside a computation (its contract), so the only nesting is a top-level read inside an `onChange`, which the flush state covers. A scheduler may therefore call `disposeAll` synchronously: no computation, batch, or flush is running when it is called. With that scheduler the engine disposes when ba3daedf7 disposed, at the end of each outermost operation.
-- The default scheduler uses `requestIdleCallback` where it exists, and disposes while `deadline.timeRemaining() > 0`. Elsewhere, including Node, it uses `setTimeout(…, 0)` and disposes for `TIMEOUT_DISPOSAL_MS` (5 ms) per task. Both reschedule while entries remain. On a server, the queue holds the nodes of every request in the process, and the re-check in `disposeNext` keeps a node that another request retained or read again.
-- `flush` reads the flush queue by index, so the entries that a refresh appends are refreshed in the same walk. It appends each changed node that has a retain to the module-level `changedNodes`, and walks those entries by index after the flush queue is drained and the marked-unneeded nodes are disposed, so every `onChange` runs after every node on the flush queue is refreshed. It sets each entry to `undefined` before it calls the `onChange` of each retain of that node, and `changedCount` is 0 when the flush returns. For each changed node it walks the retain list from the head and calls each `onChange`. No `onChange` writes, retains, or releases, so the list is the one it was when the refresh changed the value, and no flush runs inside another.
-- `flush` restores `flushState`, empties `markedUnneeded`, and clears the remaining `changedNodes` entries (resetting their `onChangeStatus`) in a `finally`. The flush queue of the batch is already detached: `endBatch` sets `batchQueue` to `undefined` before it calls `flush`, and a `writeSource` outside a batch passes a local flush queue. The cost of this `finally` was not measured at this site. In the ambient variant's microbenchmark (Measurements), removing its outermost `try`/`finally` moved an event from 62 to 64 ns to 61 to 62 ns.
-- `refreshEager` skips a node whose evaluation fell below `LAZY_OBSERVED` after marking put it on the flush queue, because a release in the same batch removed its last retain or its last `onChange` retain. `updateEvaluation` marked that node's `Clean` dependents `MaybeDirty` through `markMaybeDirtyQueue` at the release, so the lazy invariant holds and a tracked read or a top-level read recomputes the node. A `Clean` node on the flush queue was refreshed or recomputed by a tracked read or a top-level read before the flush reached the entry. An `Uncomputed` node on the flush queue was disposed after marking put it there, and recomputing it would link its edges again, so the flush skips it too.
+- `evaluation` takes one of four values. Bit 0 is the creation choice (`LAZY` 0, `EAGER` 1). A node behaves eagerly at 2 or more: `LAZY_OBSERVED` 2 (created `LAZY`, has a retain with an `onChange`) and `EAGER_ACTIVE` 3 (created `EAGER`, retained). Marking, `pull`, `verify`, and `refreshEager` test `evaluation >= LAZY_OBSERVED`. `updateEvaluation` recomputes the value after the first retain, the last release, and any retain or release that has an `onChange`. `evaluationState` reads the creation choice from bit 0. A release of a retain with an `onChange` walks the retain list in `hasOnChangeRetain`, because the engine keeps no count of retains with an `onChange`. `hasOnChangeRetain` returns a `boolean`, which answers whether a retain with an `onChange` exists and has no domain names for the two answers.
+- Marking pushes a node onto its stack only when the node leaves `Clean` and its list of dependents is not empty, so a write visits each node's dependents at most once. Marking holds the last node whose dependents it must mark in a local, and allocates the marking stack on the first push. Marking continues into a dependent that is the last entry of a list of dependents without pushing the dependent, so a chain, or a fan-out whose dependents have no dependents, allocates no stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack.
+- Marking pushes a lazy node it takes out of `Clean` onto `markedUnneeded` when the node has no dependent and no retain. `disposeMarked` runs at the end of the outermost write or batch: after the flush's refreshes and before its `onChange` calls, or alone when the write put nothing on the flush queue. `disposeMarked` disposes each listed node that is still unneeded and not `Clean`, and walks the derived dependencies of each such node with a stack allocated on the first push: a dependency left unneeded that is not `Clean` is disposed too, because the write marked it, and a `Clean` one is pushed onto the cleanup queue with its value. A listed node that a top-level read inside the batch recomputed is `Clean` and is kept. That node is on the cleanup queue already, because the node became unneeded before the write.
+- A node becomes unneeded in five places, and each puts the node on the cleanup queue: `releaseRetain`, `readUnretained`, the repoint in `readDerived`, `unlinkDropped` (the drop in `trim`), and the cascade in `disposeNode` and `disposeMarked`, all through `addToCleanupQueue`. A push onto an empty cleanup queue sets `scheduleStatus` to `SCHEDULE_PENDING`. The cleanup queue holds one entry per push and the node has no flag, so a node can be on the cleanup queue more than once. `disposeNext` and `disposeAll` check each entry again, and drop an entry whose node has a retain, has a dependent, or is `Uncomputed`.
+- Every public operation ends with `scheduleIfOutermost`. `scheduleIfOutermost` calls `scheduleIfPending` only when `batchDepth === 0` and `flushState === FLUSH_IDLE`. A top-level read never runs inside a computation (its contract), so the only nesting is a top-level read inside an `onChange`, which the flush state covers. A scheduler may therefore call `disposeAll` synchronously: no computation, batch, or flush is running when the scheduler is called. With that scheduler the engine disposes when ba3daedf7 disposed, at the end of each outermost operation.
+- The default scheduler uses `requestIdleCallback` where it exists, and disposes while `deadline.timeRemaining() > 0`. Elsewhere, including Node, it uses `setTimeout(…, 0)` and disposes for `TIMEOUT_DISPOSAL_MS` (5 ms) per task. Both reschedule while entries remain. On a server, the cleanup queue holds the nodes of every request in the process, and the check of each entry in `disposeNext` keeps a node that another request retained, or that a later tracked read or top-level read reached.
+- `flush` reads the flush queue by index, so the entries that a refresh appends are refreshed in the same walk. `flush` appends each changed node that has a retain to the module-level `changedNodes`, and walks those entries by index after the flush queue is drained and the marked-unneeded nodes are disposed, so every `onChange` runs after every node on the flush queue is refreshed. `flush` sets each entry to `undefined` before it calls the `onChange` of each retain of that node, and `changedCount` is 0 when the flush returns. For each changed node, `flush` walks the retain list from the head and calls each `onChange`. No `onChange` writes, retains, or releases, so the retain list is the same as when the refresh changed the value. No flush runs inside another.
+- `flush` restores `flushState`, empties `markedUnneeded`, and clears the remaining `changedNodes` entries (resetting their `onChangeStatus`) in a `finally`. The flush queue of the batch is already detached: `endBatch` sets `batchQueue` to `undefined` before it calls `flush`, and a `writeSource` outside a batch passes a local flush queue. The cost of this `finally` was not measured at this site. In the ambient variant's microbenchmark (Measurements), removing the outermost `try`/`finally` of that variant moved an event from 62 to 64 ns to 61 to 62 ns.
+- `refreshEager` skips a node whose evaluation fell below `LAZY_OBSERVED` after marking put it on the flush queue, because a release in the same batch removed the last retain of the node or the last retain with an `onChange`. `updateEvaluation` marked that node's `Clean` dependents `MaybeDirty` through `markMaybeDirtyQueue` at the release, so the lazy invariant holds and a tracked read or a top-level read recomputes the node. A `Clean` node on the flush queue was refreshed or recomputed by a tracked read or a top-level read before the flush reached the entry. An `Uncomputed` node on the flush queue was disposed after marking put it there, and recomputing it would link its edges again, so the flush skips it too.
 - `writeSource` inside a batch marks at once into the flush queue of the batch through `markDirtyQueue`, which creates the flush queue on the first push through `queueEagerNode`. `markDirtyQueue` and `markMaybeDirtyQueue` are copies of `markDirty` and `markMaybeDirty` that create the flush queue on the first push, because one function with an optional queue slowed `startBatch` in PR #1027's review (a batch of one write 24.9 ns against 22.8 ns on Node 24.12). `markDirty` and `markMaybeDirty` take the flush queue of the flush that is running, because `recomputeEager` marks into it.
-- A node becomes `Clean` only after its computation returns or after `verify` has brought every derived dependency it is linked to up to date. A lazy recompute therefore marks only `MaybeDirty` and `Dirty` nodes and takes no node out of `Clean`, so it marks through `markMaybeDirtyDependentsDirty`, which walks only the node's dependents list and needs no stack. A node at `LAZY_OBSERVED` or above that is `Dirty` or `MaybeDirty` may have `Clean` dependents, and only until the flush that refreshes it: `recomputeEager` marks a changed value through `markDirty`.
-- `verify` walks the lists of derived dependencies in the order of the tracked reads with an explicit stack of edges. It moves into a lazy `MaybeDirty` dependency before its dependent continues, and brings any other dependency up to date with `pull`, so a `MaybeDirty` dependency that behaves eagerly returns its previous value. After a `pull` that leaves the current node `Dirty`, it recomputes that node and moves back to the node's dependent. It does not recompute `root`, and returns `DIRTY` or `CLEAN` for its caller, because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change it. It pushes an edge only when the dependency it moves into has more than one dependent, and allocates the stack on the first push.
+- A node becomes `Clean` only after its computation returns or after `verify` has brought every derived dependency it is linked to up to date. A lazy recompute therefore marks only `MaybeDirty` and `Dirty` nodes and takes no node out of `Clean`, so the recompute marks through `markMaybeDirtyDependentsDirty`, which walks only the node's dependents list and needs no stack. A node that behaves eagerly and is `Dirty` or `MaybeDirty` may have `Clean` dependents until the flush refreshes the node, and `recomputeEager` marks a changed value through `markDirty`.
+- `verify` walks the lists of derived dependencies in the order of the tracked reads with an explicit stack of edges. `verify` moves into a lazy `MaybeDirty` dependency before its dependent continues, and brings any other dependency up to date with `pull`, so a `MaybeDirty` dependency that behaves eagerly returns its previous value. After a `pull` that leaves the current node `Dirty`, `verify` recomputes that node and moves back to the node's dependent. `verify` does not recompute `root`. `verify` returns `DIRTY` or `CLEAN` for its caller, because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change the status. `verify` pushes an edge only when the dependency it moves into has more than one dependent, and allocates the verify stack on the first push.
 - `trim` calls `unlinkDropped` only when the node has a derived edge to drop. A call with an empty list, on every recompute of a node that reads only sources, slowed the write-then-read loop of `bench/single`'s read case from 4.45 ns to 6.39 ns, and the guard brought it to 4.0 ns.
-- `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `createDerivedNode` and assigned in `disposeNode` and `disposeMarked`, where `value` is `unknown`. In the other three statuses, `value` holds a value the computation returned, which can be `undefined`.
-- The exported `SourceNode`, `DerivedNode`, `Retain`, and `Edge` mark every field `readonly`, so a caller's write to any field is a type error. The public `DerivedNode` has no `status`, `onChangeStatus`, or `computation` field. It still has `evaluation`, typed `EvaluationState`, which `index.ts` does not export. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast, and a caller reaching an edge through the public `node.firstDependent` sees only the `readonly` `Edge`.
+- `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `createDerivedNode` and assigned in `disposeNode` and `disposeMarked`, where `value` is `unknown`. In the other three statuses, `value` is the value that a recompute returned, which can be `undefined`.
+- The exported `SourceNode`, `DerivedNode`, `Retain`, and `Edge` mark every field `readonly`, so a caller's write to any field is a type error. The public `DerivedNode` has no `status`, `onChangeStatus`, or `computation` field. `DerivedNode` still has `evaluation`, typed `EvaluationState`, which `index.ts` does not export. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast, and a caller reaching an edge through the public `node.firstDependent` sees only the `readonly` `Edge`.
 - A block comment at the top of `nodes.ts` describes the edge lists. A comment in the source that states a caller's obligation starts with `Contract:`, and one that states what the engine ensures starts with `Guarantee:` or `Internal invariant:`. The `DerivedNode` doc comment lists the internal invariants, which the README does not list.
 
 ### Checks for a future debug build
@@ -2095,7 +2119,7 @@ A `__DEV__` build can restore these checks. Each throws `new Error(message)`.
 - `writeSource`, `startBatch`, `endBatch`, `retainDerivedNode`, `releaseRetain`, `readUnretained`, `disposeNext`, `disposeAll`: called while `flushState === FLUSH_RUNNING`; "<name> was called inside an onChange."
 - `startBatch`: when `batchDepth` goes from 0 to 1, `queueMicrotask` a check that `batchDepth === 0` when control returns to the event loop; "A batch was open when control returned to the event loop. startBatch and endBatch must not span an await."
 - `endBatch`: `batchDepth === 0` before the decrement; "endBatch was called without a matching startBatch."
-- `pull`, `recompute`, and `recomputeEager`: a node whose `status !== UNCOMPUTED` holds no computed value, which needs a private `NOT_SET` sentinel in `value` while `Uncomputed`; "A node that is not Uncomputed has no value. This is indicative of a bug in pico-js."
+- `pull`, `recompute`, and `recomputeEager`: a node whose `status !== UNCOMPUTED` has no value, which needs a private `NOT_SET` sentinel in `value` while `Uncomputed`; "A node that is not Uncomputed has no value. This is indicative of a bug in pico-js."
 
 ## Tests
 
@@ -2111,35 +2135,35 @@ test/collector.test.ts  13 tests, the cleanup queue, observers, readUnretained, 
 test/scheduler.test.ts  2 tests, the default scheduler
 ```
 
-`d3a2e03ff` folds the shims into the tests, so every test calls the engine's exported functions and no file under `test/` re-exports or emulates an API. Its files are `test/graph.test.ts` (100 tests), `test/collector.test.ts` (31 tests), `test/scheduler.test.ts` (4 tests), `test/graph.test-d.ts`, and the helper `test/status.ts`, which reads a node's status for assertions because the public `DerivedNode` has no `status` field. The folding follows these rules:
+`225f893e5` folds the shims into the tests, so every test calls the engine's exported functions and no file under `test/` re-exports or emulates an API. Its files are `test/graph.test.ts` (108 tests), `test/collector.test.ts` (31 tests), `test/scheduler.test.ts` (4 tests), `test/graph.test-d.ts`, and the helper `test/status.ts`, which reads a node's status for assertions because the public `DerivedNode` has no `status` field. The folding follows these rules:
 
 - `graph.test.ts` and `retain.test.ts` merge into `test/graph.test.ts`. A test that both files hold in two versions is kept once, in the version that calls the engine API. The `describe` blocks keep the names of `retain.test.ts` (ba3daedf7's), and the roots-era blocks `roots and the collector` and `setDerivedNodeEvaluation with the evaluation the node has` move into `test/collector.test.ts` or are removed, by the rules below.
 - `graph.test-d.ts` and `retain.test-d.ts` merge into `test/graph.test-d.ts`, which checks the value types of the constructors and reads, that `createDerivedNode`'s second parameter accepts `LAZY` and `EAGER` and rejects `LAZY_OBSERVED`, and that a caller cannot write a field of a source, a derived node, or a retain.
 - The shim's `startBatch(body)` becomes `startBatch()`, the body's statements, and `endBatch()`. `mutators.writeSource` becomes `writeSource`. `createEagerDerivedNode(c)` becomes `createDerivedNode(c, EAGER)`. `x.onChange = cb` and the shim's `setOnChange` become a `retainDerivedNode(x, cb)` that the test keeps and releases. `releaseDerivedNode(node)` becomes `releaseRetain(retain)` on the retain the test kept. `readRetained(retain)` becomes `readDerivedNode(retain.node)`.
-- The shim's `collect(budget)` becomes a test-local helper in `collector.test.ts` that calls `disposeNext` up to `budget` times. A test that read `collectorContents()` asserts instead what the queue does: the statuses after `disposeNext` and `disposeAll`, and `disposeNext`'s return value.
-- A file sets `scheduler.schedule` in `beforeEach`: `disposeAll` in the tests ported from `retain.test.ts`, so they keep ba3daedf7's immediate cleanup, and a function that records its calls in the collector and scheduler tests. `afterEach` calls `disposeAll`, so no queued node reaches the next test. vitest gives each file its own module instance.
+- The shim's `collect(budget)` becomes a test-local helper in `collector.test.ts` that calls `disposeNext` up to `budget` times. A test that read `collectorContents()` asserts instead what the cleanup queue does: the statuses after `disposeNext` and `disposeAll`, and `disposeNext`'s return value.
+- A file sets `scheduler.schedule` in `beforeEach`: `disposeAll` in the tests ported from `retain.test.ts`, so they keep ba3daedf7's immediate cleanup, and a function that records its calls in the collector and scheduler tests. `afterEach` calls `disposeAll`, so no node on the cleanup queue reaches the next test. vitest gives each file its own module instance.
 - Tests of `setDerivedNodeEvaluation`, of untracked reads, of nested `startBatch(body)` semantics, and of an `onChange` on a lazy node without a retain are removed with the API they test. The prototype's `// Removed under this variant:` comments are removed too (AGENTS.md: no comment that describes what was not done).
-- A test of a node that refreshes in the flush creates it `EAGER` and retains it, or retains a `LAZY` node with an `onChange`.
+- A test of a node that behaves eagerly creates the node `EAGER` and retains it, or retains a `LAZY` node with an `onChange`.
 - `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endBatch` leaves a later `startBatch`, `writeSource`, `endBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same; after a throwing flush, `scheduler.schedule` is called at the end of the next outermost operation.
 - The `README example` test runs the README's example and asserts the values and run counts its comments state.
 
-Reads outside computations go through a test-local `read(node)`, which retains the node on its first call and never releases it, so a test that does not test lifetime keeps every node it reads.
+Top-level reads go through a test-local `read(node)`. `read(node)` retains the node on its first call for that node and never releases the retain, so a test that does not test lifetime never has a node disposed.
 
 ### Random differential test
 
 `test-random/random-retain.ts` is renamed `test-random/random.ts`, and its import of `../test/api-retain` becomes the engine's own exports. `pnpm test:random` reads the seed count from `PICO_JS_RANDOM_SEEDS` (default 2,000) and the first seed from `PICO_JS_RANDOM_BASE_SEED` (default 1).
 
-A case is a graph and a list of operations, generated from the seed by mulberry32. The graph has 2 to 5 sources with values 0 to 3 and 3 to 14 derived nodes, 30% of them created `EAGER`. Each derived node reads a selector, then one of three branches of up to three reads that the selector's value picks, so its reads change from run to run. A derived node reads only sources and derived nodes of a lower index, so the graph is acyclic. A node returns the sum of its reads modulo 2, 3, or 1000, as a number, as an object it reuses from `previous` when the number is unchanged, or as a fresh object, so that cutoff applies to the first two and never to the third. An operation is a write, a retain with or without an `onChange`, a release of an outstanding retain, a read of a retained node, a `readUnretained` of any node, a collect step (`disposeAll`), or a batch of these. An `onChange` reads up to two retained nodes. After the operations, the case releases every outstanding retain and calls `disposeAll`.
+A case is a graph and a list of operations, generated from the seed by mulberry32. The graph has 2 to 5 sources with values 0 to 3 and 3 to 14 derived nodes, 30% of them created `EAGER`. Each derived node reads a selector, then one of three branches of up to three tracked reads that the selector's value picks, so the tracked reads of a node change from run to run. A derived node reads only sources and derived nodes of a smaller index, so the graph is acyclic. A node returns the sum of the values that its tracked reads return, modulo 2, 3, or 1000, as a number, as an object it reuses from `previous` when the number is unchanged, or as a fresh object, so that cutoff applies to the first two and never to the third. An operation is a write, a retain with or without an `onChange`, a release of an outstanding retain, a top-level read of a retained node, a `readUnretained` of any node, a collect step (`disposeAll`), or a batch of these. An `onChange` calls `readDerivedNode` on up to two retained nodes. After the operations, the case releases every outstanding retain and calls `disposeAll`.
 
 Deltas from `f0b001a9d`'s generator: no evaluation-change operation, no untracked read inside a computation, and the evaluation is drawn once per node at creation.
 
-Each case runs under two scheduler settings, `sync` (`scheduler.schedule = disposeAll`) and `deferred` (a scheduler that does nothing, so only collect steps and a write's marked disposal dispose), and in three batching modes:
+Each case runs under two scheduler settings, `sync` (`scheduler.schedule = disposeAll`) and `deferred` (a scheduler that does nothing, so only `disposeAll` steps and the disposal of marked-unneeded nodes dispose), and in three batching modes:
 
 - `single`: every write is a top-level `writeSource`.
 - `one-op-batch`: every write is a `startBatch`, one `writeSource`, and an `endBatch`.
 - `grouped`: each batch is one `startBatch` and `endBatch`, and its nested batches join it.
 
-The `single` and `one-op-batch` runs log every computation run, `onChange` call, read value, and, after each operation, every node's status and value. The two logs must be equal entry for entry, which compares the outside-a-batch path of `writeSource` with the inside-a-batch path. Each run also checks itself against `Model`, which keeps statuses, values, retain lists, and derived dependency lists in arrays and follows the Model section and Guarantees step by step, including the cleanup queue, its re-check on disposal, and marked disposal at the end of the outermost write or batch.
+The `single` and `one-op-batch` runs log every recompute, `onChange` call, top-level read value, and, after each operation, every node's status and value. The two logs must be equal entry for entry, which compares the outside-a-batch path of `writeSource` with the inside-a-batch path. Each run also checks itself against `Model`, which keeps statuses, values, retain lists, and derived dependency lists in arrays and follows the Model section and Guarantees step by step, including the cleanup queue, the check of each entry on disposal, and the disposal of marked-unneeded nodes at the end of the outermost operation.
 
 The prototype cleared module state between cases with `resetForTests`. The random test instead calls `vi.resetModules()` and imports `../src/index` again for each case and each shrink attempt, so a case that failed inside a computation or an `onChange` leaves no state for the next one.
 
@@ -2168,31 +2192,31 @@ f0b001a9d   c0fda7a73 with readUnretained (link and queue) and marked disposal (
 
 ### Decisions
 
-- Explicit calling node over a module-level current node (be9840e60, 7fee0aff6). A write followed by a top-level read of a retained three-level chain took 53 to 54 ns on e5e462613 against 62 to 64 ns ambient (+15% to +17%), from a load and a check on every read and a save and restore on every recompute. Ambient was +4% to +5% on deep-first-pull at depth 50, and its app engine's computation closure cost about 97 bytes per pulled node. Ambient was faster on the upstream propagation tests (-11% to -24%), part of which is the upstream adapter's own tracking wrapper.
+- Explicit calling node over a module-level current node (be9840e60, 7fee0aff6). A write followed by a top-level read of a retained chain of three nodes took 53 to 54 ns on e5e462613 against 62 to 64 ns ambient (+15% to +17%), from a load and a check on every read and a save and restore on every recompute. Ambient was +4% to +5% on deep-first-pull at depth 50, and its app engine's computation closure cost about 97 bytes per recomputed node. Ambient was faster on the upstream propagation tests (-11% to -24%), part of which is the upstream adapter's own tracking wrapper.
 - Module-level state (one batch, one cleanup queue) over per-node or per-batch objects. On e5e462613, 1cf22dd6a, and 58f634f2a: missing-data-arrives -12.8% to -13.2%; route-switch-shared -20% to -30%; a derived node 124.4 to 132.5 bytes against 139.7 for ba3daedf7. Costs outside noise in that run: cutoff-write +3.0% (e5e462613) and +4.2% (58f634f2a), which the later 1cf22dd6a run put within noise (+1.2% [-2.2, +5.2]).
-- Retain list with no count (1cf22dd6a) over a count with an observer list (e5e462613) or observer objects (58f634f2a). A derived node is 124.4 bytes against 132.5 and 132.2. A retain object is 56.6 bytes; an app subscription is 306 bytes against 306 and 356 (755 for ba3daedf7). edit-row was +13.1% [+6.5, +51.3] in session 2; the later run with the same build put it at +3.5% [-3.0, +12.9].
+- Retain list with no count (1cf22dd6a) over a count with a list of retains with an `onChange` (e5e462613) or objects for retains with an `onChange` (58f634f2a). A derived node is 124.4 bytes against 132.5 and 132.2. A retain object is 56.6 bytes; an app's retain with its `onChange` callback and node is 306 bytes against 306 and 356 (755 for ba3daedf7). edit-row was +13.1% [+6.5, +51.3] in session 2; the later run with the same build put it at +3.5% [-3.0, +12.9].
 - Rejected: roots as derived nodes (1156aa177 … 5d2439a18, c1e497e0e). The upstream suite total was +8.3% to +12.6%; createComputations +215% to +257% (+100% for V5, which dropped the root closure); fanOutRepeat +51% to +144%, dynamicSwitch +47% to +56%, writeThenDispose +55% to +81%; optimistic-rollback +30.3% [+10.5, +44.6] (FN). A root is 192 to 305 bytes against a 56.6-byte retain, and the heap after gc-sweep was 231.5 to 234.5 MB against 213.1 MB.
 - `startBatch()` and `endBatch()` over `batch(fn)`. With 64 call sites of 1 to 3 writes each, a batch took 35.4 ns against 44.9 ns (paired median +22%, range +15.7% to +39.7%). The global batch alone on ba3daedf7 (isobatch) was within noise on edit-row, cutoff-write, and deep-first-pull.
 - Rejected: marking at the outermost `endBatch` (e1, 6263c959f; e1s, 0b02da84a). In the interim suite, noObservers +139%, fanOutRepeat +17% to +50%, coalescedWrites +21% and +25%, sameRecordWrites +29%, isograph read10% +11% to +35%; it won revertInBatch (-44%, -99%) and writeThenDispose (-22%). The per-batch bookkeeping of the written sources costs more than the immediate mark that it defers. Its app runs are among the paused experiments.
 - Evaluation encoded in the `evaluation` field, over a separate chosen-evaluation field (370894bbd). On the full variant, the separate field changed nothing outside noise: edit-row +4.3% [-2.8, +17.9] against +3.5% for 1cf22dd6a, cutoff-write -0.1% against +1.2%, deep-first-pull at depth 50 +6.7% against +6.9%. The encoding alone on ba3daedf7 (isoenc) measured edit-row +7.6% [+1.1, +17.3], which the full variant does not reproduce.
 - No per-computation counter (c0fda7a73). A top-level read never runs inside a computation (contract), so `batchDepth` and the flush state decide the outermost operation. Against 1cf22dd6a in one run: edit-row +3.1% against +3.5% and cutoff-write -0.2% against +1.2%, both within noise; deep-first-pull at depth 50 +9.4% [+3.8, +13.4] against +6.9% [+5.3, +9.9], with overlapping intervals.
 - End-of-operation scheduling, which lets a synchronous scheduler reproduce immediate cleanup. With `schedule = disposeAll`, route-switch-shared computed 2,243 per event, as ba3daedf7 does, and the trace replays computed 392 / 285 / 669 / 116, as ba3daedf7 does.
-- Deferred cleanup through the queue and the idle scheduler. route-switch-shared computes 786 per event against 2,243, and runs -21.8% [-24.2, -14.9] on f0b001a9d; route-switch-shared-no-cleanup -86% to -88%. The trace replays compute 104 / 120 / 534 / 55, which matches Preact (104 / 120 / 534 / 55), against 392 / 285 / 669 / 116 for ba3daedf7 (alien: 392 / 287 / 669 / 116). Issue cases, f0b001a9d idle against ba3daedf7 held: hideAndShow 1.34 against 1.89; replaceEffect dispose first 0.82 against 1.45; moveBetweenEffects 1.05 against 1.17; unobservedComputed 100 0.54 against 1.49, and 10000 0.01 against 1.59.
-- Rejected: disposal at the last release (8b9a2537b). With render holds and the idle scheduler, the trace replays compute 334 / 247 / 669 / 106 against 104 / 120 / 534 / 55, because a node released and read again later is recomputed.
+- Deferred cleanup through the cleanup queue and the idle scheduler. route-switch-shared computes 786 per event against 2,243, and runs -21.8% [-24.2, -14.9] on f0b001a9d; route-switch-shared-no-cleanup -86% to -88%. The trace replays compute 104 / 120 / 534 / 55, which matches Preact (104 / 120 / 534 / 55), against 392 / 285 / 669 / 116 for ba3daedf7 (alien: 392 / 287 / 669 / 116). Issue cases, f0b001a9d idle against ba3daedf7 with render retains: hideAndShow 1.34 against 1.89; replaceEffect dispose first 0.82 against 1.45; moveBetweenEffects 1.05 against 1.17; unobservedComputed 100 0.54 against 1.49, and 10000 0.01 against 1.59.
+- Rejected: disposal at the last release (8b9a2537b). With render retains and the idle scheduler, the trace replays compute 334 / 247 / 669 / 106 against 104 / 120 / 534 / 55, because a node released and read again later is recomputed.
 - Marked disposal (f0b001a9d over d56dc5ede). effectChurn 100 with the idle scheduler is 1.19 [1.1, 1.3] against 22.89 [22.8, 24.0] without it and 1.16 for ba3daedf7. Without marked disposal, a node that the case leaves unneeded stays linked until the idle scheduler runs, and every write in the timed loop marks it again. With `disposeAll` before the loop: 1.83 against 32.58. effectChurn 10000 is 1.65 against 1.61. In the app, navigate (-1.0%), gc-sweep (-2.2%), and the trace replay counts are unchanged, and route-switch-shared is -21.8%.
-- `readUnretained` links and queues (d56dc5ede) over read-and-dispose (6c963e2ae). repeatedUnretainedReads diamond R10 is 3.26 against 23.30 (explicit) and 25.10 (idle); flat R10 1.48 against 5.00. The trace replays with the idle scheduler compute 104 / 120 / 534 / 55 against 334 / 258 / 954 / 148.
-- Render reads retain until commit, and `readUnretained` is not for them. Without render holds, the synchronous scheduler gives 574 / 372 / 1085 / 235 against 392 / 285 / 669 / 116 with them, because each render read is disposed before the subscription retains the node. With the idle scheduler both give 104 / 120 / 534 / 55, which depends on the scheduler not running before commit.
+- `readUnretained` links edges and puts the node on the cleanup queue (d56dc5ede) over read-and-dispose (6c963e2ae). repeatedUnretainedReads diamond R10 is 3.26 against 23.30 (explicit) and 25.10 (idle); flat R10 1.48 against 5.00. The trace replays with the idle scheduler compute 104 / 120 / 534 / 55 against 334 / 258 / 954 / 148.
+- A render retains its nodes until commit, and `readUnretained` is not for a render. Without render retains, the synchronous scheduler gives 574 / 372 / 1085 / 235 against 392 / 285 / 669 / 116 with them, because each node that a render reads is disposed before the app retains the node. With the idle scheduler both give 104 / 120 / 534 / 55, which depends on the scheduler not running before commit.
 
 ### Remaining known costs
 
-- repeatedUnretainedReads R1 (one read per unretained node) is about +25%: flat 5.25 against 4.23 (d56dc5ede) and 4.14 (ba3daedf7); diamond 27.81 against 22.34 and 22.77. The marked-list pushes and the disposal at the end of each write cost this. At R10 and R100 f0b001a9d is 1.59 and 1.11 (flat), against 1.01 and 0.63 for ba3daedf7 held.
+- repeatedUnretainedReads R1 (one `readUnretained` per node) is about +25%: flat 5.25 against 4.23 (d56dc5ede) and 4.14 (ba3daedf7); diamond 27.81 against 22.34 and 22.77. The pushes onto `markedUnneeded` and the disposal at the end of each write cost this. At R10 and R100 f0b001a9d is 1.59 and 1.11 (flat), against 1.01 and 0.63 for ba3daedf7 with render retains.
 - deep-first-pull at depth 50 is +4.7% [+0.5, +7.1] on f0b001a9d. With a warm-up pass it is within noise (+3.9% [-3.4, +5.8]; 1cf22dd6a +0.6%), and without one +6.7%, so the cost is a one-time compile of the first-retain path.
 - The heap after the gc-sweep sweep is 226.3 to 226.7 MB against 213.1 MB for ba3daedf7, because unneeded nodes stay computed until the scheduler disposes them.
 - `retainDerivedNode` allocates a 56.6-byte `Retain`, where ba3daedf7's retain allocated nothing.
 
 ### Open items
 
-- The paused experiments (`../i2-worktrees/pico-js-experiments`): the app benchmark, `bench/single`, and the fanout microbenchmark for e1 to e7 have not run, and `resume.sh` resumes them. e2 (read deduplication by run id), e4 (inline first edge), and e5 (dependents as arrays) won targeted suite shapes and are undecided.
+- The paused experiments (`../i2-worktrees/pico-js-experiments`): the app benchmark, `bench/single`, and the fanout microbenchmark for e1 to e7 have not run, and `resume.sh` resumes them. e2 (deduplication of tracked reads by run id), e4 (inline first edge), and e5 (dependents as arrays) won targeted suite shapes and are undecided.
 - The ambient variants and the reference builds (aa780509b, 703fb1f14, the `batch(fn)` and synchronous-scheduler builds) did not complete two blocks of app scenarios.
 - The single-change isolations on ba3daedf7 (`iso/`) ran only on edit-row, cutoff-write, and deep-first-pull.
 - 8b9a2537b ran only the trace replays, not the app scenarios or the issue cases.
