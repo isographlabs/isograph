@@ -1,6 +1,6 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the nine operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the eight operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
@@ -11,8 +11,7 @@ The suite has no case for the nine operations below, and each of them occurs in 
 | 5 | Many writes with no effect, then one read | - |
 | 6 | A computed reads the same computeds in a different order | - |
 | 7 | An effect stops reading a computed and later reads it again | - |
-| 8 | A computed returns its previous object, so its readers should not rerun | - |
-| 9 | One batch writes the same input many times | - |
+| 8 | One batch writes the same input many times | - |
 
 Cases 2 and 3 need `effect` to return its disposer.
 
@@ -78,7 +77,7 @@ for (let i = 0; i < count; i++) framework.effect(() => shared.read());
 
 `unobserved` was read once and has no effect. Nobody will read it again, so it should not be recomputed when `input` changes.
 
-Failure mode: an implementation that keeps every computed it has read up to date recomputes `unobserved` on every write. With many such computeds, every write pays for all of them.
+Failure mode: an implementation that keeps `unobserved` linked to `input` walks to it on every write, even though it does not recompute it. With many such computeds, every write pays a walk over all of them.
 
 ```js
 const input = framework.signal(0);
@@ -109,19 +108,19 @@ derived.read();
 
 ### 6. A computed reads the same computeds in a different order
 
-`list` reads two item computeds, and the order is reversed. Neither item's input changed, so neither item should be recomputed.
+`list` reads `count` item computeds in the order stored in `order`, and the order is reversed. No item's input changed, so no item should be recomputed. Only `list` and its effect should run.
 
-Failure mode: an implementation that matches what a computed read last time by position sees both positions change, relinks both items, and may tear them down and recompute them. With `count` items, a reversal pays for all of them.
+Failure mode: an implementation that rechecks each item a computed reads, instead of reusing what it read last time, does `count` checks on every reorder, even though nothing an item reads has changed.
 
 ```js
-const first = framework.computed(() => 1);
-const second = framework.computed(() => 2);
-const order = framework.signal([first, second]);
+const items = [];
+for (let i = 0; i < count; i++) items.push(framework.computed(() => i));
+const order = framework.signal(items);
 const list = framework.computed(() => order.read().map((item) => item.read()));
 framework.effect(() => list.read());
 
-framework.withBatch(() => order.write([second, first]));
-// first and second should not rerun.
+framework.withBatch(() => order.write([...items].reverse()));
+// items should not rerun.
 ```
 
 ### 7. An effect stops reading a computed and later reads it again
@@ -143,29 +142,7 @@ framework.withBatch(() => visible.write(true));
 // derived should not rerun.
 ```
 
-### 8. A computed returns its previous object
-
-`view` reruns after the write but returns the same object, because the field it keeps did not change. `reader` and its effect should not rerun.
-
-Failure mode: an implementation that reruns everything below a node that reran, without checking whether its value changed, reruns `reader` and the effect.
-
-```js
-const input = framework.signal(0);
-let previous;
-const view = framework.computed(() => {
-  const even = input.read() % 2 === 0;
-  if (previous !== undefined && previous.even === even) return previous;
-  previous = { even };
-  return previous;
-});
-const reader = framework.computed(() => view.read().even);
-framework.effect(() => reader.read());
-
-framework.withBatch(() => input.write(2));
-// view should rerun; reader and the effect should not.
-```
-
-### 9. One batch writes the same input many times
+### 8. One batch writes the same input many times
 
 One batch writes `input` `count` times. Only the last value can be seen, so `derived` and its effect should run once.
 
