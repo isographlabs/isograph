@@ -25,6 +25,8 @@ Each case is written against the suite's `ReactiveFramework` (`signal`, `compute
 
 ### 1. Two effects swap which of two computeds they read
 
+When `x` flips, each effect stops reading one computed and starts reading the other. Nothing `a` or `b` reads has changed, so neither should be recomputed.
+
 ```js
 function readerSwap(fw) {
   const s = fw.signal(1);
@@ -40,6 +42,8 @@ function readerSwap(fw) {
 ```
 
 ### 2. Dispose the effects that read a computed, then create new ones that read it
+
+The old effects go away and new ones read the same computeds, with no write in between. Nothing the computeds read has changed, so they should not be recomputed, even in the order where they briefly have no reader.
 
 ```js
 function replaceReaders(fw, order /* 'disposeFirst' | 'createFirst' */) {
@@ -63,6 +67,8 @@ function replaceReaders(fw, order /* 'disposeFirst' | 'createFirst' */) {
 
 ### 3. Create and dispose readers of a shared computed while writes happen
 
+Readers of `shared` come and go while `s` keeps changing. `shared` should be recomputed once per write and never because a reader was added or removed, and disposed readers should not leave memory behind.
+
 ```js
 function churn(fw) {
   const s = fw.signal(0);
@@ -81,6 +87,8 @@ function churn(fw) {
 
 ### 4. One batch writes many signals
 
+One batch writes many signals at once. Each computed and effect that depends on them should run at most once per batch, no matter how many of its signals were written, and the cost should grow with the number of writes and effects in a measurable way.
+
 ```js
 function wideBatch(fw) {
   const signals = Array.from({ length: S }, (_, i) => fw.signal(i));
@@ -97,6 +105,8 @@ function wideBatch(fw) {
 
 ### 5. Many computeds over one signal, only some with effects
 
+Only the computeds that have an effect need to be kept up to date. Computeds that nobody reads anymore should not be recomputed on writes, and effects should only rerun for computeds whose value changed.
+
 ```js
 function partialObservation(fw) {
   const s = fw.signal(0);
@@ -112,6 +122,8 @@ function partialObservation(fw) {
 ```
 
 ### 6. Many writes with no effect, then one read
+
+Nobody is watching while the writes happen, so nothing should be recomputed until the read. The read should then recompute each out-of-date computed at most once, however many writes came before it.
 
 ```js
 function manyWritesThenRead(fw) {
@@ -133,6 +145,8 @@ function manyWritesThenRead(fw) {
 
 ### 7a. A computed reads the same computeds in a different order
 
+The list reads the same items in a new order. The items themselves have not changed, so they should not be recomputed. Only `list` and its effect should run.
+
 ```js
 function reorder(fw) {
   const items = Array.from({ length: N }, (_, i) => { const s = fw.signal(i); return fw.computed(() => work(s.read())); });
@@ -145,6 +159,8 @@ function reorder(fw) {
 ```
 
 ### 7b. One computed moves from one reading computed to another
+
+An item moves from one group to another. The item itself has not changed, so it should not be recomputed. Only the two groups and their effects should run.
 
 ```js
 function move(fw, order /* 'sourceFirst' | 'targetFirst' */) {
@@ -169,6 +185,8 @@ function move(fw, order /* 'sourceFirst' | 'targetFirst' */) {
 
 ### 8. One effect switches among chains whose inputs never change
 
+The effect switches to a chain it showed before. Nothing that chain reads has changed since then, so the chain should not be recomputed.
+
 ```js
 function tabSwitch(fw) {
   const chains = Array.from({ length: T }, (_, t) => {
@@ -185,6 +203,8 @@ function tabSwitch(fw) {
 ```
 
 ### 9. A computed returns its previous object so its readers skip rerunning
+
+`view` recomputes but returns the same object as before. Its readers see no change, so they and their effects should not be recomputed.
 
 ```js
 function previousObjectCutoff(fw) {
@@ -208,6 +228,8 @@ function previousObjectCutoff(fw) {
 ```
 
 ### 10. One batch writes the same signal many times
+
+Only the last value written in the batch can be seen. `c` and the effect should run once per batch, and the cost should grow with the number of writes only through the writes themselves.
 
 ```js
 function repeatedWrites(fw) {
