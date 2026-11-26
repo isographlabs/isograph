@@ -1,19 +1,18 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the ten operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the nine operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
 | 1 | A computed moves from one effect to another in one batch | - |
 | 2 | The effect reading a computed is disposed and a new one created, with no write in between | effect returns a disposer |
 | 3 | Effects reading a shared computed are created and disposed while the input keeps changing | effect returns a disposer |
-| 4 | One batch writes many inputs | - |
-| 5 | A computed that was read once and has no effect, while its input changes | - |
-| 6 | Many writes with no effect, then one read | - |
-| 7 | A computed reads the same computeds in a different order | - |
-| 8 | An effect stops reading a computed and later reads it again | - |
-| 9 | A computed returns its previous object, so its readers should not rerun | - |
-| 10 | One batch writes the same input many times | - |
+| 4 | A computed that was read once and has no effect, while its input changes | - |
+| 5 | Many writes with no effect, then one read | - |
+| 6 | A computed reads the same computeds in a different order | - |
+| 7 | An effect stops reading a computed and later reads it again | - |
+| 8 | A computed returns its previous object, so its readers should not rerun | - |
+| 9 | One batch writes the same input many times | - |
 
 Cases 2 and 3 need `effect` to return its disposer.
 
@@ -75,29 +74,7 @@ for (let i = 0; i < count; i++) framework.effect(() => shared.read());
 // shared should not rerun when the new effects read it.
 ```
 
-### 4. One batch writes many inputs
-
-`sum` reads `count` inputs, and one batch writes all of them. `sum` and its effect should run once.
-
-Failure mode: an implementation that propagates each write separately walks from every written input to `sum`, `count` times instead of once.
-
-```js
-const inputs = [];
-for (let i = 0; i < count; i++) inputs.push(framework.signal(0));
-const sum = framework.computed(() => {
-  let total = 0;
-  for (const input of inputs) total += input.read();
-  return total;
-});
-framework.effect(() => sum.read());
-
-framework.withBatch(() => {
-  for (const input of inputs) input.write(1);
-});
-// sum and the effect should run once.
-```
-
-### 5. Only some computeds have an effect
+### 4. Only some computeds have an effect
 
 `unobserved` was read once and has no effect. Nobody will read it again, so it should not be recomputed when `input` changes.
 
@@ -114,7 +91,7 @@ framework.withBatch(() => input.write(1));
 // observed should rerun; unobserved should not.
 ```
 
-### 6. Many writes with no effect, then one read
+### 5. Many writes with no effect, then one read
 
 `derived` has no effect. `input` is written `count` times, then `derived` is read once. `derived` should run once.
 
@@ -130,7 +107,7 @@ derived.read();
 // derived should run once.
 ```
 
-### 7. A computed reads the same computeds in a different order
+### 6. A computed reads the same computeds in a different order
 
 `list` reads two item computeds, and the order is reversed. Neither item's input changed, so neither item should be recomputed.
 
@@ -147,7 +124,7 @@ framework.withBatch(() => order.write([second, first]));
 // first and second should not rerun.
 ```
 
-### 8. An effect stops reading a computed and later reads it again
+### 7. An effect stops reading a computed and later reads it again
 
 `derived` is hidden in one batch and shown again in a later one. `input` did not change, so `derived` should not be recomputed when it is shown.
 
@@ -166,7 +143,7 @@ framework.withBatch(() => visible.write(true));
 // derived should not rerun.
 ```
 
-### 9. A computed returns its previous object
+### 8. A computed returns its previous object
 
 `view` reruns after the write but returns the same object, because the field it keeps did not change. `reader` and its effect should not rerun.
 
@@ -188,7 +165,7 @@ framework.withBatch(() => input.write(2));
 // view should rerun; reader and the effect should not.
 ```
 
-### 10. One batch writes the same input many times
+### 9. One batch writes the same input many times
 
 One batch writes `input` `count` times. Only the last value can be seen, so `derived` and its effect should run once.
 
