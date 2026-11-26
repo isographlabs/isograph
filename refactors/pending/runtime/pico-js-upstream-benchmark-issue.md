@@ -44,7 +44,7 @@ framework.withBatch(() => inFirst.write(false));
 
 The old effect is disposed, then a new one reads `derived`, with no write in between. `input` did not change, so `derived` should not be recomputed. The same holds if the new effect is created first.
 
-Failure mode: once the old effect is disposed, `derived` has no reader. An implementation that tears it down at that point recomputes it when the new effect reads it.
+Failure mode: once the old effect is disposed, `derived` has no reader. Tearing a computed down as soon as it has no reader is a reasonable strategy, since it frees memory right away, but here it costs a recomputation when the new effect reads `derived`. No existing case measures that cost.
 
 ```js
 const input = framework.signal(1);
