@@ -1,6 +1,6 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the eight operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the seven operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
@@ -8,10 +8,9 @@ The suite has no case for the eight operations below, and each of them occurs in
 | 2 | The effect reading a computed is disposed and a new one created, with no write in between | effect returns a disposer |
 | 3 | Effects reading a shared computed are created and disposed while the input keeps changing | effect returns a disposer |
 | 4 | A computed that was read once and has no effect, while its input changes | - |
-| 5 | Many writes with no effect, then one read | - |
-| 6 | A computed reads the same computeds in a different order | - |
-| 7 | An effect stops reading a computed and later reads it again | - |
-| 8 | One batch writes the same input many times | - |
+| 5 | A computed reads the same computeds in a different order | - |
+| 6 | An effect stops reading a computed and later reads it again | - |
+| 7 | One batch writes the same input many times | - |
 
 Cases 2 and 3 need `effect` to return its disposer.
 
@@ -56,7 +55,7 @@ framework.effect(() => derived.read());
 
 ### 3. Effects come and go while the input keeps changing
 
-Effects reading `shared` are created, `input` is written, and the effects are disposed, over and over. `shared` should run once per write, never because effects were added or removed, and disposed effects should not keep memory alive.
+Effects reading `shared` are created, `input` is written, and the effects are disposed, over and over. `shared` should run once when first read and once per write, never because effects were added or removed, and disposed effects should not keep memory alive.
 
 Failure mode: an implementation that tears `shared` down when its last effect is disposed recomputes it when the next effects read it. An implementation that never tears anything down keeps every disposed effect alive, and memory grows.
 
@@ -90,23 +89,7 @@ framework.withBatch(() => input.write(1));
 // observed should rerun; unobserved should not.
 ```
 
-### 5. Many writes with no effect, then one read
-
-`derived` has no effect. `input` is written `count` times, then `derived` is read once. `derived` should run once.
-
-Failure mode: an implementation that recomputes on each write does `count` rounds of work for one read. One that walks the graph on every write pays that walk `count` times.
-
-```js
-const input = framework.signal(0);
-const derived = framework.computed(() => input.read() * 2);
-derived.read();
-
-for (let i = 1; i <= count; i++) framework.withBatch(() => input.write(i));
-derived.read();
-// derived should run once.
-```
-
-### 6. A computed reads the same computeds in a different order
+### 5. A computed reads the same computeds in a different order
 
 `list` reads `count` item computeds in the order stored in `order`, and the order is reversed. No item's input changed, so no item should be recomputed. Only `list` and its effect should run.
 
@@ -123,7 +106,7 @@ framework.withBatch(() => order.write([...items].reverse()));
 // items should not rerun.
 ```
 
-### 7. An effect stops reading a computed and later reads it again
+### 6. An effect stops reading a computed and later reads it again
 
 `derived` is hidden in one batch and shown again in a later one. `input` did not change, so `derived` should not be recomputed when it is shown.
 
@@ -142,7 +125,7 @@ framework.withBatch(() => visible.write(true));
 // derived should not rerun.
 ```
 
-### 8. One batch writes the same input many times
+### 7. One batch writes the same input many times
 
 One batch writes `input` `count` times. Only the last value can be seen, so `derived` and its effect should run once.
 
