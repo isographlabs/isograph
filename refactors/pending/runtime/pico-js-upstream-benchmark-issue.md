@@ -40,7 +40,10 @@ function moveBetweenEffects(framework) {
   framework.effect(() => {
     if (!inFirst.read()) derived.read();
   });
-  return () => framework.withBatch(() => inFirst.write(!inFirst.read()));
+  return () => {
+    framework.withBatch(() => inFirst.write(false));
+    framework.withBatch(() => inFirst.write(true));
+  };
   // derived should run 0 times per iteration.
 }
 ```
