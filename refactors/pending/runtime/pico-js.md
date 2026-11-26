@@ -568,24 +568,26 @@ markedUnneeded         marking.ts     markDirty, markCheck, their queue copies  
 ```ts
 // from libs/pico-js/src/nodes.ts
 /*
- * Each edge is one object in two lists: the reader's dependency list, which is
- * singly linked and in read order, and the dependency's dependents list, which
- * is doubly linked. A derived node keeps one dependency list of source edges
- * and one of derived edges.
+ * An edge connects a reader to one node it read. Each edge is in two lists:
+ * the reader's list of what it read, in read order (a derived node keeps one
+ * list for sources and one for derived nodes), and the read node's list of
+ * the edges that point at it, its dependents.
  *
- * A recompute walks the dependency list with a cursor, so each edge is reused
- * by its position. An edge whose position now reads a different node is moved
- * to that node's dependents list instead of being freed, and the edges past the
- * cursor at the end of the run are trimmed. The dependents list is doubly
- * linked so that unlinking an edge is O(1) without a search, and marking walks
- * it.
+ * When a reader recomputes, its n-th read reuses its n-th edge. For example,
+ * C reads a then b, so C's list is [edge to a, edge to b]. If C recomputes and
+ * reads:
+ * - a then b: both edges are kept, and nothing is allocated.
+ * - a then c: the second edge is taken off b's dependents and put on c's.
+ * - only a: the second edge is removed from C's list and from b's dependents.
  *
- * The links live in the edge instead of in a Set or an array, so a dependency
- * allocates nothing beyond its edge, and inserting or removing an edge is O(1).
- * A node's retain list has the same doubly linked structure, through the
+ * A write to b walks b's dependents to mark its readers. The dependents list
+ * is doubly linked through the edges, so removing C's edge from it takes two
+ * pointer updates and no search through b's other readers. The links live in
+ * the edges rather than in a Set or an array, so a read allocates nothing
+ * beyond its edge. A node's retain list is linked the same way, through the
  * `Retain` objects.
  *
- * Internal invariant: an edge is in exactly one dependency list and one
+ * Internal invariant: an edge is in exactly one reader's list and one
  * dependents list. A node's dependency lists stay linked while it is `Dirty`. A
  * disposed node has no edges.
  */
