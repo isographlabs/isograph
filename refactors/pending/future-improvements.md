@@ -45,3 +45,7 @@ pico-runtime.md's `deleteRecord` removes a deleted record's source nodes from th
 ## Independently toggled pico-js features
 
 runtime/pico-js-feature-flags.md. A Rust generator emits the pico-js engine once per configuration, so each contract check, such as a double release or a read of an unretained node, turns on or off by itself and costs nothing when off.
+
+## Redo the pico-js library swaps on the final API
+
+Once the pico-js API settles (global current node, retain objects with `onChange`, `startBatch`/`endBatch`, scheduled disposal), redo each swap of pico-js into another library's core and rerun that library's own tests and benchmarks: TanStack Store, the TC39 signal polyfill, Jotai, and Preact signals, plus nanostores, which was surveyed but not tried. The earlier swaps used `onDirty`, `pull`, `disposeDerivedNode`, and a per-computed tracking wrapper, which the new API removes. For Preact, measure whether its `Signal` and `Computed` classes can extend pico-js node classes so a Preact signal is the pico-js node.
