@@ -27,6 +27,8 @@ Each case is written against the suite's `ReactiveFramework` (`signal`, `compute
 
 When `x` flips, each effect stops reading one computed and starts reading the other. Nothing `a` or `b` reads has changed, so neither should be recomputed.
 
+Failure mode: the first effect reruns and stops reading `a`, so for a moment `a` has no reader. An implementation that tears down a computed as soon as it loses its last reader throws away `a`'s value and its dependencies. When the second effect then reads `a`, it has to recompute `a` from scratch, and the same happens to `b`, on every flip.
+
 ```js
 function readerSwap(fw) {
   const s = fw.signal(1);
@@ -44,6 +46,8 @@ function readerSwap(fw) {
 ### 2. Dispose the effects that read a computed, then create new ones that read it
 
 The old effects go away and new ones read the same computeds, with no write in between. Nothing the computeds read has changed, so they should not be recomputed, even in the order where they briefly have no reader.
+
+Failure mode: in the dispose-first order the shared computeds briefly have no reader. An implementation that tears a computed down when its last reader goes away recomputes every shared computed when the new effects read them, even though nothing changed.
 
 ```js
 function replaceReaders(fw, order /* 'disposeFirst' | 'createFirst' */) {
@@ -69,6 +73,8 @@ function replaceReaders(fw, order /* 'disposeFirst' | 'createFirst' */) {
 
 Readers of `shared` come and go while `s` keeps changing. `shared` should be recomputed once per write and never because a reader was added or removed, and disposed readers should not leave memory behind.
 
+Failure mode: an implementation that tears `shared` down each time its last reader is disposed recomputes it every cycle when the new readers arrive, on top of the `W` writes. An implementation that never tears anything down keeps every disposed row alive, and memory grows with the number of cycles.
+
 ```js
 function churn(fw) {
   const s = fw.signal(0);
@@ -89,6 +95,8 @@ function churn(fw) {
 
 One batch writes many signals at once. Each computed and effect that depends on them should run at most once per batch, no matter how many of its signals were written, and the cost should grow with the number of writes and effects in a measurable way.
 
+Failure mode: an implementation that propagates each write separately visits the same computeds and effects once per written signal, so a batch of `W` writes costs `W` times the propagation, and effects may run more than once.
+
 ```js
 function wideBatch(fw) {
   const signals = Array.from({ length: S }, (_, i) => fw.signal(i));
@@ -107,6 +115,8 @@ function wideBatch(fw) {
 
 Only the computeds that have an effect need to be kept up to date. Computeds that nobody reads anymore should not be recomputed on writes, and effects should only rerun for computeds whose value changed.
 
+Failure mode: an implementation that keeps every computed it ever read up to date recomputes all `K` computeds on every write, including the ones nobody will read again. One that cannot tell which values changed reruns every effect.
+
 ```js
 function partialObservation(fw) {
   const s = fw.signal(0);
@@ -124,6 +134,8 @@ function partialObservation(fw) {
 ### 6. Many writes with no effect, then one read
 
 Nobody is watching while the writes happen, so nothing should be recomputed until the read. The read should then recompute each out-of-date computed at most once, however many writes came before it.
+
+Failure mode: an implementation that recomputes eagerly on each write does `W` rounds of work for one read. One that marks the whole graph on every write pays the marking cost `W` times, even though one marking would do.
 
 ```js
 function manyWritesThenRead(fw) {
@@ -147,6 +159,8 @@ function manyWritesThenRead(fw) {
 
 The list reads the same items in a new order. The items themselves have not changed, so they should not be recomputed. Only `list` and its effect should run.
 
+Failure mode: an implementation that matches dependencies by position sees every position change, so it unlinks and relinks every item, and it may tear an item down and recompute it because for a moment no position still holds it.
+
 ```js
 function reorder(fw) {
   const items = Array.from({ length: N }, (_, i) => { const s = fw.signal(i); return fw.computed(() => work(s.read())); });
@@ -161,6 +175,8 @@ function reorder(fw) {
 ### 7b. One computed moves from one reading computed to another
 
 An item moves from one group to another. The item itself has not changed, so it should not be recomputed. Only the two groups and their effects should run.
+
+Failure mode: in the order where the source group is written first, the moved item briefly has no reader. An implementation that tears it down then recomputes it from scratch when the target group reads it.
 
 ```js
 function move(fw, order /* 'sourceFirst' | 'targetFirst' */) {
@@ -187,6 +203,8 @@ function move(fw, order /* 'sourceFirst' | 'targetFirst' */) {
 
 The effect switches to a chain it showed before. Nothing that chain reads has changed since then, so the chain should not be recomputed.
 
+Failure mode: when the effect switches away from a chain, the chain loses its only reader. An implementation that tears it down at that point recomputes the whole chain, all `d` computeds, every time the effect switches back to it.
+
 ```js
 function tabSwitch(fw) {
   const chains = Array.from({ length: T }, (_, t) => {
@@ -205,6 +223,8 @@ function tabSwitch(fw) {
 ### 9. A computed returns its previous object so its readers skip rerunning
 
 `view` recomputes but returns the same object as before. Its readers see no change, so they and their effects should not be recomputed.
+
+Failure mode: an implementation that compares values only within one node, or that marks readers dirty without checking whether `view` actually changed, reruns all `R` readers and their effects on every write.
 
 ```js
 function previousObjectCutoff(fw) {
@@ -230,6 +250,8 @@ function previousObjectCutoff(fw) {
 ### 10. One batch writes the same signal many times
 
 Only the last value written in the batch can be seen. `c` and the effect should run once per batch, and the cost should grow with the number of writes only through the writes themselves.
+
+Failure mode: an implementation that propagates on every write inside the batch walks the graph `W` times, and one that runs effects per write runs the effect `W` times instead of once.
 
 ```js
 function repeatedWrites(fw) {
