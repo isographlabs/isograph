@@ -574,18 +574,18 @@ markedUnneeded         marking.ts     markDirty, markCheck, their queue copies  
  * the edges that point at it, its dependents.
  *
  * When a reader recomputes, its n-th read reuses its n-th edge. For example,
- * C reads a then b, so C's list is [edge to a, edge to b]. If C recomputes and
- * reads:
- * - a then b: both edges are kept, and nothing is allocated.
- * - a then c: the second edge is taken off b's dependents and put on c's.
- * - only a: the second edge is removed from C's list and from b's dependents.
+ * derived node d1 reads sources s1 then s2, so d1's source list is [e1, e2],
+ * where e1 points at s1 and e2 at s2. If d1 recomputes and reads:
+ * - s1 then s2: e1 and e2 are kept, and nothing is allocated.
+ * - s1 then s3: e2 is taken off s2's dependents and put on s3's.
+ * - only s1: e2 is removed from d1's list and from s2's dependents.
  *
- * A write to b walks b's dependents to mark its readers. The dependents list
- * is doubly linked through the edges, so removing C's edge from it takes two
- * pointer updates and no search through b's other readers. The links live in
- * the edges rather than in a Set or an array, so a read allocates nothing
- * beyond its edge. A node's retain list is linked the same way, through the
- * `Retain` objects.
+ * A write to s2 walks s2's dependents to mark its readers. The dependents list
+ * is doubly linked through the edges, so removing e2 from it takes two pointer
+ * updates and no search through s2's other readers. The links live in the
+ * edges rather than in a Set or an array, so a read allocates nothing beyond
+ * its edge. A node's retain list is linked the same way, through the `Retain`
+ * objects.
  *
  * Internal invariant: an edge is in exactly one reader's list and one
  * dependents list. A node's dependency lists stay linked while it is `Dirty`. A
