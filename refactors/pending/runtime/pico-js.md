@@ -218,6 +218,8 @@ jobs:
         run: pnpm --filter @isograph/pico-js test:random
         env:
           PICO_JS_RANDOM_SEEDS: 2000
+      - name: Exhaustive model check
+        run: pnpm --filter @isograph/pico-js test:exhaustive
 ```
 
 ```yaml
@@ -363,23 +365,10 @@ pico-js frees a node that nothing retains and no other node reads, after a while
 Pass a callback to `retainDerivedNode` to run code when a node's value changes:
 
 ```ts
-retainDerivedNode(sum, () => console.log(readDerivedNode(sum)));
+retainDerivedNode(sum, (value) => console.log(value));
 ```
 
-`onChange` receives no arguments, so read the node inside it. pico-js does not call it when the retain is created. pico-js updates a node with a callback without waiting for a read. After each update that may change its value, pico-js brings it up to date right away, which recomputes it only if something it read changed, and calls the callback if the value changed. The call happens synchronously, before `writeSource` returns, or before the `endWriteBatch` that closes the outermost batch returns. After the last retain with a callback is released, the node recomputes only when it is read. The step at the end of an update that brings such nodes up to date and calls their callbacks is the flush.
-
-### Recomputing early to stop updates
-
-Normally an update marks every node that depends on the changed source, and each of those nodes later checks or recomputes when it is read. A node with a callback recomputes right after the update. If its value is unchanged, pico-js does not mark the nodes that depend on it, so those nodes do not recompute on its account. Other paths from the update can still reach them. To get this without reacting to the change, retain the node with a callback that does nothing:
-
-```ts
-const isEven = createDerivedNode(
-  (callingNode) => readSource(callingNode, a) % 2 === 0,
-);
-retainDerivedNode(isEven, () => {});
-```
-
-This pays off for a node whose value usually stays the same and that many nodes depend on. For other nodes it costs a recompute in each update after which nothing would have read the node.
+`onChange` receives the node's value after the update. pico-js does not call it when the retain is created. pico-js updates a node with a callback without waiting for a read. After each update that may change its value, pico-js brings it up to date right away, which recomputes it only if something it read changed, and calls the callback if the value changed. The call happens synchronously, before `writeSource` returns, or before the `endWriteBatch` that closes the outermost batch returns. After the last retain with a callback is released, the node recomputes only when it is read. The step at the end of an update that brings such nodes up to date and calls their callbacks is the flush.
 
 ## Grouping updates
 
@@ -393,6 +382,8 @@ writeSource(b, 4);
 endWriteBatch(); // no flush: the outer batch is still open
 endWriteBatch(); // flushes both writes
 ```
+
+A read inside a batch returns the current value. If the read reaches a node with a callback that the batch's writes took out of date, pico-js brings that node up to date at once, and its callback still waits for the `endWriteBatch` that closes the outermost batch. A `retainDerivedNode` without a callback inside a batch is a read, and returns the current value too.
 
 ## Freeing unused nodes
 
@@ -532,7 +523,7 @@ function subscribe<T>(
   node: Derived<T>,
   onChange: (value: T) => void,
 ): () => void {
-  const retain = retainDerivedNode(node.node, () => onChange(node()));
+  const retain = retainDerivedNode(node.node, onChange);
   return () => releaseRetain(retain);
 }
 ```
@@ -562,7 +553,7 @@ Breaking one of these can give stale or wrong values, or leave pico-js's state i
   });
   ```
 
-  pico-js adds no handling for a throw. After a throw out of a flush, the node that threw, the nodes the flush had not refreshed yet, and their dependents can keep old values, and later updates may not refresh them. The callbacks that had not run yet are dropped. pico-js clears its own flush bookkeeping, which is the flush state, the list of unneeded nodes, and the list of changed nodes, so the next update starts a new flush.
+  pico-js does not recover from a throw. After a throw out of a flush, the callbacks that had not run yet are dropped. The node that threw and the nodes with callbacks that the flush had not refreshed yet leave the flush queue, so a read brings them up to date, and later updates may skip their callbacks, or call a callback whose node's value did not change. pico-js clears its own flush bookkeeping, which is the flush state, the list of unneeded nodes, and the list of changed nodes, so the next update starts a new flush.
 
 - The graph must not have cycles. A node that reads itself, directly or through other nodes, can recurse until the call stack overflows.
 - A change callback may call `readDerivedNode` and must not do anything else with pico-js. A write inside a callback that reaches no node with a callback only marks. A write that reaches a node with a callback starts a second flush that throws a `TypeError` and drops every pending callback of both flushes. A batch, retain, or release inside a callback is not supported either. Compute a value that can be computed from the graph in a derived node, not in a source that a callback writes. To reset a value when another changes, keep the raw value in the source and compute the effective value in a derived node:
@@ -579,9 +570,9 @@ Breaking one of these can give stale or wrong values, or leave pico-js's state i
   Starting work outside the graph from a callback, for example a fetch, is fine, and the `writeSource` from its response runs outside the flush. A write that must follow a change can be deferred with `queueMicrotask(() => writeSource(...))`, which runs after the flush returns.
 
 - Release each retain exactly once. Releasing a retain twice can corrupt the node's retain list, so later callbacks and cleanup can misbehave. A retain that is never released keeps its node and everything the node depends on cached for good.
-- Do not read derived nodes inside a write batch, and do not call `retainDerivedNode` there, because retaining computes the node, which is a read. Inside the batch, a read of a node with a callback, or of a node that depends on one, returns the value from before the batch's writes. The `endWriteBatch` that closes the outermost batch brings nodes with callbacks up to date and marks the nodes that depend on them.
+- Do not call `retainDerivedNode` with a callback inside a write batch. If the batch's writes changed the node's value before the retain, the `endWriteBatch` that closes the outermost batch calls the new callback for that change, although the retain already computed the new value.
 - Call `endWriteBatch` exactly once for each `startWriteBatch`. If the code between them can throw, call `endWriteBatch` in a `finally`. Until the outermost batch's `endWriteBatch`, the flush does not run, so no callback runs.
-- A write batch must not span an `await`. Requests share one graph (see "Servers"), so another request's writes join your batch, and nodes with callbacks are brought up to date when you end it, and its reads of nodes with callbacks in the meantime return values from before the batch's writes.
+- A write batch must not span an `await`. Requests share one graph (see "Servers"), so another request's writes join your batch, and nodes with callbacks are brought up to date when you end it, or earlier when its reads reach them.
 - A custom scheduler must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`. If it stops early, the remaining unneeded nodes stay cached until something calls `disposeNext` or `disposeAll` again.
 - Do not mutate values after passing them to pico-js or reading them from it. A value changed in place is still `===` to itself, so nodes that depend on it can keep results computed from its old contents.
 - Keep chains of nodes that each read the next shorter than about 2,000 nodes in Node 24. Each node in such a chain uses several call stack frames when it computes for the first time or recomputes, and a longer chain can throw a `RangeError`.
@@ -636,14 +627,16 @@ const changedNodes: Array<MutableDerivedNode<unknown> | undefined> = [];
 let changedCount = 0;
 ```
 
-- `createDerivedNode` takes only the computation, and `createEagerDerivedNode` is removed. `newDerivedNode` folds into `createDerivedNode`. A derived node is lazy except while it has a retain with an `onChange`; a caller that wants the early recompute without a reaction retains with an `onChange` that does nothing.
+- `createDerivedNode` takes only the computation, and `createEagerDerivedNode` is removed. `newDerivedNode` folds into `createDerivedNode`. A derived node is lazy except while it has a retain with an `onChange`, so that its `onChange` can run. `onChange` receives the node's value.
 - `setDerivedNodeEvaluation` is removed, and so is the creation choice. `evaluation` is `UNOBSERVED` or `OBSERVED`, set by `retainDerivedNode` and `releaseRetain` through `observe` and `unobserveIfLast`. The path of `setDerivedNodeEvaluation` that put a `Dirty` or `MaybeDirty` node on the flush queue when the node became eager has no other caller and goes with it. A node becomes observed through a retain, which brings the node up to date first, so the node is `Clean`.
 - `batch(body)` is removed. `startWriteBatch()` and `endWriteBatch()` remain.
 - `readRetained(retain)` is removed. `readDerivedNode(node)` is the top-level read of a retained node, and a computation no longer calls it, so a computation makes no read outside `readSource` and `readDerived`. This choice is open: `readRetained(retain)` makes "the node is retained" a fact of the argument's type instead of a contract, at the cost that every caller of `readRetained` keeps the `Retain` that it passes. The engine code is the same either way (`pull(retain.node)` against `pull(node)`).
 - `resetForTests` and `collectorContents` are removed, because only tests call them (AGENTS.md, Tests: an API only tests call should not exist). Tests observe the cleanup queue through `disposeNext`'s return value and node statuses, and the random test gets fresh module state per case (Tests).
 - `schedulePending: boolean` becomes `scheduleStatus: ScheduleStatus`, and the counter `flushing` becomes `flushState: FlushState`, a two-value union. A flush cannot run inside another, because an `onChange` does not write or end a batch (contract), so the count never exceeds 1.
 - The flush's list of changed nodes, which the prototype allocated per flush on the first changed node, is the module-level `changedNodes` with `changedCount`. Each entry is set to `undefined` before its node's `onChange` calls run, so the array keeps no node reachable after the flush.
-- `flush` wraps `flushQueue` in `try`/`finally`, which sets `flushState` to `FLUSH_IDLE`, empties `markedUnneeded`, and clears the entries of `changedNodes` that a throw left, resetting their `onChangeStatus`. A computation or an `onChange` that throws therefore leaves the module state of an idle engine for the next operation. The prototype restored nothing and needed `resetForTests` after a throw.
+- `flush` wraps `refreshFlushQueue` and `callOnChanges` in `try`/`finally`, which sets `flushState` to `FLUSH_IDLE`, clears `markedUnneeded`, and clears the entries of `changedNodes` that a throw left, resetting their `ON_CHANGE_QUEUED` bit. A computation or an `onChange` that throws therefore leaves the module state of an idle engine for the next operation. The prototype restored nothing and needed `resetForTests` after a throw.
+- Marking goes past a node with an `onChange` (`OBSERVED`): it puts the node on the flush queue when it takes the node out of `Clean`, and marks the nodes beyond it `MaybeDirty` with the `MARKED_BEYOND` bit, without queueing the `OBSERVED` nodes among them. A pull of a queued node that is `Dirty` or `MaybeDirty` refreshes it at once, in a flush and in an open batch. This is the stale-read fix A2 (Measurements, Decisions). The refresh, `changedNodes`, and the `onChange` calls live in `pull.ts`, because the refresh and the pull call each other.
+- `markedUnneeded` is written by index with `markedUnneededCount`, and is cleared by setting the entries in use to `undefined` and the count to 0, as `changedNodes` is.
 - `collectorStack` is renamed `cleanupQueue`, and `addToCollector` is renamed `addToCleanupQueue`.
 - The public API drops `Status` and the `status` field with `UNCOMPUTED`, `DIRTY`, `MAYBE_DIRTY`, and `CLEAN`, the evaluation constants `UNOBSERVED` and `OBSERVED`, and the types `EvaluationState` and `DependentsStatus`. `index.ts` exports no evaluation choice. `computation` is a method of the internal `MutableDerivedNode`, which keeps `MutableDerivedNode<TValue>` assignable to `MutableDerivedNode<unknown>`. Tests read a node's status through the test helper `test/status.ts` (`statusOf(node)`), which reads it through `internal(node)`.
 - The public `SourceNode`, `DerivedNode`, and `Retain` are opaque, and there is no public `Edge`. The engine works on internal types written out field by field: `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain` (each an intersection of its public type with its fields), and `MutableEdge`, whose link fields (`dependency`, `nextDependency`, `previousDependent`, `nextDependent`) are mutable and whose `dependent` is `readonly`. Each exported function casts its public arguments to the internal type once, and the internal types reference each other, so edge walks need no casts. The generic `Mutable<T>` and the aliases `SourceEdge`, `DerivedEdge`, and `Queue` are removed.
@@ -768,7 +761,8 @@ export type MutableDerivedNode<TValue> = DerivedNode<TValue> &
     firstRetain: MutableRetain<TValue> | undefined;
     status: Status;
     evaluation: EvaluationState;
-    onChangeStatus: OnChangeStatus;
+    // The bits `ON_CHANGE_QUEUED` and `MARKED_BEYOND`.
+    flags: number;
     firstSourceDependency: MutableEdge<MutableSourceNode<unknown>> | undefined;
     lastSourceDependency: MutableEdge<MutableSourceNode<unknown>> | undefined;
     firstDerivedDependency:
@@ -780,12 +774,18 @@ export type MutableDerivedNode<TValue> = DerivedNode<TValue> &
     computation(callingNode: CallingNode, previous: TValue | undefined): TValue;
   };
 
+/**
+ * Internal invariant: `onChange` has the type of a method, which keeps
+ * `MutableRetain<TValue>` assignable to `MutableRetain<unknown>`.
+ */
 export type MutableRetain<TValue> = Retain<TValue> & {
   readonly node: MutableDerivedNode<TValue>;
-  readonly onChange: (() => void) | undefined;
+  readonly onChange: OnChange<TValue> | undefined;
   previous: MutableRetain<TValue> | undefined;
   next: MutableRetain<TValue> | undefined;
 };
+
+type OnChange<TValue> = { method(value: TValue): void }['method'];
 
 export const DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY = 0;
 export const DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY = 1;
@@ -808,15 +808,23 @@ export const OBSERVED = 1;
 
 /**
  * Internal invariant: a node is `OBSERVED` exactly while it has a retain with
- * an `onChange`. Marking stops at an observed node and puts it on the flush
- * queue. Every other node is lazy.
+ * an `onChange`. Marking puts an observed node that it takes out of `Clean` on
+ * the flush queue, unless it reached the node only beyond another observed
+ * node. Every other node is lazy.
  */
 export type EvaluationState = typeof UNOBSERVED | typeof OBSERVED;
 
-export const ON_CHANGE_NOT_QUEUED = 0;
+/**
+ * A bit of `flags`: the node is on the list of changed nodes of the running
+ * flush, so a second changed recompute in that flush does not add it again.
+ */
 export const ON_CHANGE_QUEUED = 1;
-
-type OnChangeStatus = typeof ON_CHANGE_NOT_QUEUED | typeof ON_CHANGE_QUEUED;
+/**
+ * A bit of `flags`, read only while the node is `MaybeDirty`: marking reached
+ * the node only beyond an observed node that it put on the flush queue, so an
+ * observed node above it may be `MaybeDirty` and on no flush queue.
+ */
+export const MARKED_BEYOND = 2;
 
 /**
  * Internal invariants of a derived node whose computation is not running:
@@ -825,8 +833,12 @@ type OnChangeStatus = typeof ON_CHANGE_NOT_QUEUED | typeof ON_CHANGE_QUEUED;
  * - `Dirty`: `value` is the value of the last recompute. A lazy node has
  *   `MaybeDirty` or `Dirty` dependents. An observed node is on the flush
  *   queue of the open batch or of the running flush, and its dependents may be
- *   `Clean`.
- * - `MaybeDirty`: as `Dirty`.
+ *   `Clean`, or it is on no flush queue after a flush that a computation's
+ *   throw cut short, and its dependents are not `Clean`.
+ * - `MaybeDirty`: as `Dirty`. An observed node that marking reached only
+ *   beyond another observed node is also on no flush queue: the change of the
+ *   node below it puts it there, and if that node keeps its value, the node's
+ *   value is current and a read verifies it.
  * - `Clean`: `value` is up to date, unless the node depends through `Clean`
  *   nodes on a `Dirty` or `MaybeDirty` observed node.
  *
@@ -876,7 +888,7 @@ export function createDerivedNode<TValue>(
     // every read.
     value: undefined as TValue,
     firstRetain: undefined,
-    onChangeStatus: ON_CHANGE_NOT_QUEUED,
+    flags: 0,
     status: UNCOMPUTED,
     evaluation: UNOBSERVED,
     firstSourceDependency: undefined,
@@ -955,7 +967,9 @@ import {
   CLEAN,
   DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY,
   DIRTY,
+  MARKED_BEYOND,
   OBSERVED,
+  ON_CHANGE_QUEUED,
   UNCOMPUTED,
   type MutableDerivedNode,
   type MutableEdge,
@@ -963,11 +977,30 @@ import {
 } from './nodes';
 
 /**
- * Internal invariant: `markedUnneeded` contains the nodes that marking took out
- * of `Clean` while they were unneeded. `markedUnneeded` is empty when an
- * outermost operation returns.
+ * Internal invariant: the first `markedUnneededCount` entries of
+ * `markedUnneeded` are the nodes that marking took out of `Clean` while they
+ * were unneeded, and every later entry is `undefined`. `markedUnneededCount`
+ * is 0 when an outermost operation returns.
  */
-export const markedUnneeded: Array<MutableDerivedNode<unknown>> = [];
+export const markedUnneeded: Array<MutableDerivedNode<unknown> | undefined> =
+  [];
+export let markedUnneededCount = 0;
+
+function addMarkedUnneeded(node: MutableDerivedNode<unknown>): void {
+  markedUnneeded[markedUnneededCount] = node;
+  markedUnneededCount += 1;
+}
+
+/**
+ * Sets each entry in use to `undefined` and the count to 0, so the array keeps
+ * its length and its capacity.
+ */
+export function clearMarkedUnneeded(): void {
+  for (let index = 0; index < markedUnneededCount; index += 1) {
+    markedUnneeded[index] = undefined;
+  }
+  markedUnneededCount = 0;
+}
 
 export function storeValue<TValue>(
   source: MutableSourceNode<TValue>,
@@ -981,97 +1014,25 @@ export function storeValue<TValue>(
   return source.firstDependent;
 }
 
-export function markDirty<TDependency>(
-  observedNodes: Array<MutableDerivedNode<unknown>>,
-  first: MutableEdge<TDependency>,
-): void {
-  let stack: Array<MutableDerivedNode<unknown>> | undefined;
-  let nextToMark: MutableDerivedNode<unknown> | undefined;
-  let edge: MutableEdge<TDependency> | undefined = first;
-  while (edge !== undefined) {
-    const node = edge.dependent;
-    edge = edge.nextDependent;
-    switch (node.status) {
-      case CLEAN:
-        node.status = DIRTY;
-        if (node.evaluation === OBSERVED) {
-          observedNodes.push(node);
-          break;
-        }
-        if (node.firstDependent !== undefined) {
-          if (nextToMark !== undefined) {
-            (stack ??= []).push(nextToMark);
-          }
-          nextToMark = node;
-        } else if (node.firstRetain === undefined) {
-          markedUnneeded.push(node);
-        }
-        break;
-      // Internal invariant: a MaybeDirty node either marked its dependents when
-      // it left Clean, or is observed and went on the flush queue then.
-      case MAYBE_DIRTY:
-        node.status = DIRTY;
-        break;
-      // Internal invariant: a Dirty node was marked earlier. An Uncomputed
-      // node has no edge to a dependency, so no list of dependents has it.
-      case DIRTY:
-      case UNCOMPUTED:
-        break;
-    }
-  }
-  if (nextToMark !== undefined) {
-    markMaybeDirty(observedNodes, nextToMark, stack);
-  }
-}
-
-function markMaybeDirty(
-  observedNodes: Array<MutableDerivedNode<unknown>>,
-  nextToMark: MutableDerivedNode<unknown>,
-  initialStack: Array<MutableDerivedNode<unknown>> | undefined,
-): void {
-  let stack = initialStack;
-  let marked: MutableDerivedNode<unknown> | undefined = nextToMark;
-  while (marked !== undefined) {
-    let dependentEdge = marked.firstDependent;
-    while (dependentEdge !== undefined) {
-      const dependent = dependentEdge.dependent;
-      dependentEdge = dependentEdge.nextDependent;
-      switch (dependent.status) {
-        case CLEAN:
-          dependent.status = MAYBE_DIRTY;
-          if (dependent.evaluation === OBSERVED) {
-            observedNodes.push(dependent);
-            break;
-          }
-          if (dependent.firstDependent !== undefined) {
-            if (dependentEdge === undefined) {
-              dependentEdge = dependent.firstDependent;
-            } else {
-              (stack ??= []).push(dependent);
-            }
-          } else if (dependent.firstRetain === undefined) {
-            markedUnneeded.push(dependent);
-          }
-          break;
-        // Internal invariant: a lazy node that is not Clean has no Clean
-        // dependents, and marking stops at an observed node.
-        case MAYBE_DIRTY:
-        case DIRTY:
-        case UNCOMPUTED:
-          break;
-      }
-    }
-    marked = stack === undefined ? undefined : stack.pop();
-  }
-}
-
+/**
+ * Marks a write's readers and every node above them. A Clean reader becomes
+ * Dirty, and a Clean node above becomes MaybeDirty. An observed node that this
+ * takes out of Clean goes on the flush queue, unless marking reached it only
+ * beyond another observed node: such a node is MaybeDirty with
+ * `MARKED_BEYOND`, the change of the observed node below it puts it on the
+ * flush queue, and if that node keeps its value, a read verifies it.
+ */
 export function markDirtyQueue<TDependency>(
   initialQueue: Array<MutableDerivedNode<unknown>> | undefined,
   first: MutableEdge<TDependency>,
 ): Array<MutableDerivedNode<unknown>> | undefined {
   let queue = initialQueue;
+  // `held` is the latest marked lazy node with dependents, and the stack holds
+  // the earlier ones, so a write that reaches one allocates no array.
+  // `beyond` holds the queued observed nodes with dependents.
   let stack: Array<MutableDerivedNode<unknown>> | undefined;
-  let nextToMark: MutableDerivedNode<unknown> | undefined;
+  let held: MutableDerivedNode<unknown> | undefined;
+  let beyond: Array<MutableDerivedNode<unknown>> | undefined;
   let edge: MutableEdge<TDependency> | undefined = first;
   while (edge !== undefined) {
     const node = edge.dependent;
@@ -1081,21 +1042,35 @@ export function markDirtyQueue<TDependency>(
         node.status = DIRTY;
         if (node.evaluation === OBSERVED) {
           queue = queueObservedNode(queue, node);
-          break;
-        }
-        if (node.firstDependent !== undefined) {
-          if (nextToMark !== undefined) {
-            (stack ??= []).push(nextToMark);
+          if (node.firstDependent !== undefined) {
+            (beyond ??= []).push(node);
           }
-          nextToMark = node;
+        } else if (node.firstDependent !== undefined) {
+          if (held !== undefined) {
+            (stack ??= []).push(held);
+          }
+          held = node;
         } else if (node.firstRetain === undefined) {
-          markedUnneeded.push(node);
+          addMarkedUnneeded(node);
         }
         break;
-      // Internal invariant: a MaybeDirty node either marked its dependents when
-      // it left Clean, or is observed and went on the flush queue then.
+      // Internal invariant: a MaybeDirty node marked its dependents when it
+      // left Clean, or is observed and went on the flush queue then. One that
+      // marking reached only beyond an observed node is marked again in line:
+      // put on the flush queue if it is observed, walked through if it is lazy.
       case MAYBE_DIRTY:
         node.status = DIRTY;
+        if ((node.flags & MARKED_BEYOND) !== 0) {
+          node.flags &= ON_CHANGE_QUEUED;
+          if (node.evaluation === OBSERVED) {
+            queue = queueObservedNode(queue, node);
+          } else if (node.firstDependent !== undefined) {
+            if (held !== undefined) {
+              (stack ??= []).push(held);
+            }
+            held = node;
+          }
+        }
         break;
       // Internal invariant: a Dirty node was marked earlier. An Uncomputed
       // node has no edge to a dependency, so no list of dependents has it.
@@ -1104,19 +1079,27 @@ export function markDirtyQueue<TDependency>(
         break;
     }
   }
-  return nextToMark === undefined
+  return held === undefined && beyond === undefined
     ? queue
-    : markMaybeDirtyQueue(queue, nextToMark, stack);
+    : markMaybeDirtyQueue(queue, held, stack, beyond);
 }
 
+/**
+ * Marks the Clean dependents of `held` and of each node on the stack
+ * MaybeDirty, putting each observed one on the flush queue, and the Clean
+ * dependents of each node on `beyond` MaybeDirty with `MARKED_BEYOND`, putting
+ * none on the flush queue. It continues through every node it marks.
+ */
 export function markMaybeDirtyQueue(
   initialQueue: Array<MutableDerivedNode<unknown>> | undefined,
-  nextToMark: MutableDerivedNode<unknown>,
+  held: MutableDerivedNode<unknown> | undefined,
   initialStack: Array<MutableDerivedNode<unknown>> | undefined,
+  initialBeyond: Array<MutableDerivedNode<unknown>> | undefined,
 ): Array<MutableDerivedNode<unknown>> | undefined {
   let queue = initialQueue;
   let stack = initialStack;
-  let marked: MutableDerivedNode<unknown> | undefined = nextToMark;
+  let beyond = initialBeyond;
+  let marked: MutableDerivedNode<unknown> | undefined = held;
   while (marked !== undefined) {
     let dependentEdge = marked.firstDependent;
     while (dependentEdge !== undefined) {
@@ -1125,23 +1108,38 @@ export function markMaybeDirtyQueue(
       switch (dependent.status) {
         case CLEAN:
           dependent.status = MAYBE_DIRTY;
+          dependent.flags &= ON_CHANGE_QUEUED;
           if (dependent.evaluation === OBSERVED) {
             queue = queueObservedNode(queue, dependent);
-            break;
-          }
-          if (dependent.firstDependent !== undefined) {
+            if (dependent.firstDependent !== undefined) {
+              (beyond ??= []).push(dependent);
+            }
+          } else if (dependent.firstDependent !== undefined) {
             if (dependentEdge === undefined) {
               dependentEdge = dependent.firstDependent;
             } else {
               (stack ??= []).push(dependent);
             }
           } else if (dependent.firstRetain === undefined) {
-            markedUnneeded.push(dependent);
+            addMarkedUnneeded(dependent);
+          }
+          break;
+        case MAYBE_DIRTY:
+          if ((dependent.flags & MARKED_BEYOND) !== 0) {
+            dependent.flags &= ON_CHANGE_QUEUED;
+            if (dependent.evaluation === OBSERVED) {
+              queue = queueObservedNode(queue, dependent);
+            } else if (dependent.firstDependent !== undefined) {
+              if (dependentEdge === undefined) {
+                dependentEdge = dependent.firstDependent;
+              } else {
+                (stack ??= []).push(dependent);
+              }
+            }
           }
           break;
         // Internal invariant: a lazy node that is not Clean has no Clean
-        // dependents, and marking stops at an observed node.
-        case MAYBE_DIRTY:
+        // dependents.
         case DIRTY:
         case UNCOMPUTED:
           break;
@@ -1149,7 +1147,126 @@ export function markMaybeDirtyQueue(
     }
     marked = stack === undefined ? undefined : stack.pop();
   }
+  if (beyond === undefined) {
+    return queue;
+  }
+  marked = beyond.pop();
+  while (marked !== undefined) {
+    let dependentEdge = marked.firstDependent;
+    while (dependentEdge !== undefined) {
+      const dependent = dependentEdge.dependent;
+      dependentEdge = dependentEdge.nextDependent;
+      if (dependent.status === CLEAN) {
+        dependent.status = MAYBE_DIRTY;
+        dependent.flags |= MARKED_BEYOND;
+        if (dependent.firstDependent !== undefined) {
+          beyond.push(dependent);
+        } else if (dependent.firstRetain === undefined) {
+          addMarkedUnneeded(dependent);
+        }
+      }
+    }
+    marked = beyond.pop();
+  }
   return queue;
+}
+
+/**
+ * Marks the dependents of the observed `node`, whose refresh changed its
+ * value. A Clean direct dependent becomes Dirty, and each Clean node that a
+ * walk through lazy nodes reaches beyond them becomes MaybeDirty. A MaybeDirty
+ * node marked only beyond an observed node is marked in line. Each observed
+ * node that this marks goes on `observedNodes`, and the walk does not continue
+ * through it: its own refresh marks what is beyond it. A node that an earlier
+ * marking reached in line has its observed dependents on a flush queue
+ * already, so the walk stops at it.
+ */
+export function markFromChange(
+  observedNodes: Array<MutableDerivedNode<unknown>>,
+  node: MutableDerivedNode<unknown>,
+): void {
+  let stack: Array<MutableDerivedNode<unknown>> | undefined;
+  let held: MutableDerivedNode<unknown> | undefined;
+  let edge = node.firstDependent;
+  while (edge !== undefined) {
+    const dependent = edge.dependent;
+    edge = edge.nextDependent;
+    switch (dependent.status) {
+      case CLEAN:
+        dependent.status = DIRTY;
+        if (dependent.evaluation === OBSERVED) {
+          observedNodes.push(dependent);
+        } else if (dependent.firstDependent !== undefined) {
+          if (held !== undefined) {
+            (stack ??= []).push(held);
+          }
+          held = dependent;
+        } else if (dependent.firstRetain === undefined) {
+          addMarkedUnneeded(dependent);
+        }
+        break;
+      case MAYBE_DIRTY:
+        dependent.status = DIRTY;
+        if ((dependent.flags & MARKED_BEYOND) !== 0) {
+          dependent.flags &= ON_CHANGE_QUEUED;
+          if (dependent.evaluation === OBSERVED) {
+            observedNodes.push(dependent);
+          } else if (dependent.firstDependent !== undefined) {
+            if (held !== undefined) {
+              (stack ??= []).push(held);
+            }
+            held = dependent;
+          }
+        }
+        break;
+      case DIRTY:
+      case UNCOMPUTED:
+        break;
+    }
+  }
+  let marked = held;
+  while (marked !== undefined) {
+    let dependentEdge = marked.firstDependent;
+    while (dependentEdge !== undefined) {
+      const dependent = dependentEdge.dependent;
+      dependentEdge = dependentEdge.nextDependent;
+      switch (dependent.status) {
+        case CLEAN:
+          dependent.status = MAYBE_DIRTY;
+          dependent.flags &= ON_CHANGE_QUEUED;
+          if (dependent.evaluation === OBSERVED) {
+            observedNodes.push(dependent);
+          } else if (dependent.firstDependent !== undefined) {
+            if (dependentEdge === undefined) {
+              dependentEdge = dependent.firstDependent;
+            } else {
+              (stack ??= []).push(dependent);
+            }
+          } else if (dependent.firstRetain === undefined) {
+            addMarkedUnneeded(dependent);
+          }
+          break;
+        case MAYBE_DIRTY:
+          if ((dependent.flags & MARKED_BEYOND) !== 0) {
+            dependent.flags &= ON_CHANGE_QUEUED;
+            if (dependent.evaluation === OBSERVED) {
+              observedNodes.push(dependent);
+            } else if (dependent.firstDependent !== undefined) {
+              if (dependentEdge === undefined) {
+                dependentEdge = dependent.firstDependent;
+              } else {
+                (stack ??= []).push(dependent);
+              }
+            }
+          }
+          break;
+        case DIRTY:
+        case UNCOMPUTED:
+          break;
+      }
+    }
+    marked = stack === undefined ? undefined : stack.pop();
+  }
 }
 
 function queueObservedNode(
@@ -1188,7 +1305,11 @@ export function markMaybeDirtyDependentsDirty(
 ```ts
 // from libs/pico-js/src/cleanup.ts
 import { unlinkAll, unlinkEdge } from './edges';
-import { markedUnneeded } from './marking';
+import {
+  clearMarkedUnneeded,
+  markedUnneeded,
+  markedUnneededCount,
+} from './marking';
 import { CLEAN, UNCOMPUTED, type MutableDerivedNode } from './nodes';
 
 /**
@@ -1347,8 +1468,8 @@ function disposeNode(node: MutableDerivedNode<unknown>): void {
  */
 export function disposeMarked(): void {
   let stack: Array<MutableDerivedNode<unknown>> | undefined;
-  for (const marked of markedUnneeded) {
-    let node: MutableDerivedNode<unknown> | undefined = marked;
+  for (let index = 0; index < markedUnneededCount; index += 1) {
+    let node: MutableDerivedNode<unknown> | undefined = markedUnneeded[index];
     while (node !== undefined) {
       if (
         node.firstRetain === undefined &&
@@ -1383,7 +1504,7 @@ export function disposeMarked(): void {
       node = stack?.pop();
     }
   }
-  markedUnneeded.length = 0;
+  clearMarkedUnneeded();
 }
 ```
 
@@ -1391,13 +1512,19 @@ export function disposeMarked(): void {
 
 ```ts
 // from libs/pico-js/src/pull.ts
-import { markMaybeDirtyDependentsDirty } from './marking';
+import {
+  markFromChange,
+  markMaybeDirtyDependentsDirty,
+  markMaybeDirtyQueue,
+} from './marking';
 import {
   MAYBE_DIRTY,
   CLEAN,
   DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY,
   DIRTY,
+  MARKED_BEYOND,
   OBSERVED,
+  ON_CHANGE_QUEUED,
   UNCOMPUTED,
   type CallingNode,
   type DerivedNode,
@@ -1508,26 +1635,48 @@ export function readDerived<TValue>(
 }
 
 /**
- * Guarantee: an observed `Dirty` or `MaybeDirty` node returns its
- * previous value and recomputes nothing.
+ * Guarantee: a pull of an observed `Dirty` or `MaybeDirty` node on the flush
+ * queue of the running flush or of the open batch refreshes it at once, so the
+ * reader sees its new value, and its `onChange` runs in the flush after every
+ * node on the flush queue is refreshed.
  */
 export function pull<TValue>(node: MutableDerivedNode<TValue>): TValue {
   switch (node.status) {
     case CLEAN:
       return node.value;
     case DIRTY:
-      return node.evaluation === OBSERVED ? node.value : recompute(node);
+      return node.evaluation === OBSERVED
+        ? pullObserved(node)
+        : recompute(node);
     case MAYBE_DIRTY:
-      if (node.evaluation === OBSERVED) {
-        return node.value;
-      }
-      return verify(node) === DIRTY ? recompute(node) : node.value;
+      return node.evaluation === OBSERVED
+        ? pullObserved(node)
+        : pullMaybeDirty(node);
     case UNCOMPUTED:
       return computeFirst(node);
   }
 }
 
-export function verify(
+function pullMaybeDirty<TValue>(node: MutableDerivedNode<TValue>): TValue {
+  return verify(node) === DIRTY ? recompute(node) : node.value;
+}
+
+/**
+ * Internal invariant: with no flush queue to refresh into, an observed node
+ * that is not `Clean` is on no flush queue. Marking left it `MaybeDirty`
+ * beyond an observed node that kept its value, or a throw cut the flush short
+ * before its refresh. A pull brings it up to date as a lazy node.
+ */
+function pullObserved<TValue>(node: MutableDerivedNode<TValue>): TValue {
+  const queue = refreshQueue;
+  if (queue !== undefined) {
+    refreshQueued(queue, node as unknown as MutableDerivedNode<unknown>);
+    return node.value;
+  }
+  return node.status === DIRTY ? recompute(node) : pullMaybeDirty(node);
+}
+
+function verify(
   root: MutableDerivedNode<unknown>,
 ): typeof DIRTY | typeof CLEAN {
   let verifyStack: Array<MutableEdge<MutableDerivedNode<unknown>>> | undefined;
@@ -1587,6 +1736,202 @@ export function verify(
   }
 }
 
+/**
+ * The flush queue that a pull of an observed node that is not `Clean`
+ * refreshes the node into: the running flush's during its refreshes, and the
+ * open batch's once the batch has one. `undefined` otherwise.
+ */
+let refreshQueue: Array<MutableDerivedNode<unknown>> | undefined;
+
+export function setRefreshQueue(
+  queue: Array<MutableDerivedNode<unknown>> | undefined,
+): void {
+  refreshQueue = queue;
+}
+
+/**
+ * Internal invariant: no flush runs inside another, because no `onChange`
+ * writes or ends a batch. One module-level array therefore serves every
+ * flush. A refresh in an open batch adds to it, and the flush of the batch
+ * calls those `onChange` callbacks. The flush clears each entry of the array
+ * before it calls the `onChange` callbacks of the entry's node, and
+ * `changedCount` is 0 outside a flush, except in a batch that has refreshed a
+ * node. The list has no duplicates, because a node on it has the bit
+ * `ON_CHANGE_QUEUED`.
+ */
+const changedNodes: Array<MutableDerivedNode<unknown> | undefined> = [];
+let changedCount = 0;
+
+/**
+ * Refreshes each node on the flush queue, and records each node whose refresh
+ * changed its value for its `onChange`.
+ *
+ * Internal invariant: marking puts a node on the flush queue each time it
+ * takes the node out of `Clean`, and a pull refreshes a node on the flush
+ * queue at once. A node is on the flush queue twice when a recompute made it
+ * `Clean` after its first entry and a later marking put it there again, and
+ * `refreshObserved` skips the later entry because the node is `Clean`.
+ */
+export function refreshFlushQueue(
+  observedNodes: Array<MutableDerivedNode<unknown>>,
+): void {
+  refreshQueue = observedNodes;
+  // An index walks the array, because a refresh appends to it during the
+  // walk.
+  let index = 0;
+  try {
+    while (true) {
+      const node = observedNodes[index];
+      if (node === undefined) {
+        break;
+      }
+      index += 1;
+      refreshQueued(observedNodes, node);
+    }
+  } catch (error) {
+    // The node whose refresh threw is at index - 1.
+    markBeyondUnrefreshed(observedNodes, index - 1);
+    throw error;
+  } finally {
+    refreshQueue = undefined;
+  }
+}
+
+/**
+ * Marks the dependents of each node of `nodes` from `from` on that is observed
+ * and not `Clean`, after a computation's throw cut the flush short, as marking
+ * beyond an observed node does. Each `Clean` node above becomes `MaybeDirty`
+ * with `MARKED_BEYOND`, so a read verifies it, and a later marking that
+ * reaches it in line puts each observed one on a flush queue. The nodes of
+ * `nodes` stay on no flush queue, and a read recomputes them as lazy nodes.
+ */
+function markBeyondUnrefreshed(
+  nodes: ReadonlyArray<MutableDerivedNode<unknown>>,
+  from: number,
+): void {
+  let beyond: Array<MutableDerivedNode<unknown>> | undefined;
+  for (let index = from; index < nodes.length; index += 1) {
+    const node = nodes[index]!;
+    if (
+      node.evaluation === OBSERVED &&
+      (node.status === DIRTY || node.status === MAYBE_DIRTY) &&
+      node.firstDependent !== undefined
+    ) {
+      (beyond ??= []).push(node);
+    }
+  }
+  if (beyond !== undefined) {
+    markMaybeDirtyQueue(undefined, undefined, undefined, beyond);
+  }
+}
+
+/** Refreshes `node` and records it for its `onChange` if its value changed. */
+function refreshQueued(
+  observedNodes: Array<MutableDerivedNode<unknown>>,
+  node: MutableDerivedNode<unknown>,
+): void {
+  const result = refreshObserved(observedNodes, node);
+  if (result === CHANGED && (node.flags & ON_CHANGE_QUEUED) === 0) {
+    node.flags |= ON_CHANGE_QUEUED;
+    changedNodes[changedCount] = node;
+    changedCount += 1;
+  }
+}
+
+/**
+ * Calls the `onChange` of each retain of each node whose refresh changed its
+ * value, in the order of each node's first refresh that changed it.
+ */
+export function callOnChanges(): void {
+  for (let index = 0; index < changedCount; index += 1) {
+    const node = changedNodes[index]!;
+    changedNodes[index] = undefined;
+    node.flags &= MARKED_BEYOND;
+    // Contract: no computation or `onChange` retains or releases, so the
+    // retain list is the one the node had when the refresh changed its value.
+    const value = node.value;
+    let retain = node.firstRetain;
+    while (retain !== undefined) {
+      if (retain.onChange !== undefined) {
+        retain.onChange(value);
+      }
+      retain = retain.next;
+    }
+  }
+  changedCount = 0;
+}
+
+/**
+ * Clears the list of changed nodes after a computation or an `onChange`
+ * threw, so the next change of each node on it calls its `onChange` again.
+ */
+export function clearChangedNodes(): void {
+  for (let index = 0; index < changedCount; index += 1) {
+    const node = changedNodes[index];
+    if (node !== undefined) {
+      node.flags &= MARKED_BEYOND;
+      changedNodes[index] = undefined;
+    }
+  }
+  changedCount = 0;
+}
+
+const CHANGED = 0;
+const UNCHANGED = 1;
+
+type RefreshResult = typeof CHANGED | typeof UNCHANGED;
+
+/**
+ * Internal invariant: a node that stopped being observed
+ * after marking put it on the flush queue is skipped by the flush. The node
+ * stays `Dirty` or `MaybeDirty`, and the drop marked its dependents, so a
+ * tracked read or a top-level read recomputes the node as a lazy node.
+ */
+function refreshObserved(
+  observedNodes: Array<MutableDerivedNode<unknown>>,
+  node: MutableDerivedNode<unknown>,
+): RefreshResult {
+  if (node.evaluation !== OBSERVED) {
+    return UNCHANGED;
+  }
+  switch (node.status) {
+    case DIRTY:
+      return recomputeObserved(observedNodes, node);
+    case MAYBE_DIRTY:
+      return verify(node) === DIRTY
+        ? recomputeObserved(observedNodes, node)
+        : UNCHANGED;
+    // Internal invariant: a Clean node on the flush queue was recomputed after
+    // marking put it there, by a pull or by an earlier entry of the same node.
+    // An Uncomputed node was disposed after marking put it on the flush queue,
+    // and recomputing it would link its edges again.
+    case CLEAN:
+    case UNCOMPUTED:
+      return UNCHANGED;
+  }
+}
+
+/**
+ * Internal invariant: the dependents of an observed node may be `Clean`, so a
+ * changed value marks them through `markFromChange`, which puts each observed
+ * node it marks on the flush queue the flush is walking.
+ */
+function recomputeObserved(
+  observedNodes: Array<MutableDerivedNode<unknown>>,
+  node: MutableDerivedNode<unknown>,
+): RefreshResult {
+  const previous = node.value;
+  const value = rerun(node, previous);
+  if (value === previous) {
+    return UNCHANGED;
+  }
+  node.value = value;
+  if (node.firstDependent !== undefined) {
+    markFromChange(observedNodes, node);
+  }
+  return CHANGED;
+}
+
 function computeFirst<TValue>(node: MutableDerivedNode<TValue>): TValue {
   const value = node.computation(node, undefined);
   trim(node);
@@ -1602,14 +1947,15 @@ function recompute<TValue>(node: MutableDerivedNode<TValue>): TValue {
     return previous;
   }
   node.value = value;
-  // Internal invariant: the dependents of a lazy node are already MaybeDirty or
-  // Dirty. A MaybeDirty dependent now has a dependency whose value changed, so
-  // markMaybeDirtyDependentsDirty makes that dependent Dirty.
+  // Internal invariant: the dependents of a lazy node, and of an observed node
+  // on no flush queue, are already MaybeDirty or Dirty. A MaybeDirty dependent
+  // now has a dependency whose value changed, so markMaybeDirtyDependentsDirty
+  // makes that dependent Dirty.
   markMaybeDirtyDependentsDirty(node.firstDependent);
   return value;
 }
 
-export function rerun<TValue>(
+function rerun<TValue>(
   node: MutableDerivedNode<TValue>,
   previous: TValue,
 ): TValue {
@@ -1664,24 +2010,22 @@ function unlinkDropped(first: MutableEdge<MutableDerivedNode<unknown>>): void {
 ```ts
 // from libs/pico-js/src/batch.ts
 import {
-  markDirty,
+  clearMarkedUnneeded,
   markDirtyQueue,
-  markedUnneeded,
+  markedUnneededCount,
   storeValue,
 } from './marking';
-import {
-  MAYBE_DIRTY,
-  CLEAN,
-  DIRTY,
-  OBSERVED,
-  ON_CHANGE_NOT_QUEUED,
-  ON_CHANGE_QUEUED,
-  UNCOMPUTED,
-  type MutableDerivedNode,
-  type MutableSourceNode,
-  type SourceNode,
+import type {
+  MutableDerivedNode,
+  MutableSourceNode,
+  SourceNode,
 } from './nodes';
-import { rerun, verify } from './pull';
+import {
+  callOnChanges,
+  clearChangedNodes,
+  refreshFlushQueue,
+  setRefreshQueue,
+} from './pull';
 import { disposeMarked, scheduleIfPending } from './cleanup';
 
 let batchDepth = 0;
@@ -1706,9 +2050,9 @@ let flushState: FlushState = FLUSH_IDLE;
  * nested batch joins the open batch.
  *
  * Contract: each `startWriteBatch` is matched by one `endWriteBatch`, called outside
- * computations and `onChange` callbacks. Inside the batch, a top-level read of
- * a node on the flush queue, or of a node that depends on it, returns the
- * previous value.
+ * computations and `onChange` callbacks. Inside the batch, a read that reaches
+ * a node on the flush queue refreshes that node at once, and its `onChange`
+ * waits for the flush.
  */
 export function startWriteBatch(): void {
   batchDepth += 1;
@@ -1726,6 +2070,7 @@ export function endWriteBatch(): void {
   if (batchDepth === 0) {
     const queue = batchQueue;
     batchQueue = undefined;
+    setRefreshQueue(undefined);
     flushOrDisposeMarked(queue);
   }
   scheduleIfOutermost();
@@ -1760,6 +2105,7 @@ export function flushOrQueue(
 ): void {
   if (batchDepth > 0) {
     batchQueue = queue;
+    setRefreshQueue(queue);
   } else {
     flushOrDisposeMarked(queue);
   }
@@ -1770,7 +2116,7 @@ function flushOrDisposeMarked(
 ): void {
   if (queue !== undefined) {
     flush(queue);
-  } else if (markedUnneeded.length > 0) {
+  } else if (markedUnneededCount > 0) {
     disposeMarked();
   }
 }
@@ -1792,147 +2138,31 @@ export function scheduleIfOutermost(): void {
 }
 
 /**
- * Internal invariant: no flush runs inside another, because no `onChange`
- * writes or ends a batch. One module-level array therefore serves every
- * flush. The flush clears each entry of the array before it calls the
- * `onChange` callbacks of the entry's node, and `changedCount` is 0 outside a
- * flush.
- */
-const changedNodes: Array<MutableDerivedNode<unknown> | undefined> = [];
-let changedCount = 0;
-
-/**
  * Guarantee: every `onChange` runs after the flush has refreshed every node
  * on the flush queue, in the order of each node's first recompute that
  * changed its value. A computation or an `onChange` that throws leaves the
  * flush state idle, the marked-unneeded list empty, and no node waiting for
- * its `onChange` callbacks. Later operations, including another request's,
- * therefore start from the module state of an idle engine.
+ * its `onChange` callbacks. Each observed node that the flush did not refresh
+ * is on no flush queue, and a read recomputes it. Later operations, including
+ * another request's, therefore start from the module state of an idle engine.
  *
- * Internal invariant: marking puts a node on the flush queue each time it
- * takes the node out of `Clean`. A node is on the flush queue twice when a
- * recompute made it `Clean` after its first entry and a later write marked it
- * again. `refreshObserved` skips the second entry because the node is `Clean`.
- * The list of changed nodes has no duplicates, because a node on it has
- * `onChangeStatus` `ON_CHANGE_QUEUED`. An `onChange` writes nothing, so it
- * puts no node on the flush queue. The nodes left on the marked-unneeded list
- * after a throw are on the cleanup queue already.
+ * Internal invariant: an `onChange` writes nothing, so it puts no node on the
+ * flush queue. The nodes left on the marked-unneeded list after a throw are on
+ * the cleanup queue already.
  */
 function flush(observedNodes: Array<MutableDerivedNode<unknown>>): void {
   flushState = FLUSH_RUNNING;
   try {
-    flushQueue(observedNodes);
+    refreshFlushQueue(observedNodes);
+    if (markedUnneededCount > 0) {
+      disposeMarked();
+    }
+    callOnChanges();
   } finally {
     flushState = FLUSH_IDLE;
-    markedUnneeded.length = 0;
-    if (changedCount > 0) {
-      clearChangedNodes();
-    }
+    clearMarkedUnneeded();
+    clearChangedNodes();
   }
-}
-
-function clearChangedNodes(): void {
-  for (let index = 0; index < changedCount; index += 1) {
-    const node = changedNodes[index];
-    if (node !== undefined) {
-      node.onChangeStatus = ON_CHANGE_NOT_QUEUED;
-      changedNodes[index] = undefined;
-    }
-  }
-  changedCount = 0;
-}
-
-function flushQueue(observedNodes: Array<MutableDerivedNode<unknown>>): void {
-  let index = 0;
-  while (true) {
-    const node = observedNodes[index];
-    if (node === undefined) {
-      break;
-    }
-    index += 1;
-    const result = refreshObserved(observedNodes, node);
-    if (result === CHANGED && node.onChangeStatus === ON_CHANGE_NOT_QUEUED) {
-      node.onChangeStatus = ON_CHANGE_QUEUED;
-      changedNodes[changedCount] = node;
-      changedCount += 1;
-    }
-  }
-  if (markedUnneeded.length > 0) {
-    disposeMarked();
-  }
-  for (index = 0; index < changedCount; index += 1) {
-    const node = changedNodes[index]!;
-    changedNodes[index] = undefined;
-    node.onChangeStatus = ON_CHANGE_NOT_QUEUED;
-    // Contract: no computation or `onChange` retains or releases, so the
-    // retain list is the one the node had when the refresh changed its value.
-    let retain = node.firstRetain;
-    while (retain !== undefined) {
-      if (retain.onChange !== undefined) {
-        retain.onChange();
-      }
-      retain = retain.next;
-    }
-  }
-  changedCount = 0;
-}
-
-const CHANGED = 0;
-const UNCHANGED = 1;
-
-type RefreshResult = typeof CHANGED | typeof UNCHANGED;
-
-/**
- * Internal invariant: a node that stopped being observed
- * after marking put it on the flush queue is skipped by the flush. The node
- * stays `Dirty` or `MaybeDirty`, and the drop marked its dependents, so a
- * tracked read or a top-level read recomputes the node as a lazy node.
- */
-function refreshObserved(
-  observedNodes: Array<MutableDerivedNode<unknown>>,
-  node: MutableDerivedNode<unknown>,
-): RefreshResult {
-  if (node.evaluation !== OBSERVED) {
-    return UNCHANGED;
-  }
-  switch (node.status) {
-    case DIRTY:
-      return recomputeObserved(observedNodes, node);
-    case MAYBE_DIRTY:
-      return verify(node) === DIRTY
-        ? recomputeObserved(observedNodes, node)
-        : UNCHANGED;
-    // Internal invariant: a Clean node on the flush queue was recomputed after
-    // marking put it there, by a tracked read, a top-level read, or an earlier
-    // entry of the same node. An Uncomputed node was disposed after marking put
-    // it on the flush queue, and recomputing it would link its edges again.
-    case CLEAN:
-    case UNCOMPUTED:
-      return UNCHANGED;
-  }
-}
-
-/**
- * Internal invariant: the dependents of an observed node may be
- * `Clean`, so a changed value marks them through `markDirty`. Each observed
- * dependent that `markDirty` marks goes on the flush queue the
- * flush is walking.
- */
-function recomputeObserved(
-  observedNodes: Array<MutableDerivedNode<unknown>>,
-  node: MutableDerivedNode<unknown>,
-): RefreshResult {
-  const previous = node.value;
-  const value = rerun(node, previous);
-  if (value === previous) {
-    return UNCHANGED;
-  }
-  node.value = value;
-  const first = node.firstDependent;
-  if (first !== undefined) {
-    markDirty(observedNodes, first);
-  }
-  return CHANGED;
 }
 ```
 
@@ -1962,17 +2192,18 @@ import { pull } from './pull';
  * dependencies until its last retain is released. A retain with an
  * `onChange` makes the node observed.
  *
- * Guarantee: the flush calls `onChange` once for each change of the node's
- * value that the flush made, after the flush has refreshed every node on the
- * flush queue. The first recompute of a node does not call `onChange`.
+ * Guarantee: the flush calls `onChange` with the node's value once for each
+ * update or outermost batch that changed the node's value, after the flush has
+ * refreshed every node on the flush queue. The first recompute of a node does
+ * not call `onChange`.
  *
- * Contract: called outside computations, `onChange` callbacks, and write
- * batches. `onChange` does not write, start or end a batch, retain, release,
- * or dispose. It may call `readDerivedNode`.
+ * Contract: called outside computations and `onChange` callbacks, and, with
+ * an `onChange`, outside write batches. `onChange` does not write, start or
+ * end a batch, retain, release, or dispose. It may call `readDerivedNode`.
  */
 export function retainDerivedNode<TValue>(
   node: DerivedNode<TValue>,
-  onChange?: () => void,
+  onChange?: (value: TValue) => void,
 ): Retain<TValue> {
   const mutableNode = node as MutableDerivedNode<TValue>;
   // Internal invariant: retaining brings the node up to date, so it is Clean
@@ -2059,10 +2290,12 @@ function observe(node: MutableDerivedNode<unknown>): void {
 
 /**
  * Internal invariant: a node that stops being observed while `Dirty` or
- * `MaybeDirty` may have `Clean` dependents, so the node marks them
- * `MaybeDirty`. A lazy node that is not `Clean` has no `Clean` dependents.
- * A node that becomes observed was brought up to date first, so it is
- * `Clean`.
+ * `MaybeDirty` may have `Clean` dependents, and its other dependents may be
+ * marked only beyond it, waiting for its refresh to put the observed nodes
+ * among them on the flush queue. Marking from the node in line restores the
+ * invariant that a lazy node that is not `Clean` has no `Clean` dependents and
+ * puts those observed nodes on the flush queue. A node that becomes observed
+ * was brought up to date first, so it is `Clean`.
  */
 function unobserveIfLast(node: MutableDerivedNode<unknown>): void {
   if (hasOnChangeRetain(node)) {
@@ -2070,7 +2303,9 @@ function unobserveIfLast(node: MutableDerivedNode<unknown>): void {
   }
   node.evaluation = UNOBSERVED;
   if (node.status === DIRTY || node.status === MAYBE_DIRTY) {
-    flushOrQueue(markMaybeDirtyQueue(currentBatchQueue(), node, undefined));
+    flushOrQueue(
+      markMaybeDirtyQueue(currentBatchQueue(), node, undefined, undefined),
+    );
   }
 }
 
@@ -2100,15 +2335,15 @@ export { readDerivedNode, releaseRetain, retainDerivedNode } from './retain';
 
 ## Implementation notes
 
-- `Status` is a union of four numbers with a constant for each, so the hot path compares small integers and each value has a name in the code. `DependentsStatus`, `OnChangeStatus`, `ScheduleStatus`, `FlushState`, and `RefreshResult` follow the same pattern. `ScheduleStatus` and `FlushState` replace the prototype's `boolean` and counter (AGENTS.md, Booleans).
+- `Status` is a union of four numbers with a constant for each, so the hot path compares small integers and each value has a name in the code. `DependentsStatus`, `ScheduleStatus`, `FlushState`, and `RefreshResult` follow the same pattern. A derived node's `flags` field holds the bits `ON_CHANGE_QUEUED` and `MARKED_BEYOND`. `ScheduleStatus` and `FlushState` replace the prototype's `boolean` and counter (AGENTS.md, Booleans).
 - `evaluation` takes one of two values: `UNOBSERVED` 0 and `OBSERVED` 1, and a node is `OBSERVED` exactly while it has a retain with an `onChange`. Marking, `pull`, `verify`, and `refreshObserved` test `evaluation === OBSERVED`. `observe` sets `OBSERVED` when a retain with an `onChange` is added, and `unobserveIfLast` sets `UNOBSERVED` when the release of a retain with an `onChange` leaves none. A release of a retain with an `onChange` walks the retain list in `hasOnChangeRetain`, because the engine keeps no count of retains with an `onChange`. `hasOnChangeRetain` returns a `boolean`, which answers whether a retain with an `onChange` exists and has no domain names for the two answers.
 - Marking pushes a node onto its stack only when the node leaves `Clean` and its list of dependents is not empty, so a write visits each node's dependents at most once. Marking holds the last node whose dependents it must mark in a local, and allocates the marking stack on the first push. Marking continues into a dependent that is the last entry of a list of dependents without pushing the dependent, so a chain, or a fan-out whose dependents have no dependents, allocates no stack. The marking stack and the verification stack are arrays local to the call, so the depth of a marked or verified chain does not reach the call stack.
-- Marking pushes a lazy node it takes out of `Clean` onto `markedUnneeded` when the node has no dependent and no retain. `disposeMarked` runs at the end of the outermost write or batch: after the flush's refreshes and before its `onChange` calls, or alone when the write put nothing on the flush queue. `disposeMarked` disposes each listed node that is still unneeded and not `Clean`, and walks the derived dependencies of each such node with a stack allocated on the first push: a dependency left unneeded that is not `Clean` is disposed too, because the write marked it, and a `Clean` one is pushed onto the cleanup queue with its value. A listed node that a top-level read inside the batch recomputed is `Clean` and is kept. That node is on the cleanup queue already, because the node became unneeded before the write.
+- Marking adds a lazy node it takes out of `Clean` to `markedUnneeded` when the node has no dependent and no retain. `disposeMarked` runs at the end of the outermost write or batch: after the flush's refreshes and before its `onChange` calls, or alone when the write put nothing on the flush queue. `disposeMarked` disposes each listed node that is still unneeded and not `Clean`, and walks the derived dependencies of each such node with a stack allocated on the first push: a dependency left unneeded that is not `Clean` is disposed too, because the write marked it, and a `Clean` one is pushed onto the cleanup queue with its value. A listed node that a top-level read inside the batch recomputed is `Clean` and is kept. That node is on the cleanup queue already, because the node became unneeded before the write.
 - A node becomes unneeded in five places, and each puts the node on the cleanup queue: `releaseRetain`, `readDerivedNode`, the repoint in `readDerived`, `unlinkDropped` (the drop in `trim`), and the cascade in `disposeNode` and `disposeMarked`, all through `addToCleanupQueue`. A push onto an empty cleanup queue sets `scheduleStatus` to `SCHEDULE_PENDING`. The cleanup queue holds one entry per push and the node has no flag, so a node can be on the cleanup queue more than once. `disposeNext` and `disposeAll` check each entry again, and drop an entry whose node has a retain, has a dependent, or is `Uncomputed`.
 - Every public operation ends with `scheduleIfOutermost`. `scheduleIfOutermost` calls `scheduleIfPending` only when `batchDepth === 0` and `flushState === FLUSH_IDLE`. A top-level read never runs inside a computation (its contract), so the only nesting is a top-level read inside an `onChange`, which the flush state covers. A scheduler may therefore call `disposeAll` synchronously: no computation, batch, or flush is running when the scheduler is called. With that scheduler the engine disposes when ba3daedf7 disposed, at the end of each outermost operation.
 - The default scheduler uses `requestIdleCallback` where it exists, and disposes while `deadline.timeRemaining() > 0`. Elsewhere, including Node, it uses `setTimeout(…, 0)` and disposes for `TIMEOUT_DISPOSAL_MS` (5 ms) per task. Both reschedule while entries remain. On a server, the cleanup queue holds the nodes of every request in the process, and the check of each entry in `disposeNext` keeps a node that another request retained, or that a later tracked read or top-level read reached.
 - `flush` reads the flush queue by index, so the entries that a refresh appends are refreshed in the same walk. `flush` appends each changed node that has a retain to the module-level `changedNodes`, and walks those entries by index after the flush queue is drained and the marked-unneeded nodes are disposed, so every `onChange` runs after every node on the flush queue is refreshed. `flush` sets each entry to `undefined` before it calls the `onChange` of each retain of that node, and `changedCount` is 0 when the flush returns. For each changed node, `flush` walks the retain list from the head and calls each `onChange`. No `onChange` writes, retains, or releases, so the retain list is the same as when the refresh changed the value. No flush runs inside another.
-- `flush` restores `flushState`, empties `markedUnneeded`, and clears the remaining `changedNodes` entries (resetting their `onChangeStatus`) in a `finally`. The flush queue of the batch is already detached: `endWriteBatch` sets `batchQueue` to `undefined` before it calls `flush`, and a `writeSource` outside a batch passes a local flush queue. The cost of this `finally` was not measured at this site. In the ambient variant's microbenchmark (Measurements), removing the outermost `try`/`finally` of that variant moved an event from 62 to 64 ns to 61 to 62 ns.
+- `flush` restores `flushState`, clears `markedUnneeded`, and clears the remaining `changedNodes` entries (resetting their `ON_CHANGE_QUEUED` bit) in a `finally`. The flush queue of the batch is already detached: `endWriteBatch` sets `batchQueue` to `undefined` before it calls `flush`, and a `writeSource` outside a batch passes a local flush queue. The cost of this `finally` was not measured at this site. In the ambient variant's microbenchmark (Measurements), removing the outermost `try`/`finally` of that variant moved an event from 62 to 64 ns to 61 to 62 ns.
 - `refreshObserved` skips a node that stopped being observed after marking put it on the flush queue, because a release in the same batch removed the last retain with an `onChange`. `unobserveIfLast` marked that node's `Clean` dependents `MaybeDirty` through `markMaybeDirtyQueue` at the release, so the lazy invariant holds and a tracked read or a top-level read recomputes the node. A `Clean` node on the flush queue was refreshed or recomputed by a tracked read or a top-level read before the flush reached the entry. An `Uncomputed` node on the flush queue was disposed after marking put it there, and recomputing it would link its edges again, so the flush skips it too.
 - `writeSource` inside a batch marks at once into the flush queue of the batch through `markDirtyQueue`, which creates the flush queue on the first push through `queueObservedNode`. `markDirtyQueue` and `markMaybeDirtyQueue` are copies of `markDirty` and `markMaybeDirty` that create the flush queue on the first push, because one function with an optional queue slowed `startWriteBatch` in PR #1027's review (a batch of one write 24.9 ns against 22.8 ns on Node 24.12). `markDirty` and `markMaybeDirty` take the flush queue of the flush that is running, because `recomputeObserved` marks into it.
 - A node becomes `Clean` only after its computation returns or after `verify` has brought every derived dependency it is linked to up to date. A lazy recompute therefore marks only `MaybeDirty` and `Dirty` nodes and takes no node out of `Clean`, so the recompute marks through `markMaybeDirtyDependentsDirty`, which walks only the node's dependents list and needs no stack. A node that is observed and is `Dirty` or `MaybeDirty` may have `Clean` dependents until the flush refreshes the node, and `recomputeObserved` marks a changed value through `markDirty`.
@@ -2161,8 +2396,8 @@ test/scheduler.test.ts  2 tests, the default scheduler
 - A test of an observed node retains the node with an `onChange`, which may do nothing.
 - `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endWriteBatch` leaves a later `startWriteBatch`, `writeSource`, `endWriteBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same.
 - The `README example` test runs the README's example and asserts the values and run counts its comments state.
-- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands. The cases are the stale reads of a refresh that receives a queued observed node (a chain, a fan-in, a branch switch, a lazy node over a queued node), and a change callback that runs although its node ends the flush with its previous value.
-- `test/contracts.test.ts` (8 tests) asserts the consequences the README states that are definite behaviors: an unchanged write, a new equal value instead of `previous`, a read inside a batch, an unmatched `endWriteBatch`, a retain that is never released, and a scheduler that stops early. The README makes throwing a contract (an error is caught inside the computation and returned as a value, and after a throw the nodes the flush had not refreshed can keep old values) and states no further result for a double release, a cycle, a mutated value, a call from inside a computation or an `onChange`, or call stack depth, and these have no test.
+- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. The cases are the stale reads that the engine gave before the stale-read fix A2, and each passes now: the stale reads of a refresh that receives a queued observed node (a chain, a fan-in, a branch switch, a lazy node over a queued node), and a change callback that runs although its node ends the flush with its previous value.
+- `test/contracts.test.ts` (8 tests) asserts the consequences the README states that are definite behaviors: an unchanged write, a new equal value instead of `previous`, a retain with an `onChange` inside a batch, an unmatched `endWriteBatch`, a retain that is never released, and a scheduler that stops early. The README makes throwing a contract (an error is caught inside the computation and returned as a value, and after a throw the callbacks that had not run are dropped and later updates may skip or repeat callbacks) and states no further result for a double release, a cycle, a mutated value, a call from inside a computation or an `onChange`, or call stack depth, and these have no test.
 
 Top-level reads go through a test-local `read(node)`. `read(node)` retains the node on its first call for that node and never releases the retain, so a test that does not test lifetime never has a node disposed.
 
@@ -2170,7 +2405,7 @@ Top-level reads go through a test-local `read(node)`. `read(node)` retains the n
 
 `test-exhaustive/checker.ts` is a bounded model checker and `test-exhaustive/exhaustive.ts` runs it against the public API (`createSourceNode`, `createDerivedNode`, `readSource`, `readDerived`, `readDerivedNode`, `retainDerivedNode`, `releaseRetain`, `startWriteBatch`, `endWriteBatch`, `writeSource`, `disposeNext`, `disposeAll`, `scheduler`). Its `Engine` type uses the public `SourceNode`, `DerivedNode`, `Retain`, and `CallingNode` types, and its `internal(node)` member, which `exhaustive.ts` implements with `internal` from `test/internal.ts`, returns the `MutableDerivedNode` from which the checker reads `status`, `evaluation`, `value`, and `firstDependent`. It enumerates graphs of up to 4 derived nodes over up to 2 sources (static reads, branching reads, injective and parity computations), retain setups with and without `onChange`, and operation sequences of writes, batches, reads, retains, releases, disposals, and throwing computations and `onChange` calls. It compares every value a computation, a top-level read, or an `onChange` receives with a reference evaluator that shares no code with the engine, and checks that each `onChange` ran exactly once when its node's value changed and not otherwise.
 
-`pnpm test:exhaustive` runs the `ci` preset by default (about 2.5 minutes); `PICO_EXHAUSTIVE_BOUND` selects `medium`, `full`, or a JSON object of bounds, and `PICO_EXHAUSTIVE_SHARD` with `PICO_EXHAUSTIVE_SHARDS` run one shard. A top-level read that no contract forbids is a read of any node, retained or not, outside a batch. An operation that breaks a contract (a read or a retain inside a batch, a second release) marks the run contract-broken and its violations are not failures. Violations after a throw are printed and do not fail the test, because the README leaves those values unspecified. On the current engine the `ci` preset fails with 8 distinct violation signatures, each a computation that receives an old value of a queued observed node, or an `onChange` that runs for a node that ends the flush with its previous value. The CI step is added together with the fix that makes the suite pass.
+`pnpm test:exhaustive` runs the `ci` preset by default (about 47 seconds on a laptop); `PICO_EXHAUSTIVE_BOUND` selects `medium`, `full`, or a JSON object of bounds, and `PICO_EXHAUSTIVE_SHARD` with `PICO_EXHAUSTIVE_SHARDS` run one shard. A top-level read that no contract forbids is a read of any node, retained or not, inside or outside a batch, and a retain without an `onChange` is allowed inside a batch too. An operation that breaks a contract (a retain with an `onChange` inside a batch, a second release) marks the run contract-broken and its violations are not failures. Violations after a throw are printed and do not fail the test, because the README leaves those values unspecified. Before the stale-read fix A2 the `ci` preset failed with 10 distinct violation signatures, each a computation that receives an old value of a queued observed node, or an `onChange` that runs for a node that ends the flush with its previous value. With A2 it passes, and CI runs it.
 
 ### Random differential test
 
@@ -2227,16 +2462,19 @@ f0b001a9d   c0fda7a73 with readUnretained (link and queue) and marked disposal (
 - Deferred cleanup through the cleanup queue and the idle scheduler. route-switch-shared computes 786 per event against 2,243, and runs -21.8% [-24.2, -14.9] on f0b001a9d; route-switch-shared-no-cleanup -86% to -88%. The trace replays compute 104 / 120 / 534 / 55, which matches Preact (104 / 120 / 534 / 55), against 392 / 285 / 669 / 116 for ba3daedf7 (alien: 392 / 287 / 669 / 116). Issue cases, f0b001a9d idle against ba3daedf7 with render retains: hideAndShow 1.34 against 1.89; replaceEffect dispose first 0.82 against 1.45; moveBetweenEffects 1.05 against 1.17; unobservedComputed 100 0.54 against 1.49, and 10000 0.01 against 1.59.
 - Rejected: disposal at the last release (8b9a2537b). With render retains and the idle scheduler, the trace replays compute 334 / 247 / 669 / 106 against 104 / 120 / 534 / 55, because a node released and read again later is recomputed.
 - Marked disposal (f0b001a9d over d56dc5ede). effectChurn 100 with the idle scheduler is 1.19 [1.1, 1.3] against 22.89 [22.8, 24.0] without it and 1.16 for ba3daedf7. Without marked disposal, a node that the case leaves unneeded stays linked until the idle scheduler runs, and every write in the timed loop marks it again. With `disposeAll` before the loop: 1.83 against 32.58. effectChurn 10000 is 1.65 against 1.61. In the app, navigate (-1.0%), gc-sweep (-2.2%), and the trace replay counts are unchanged, and route-switch-shared is -21.8%.
+- Stale-read fix A2 (mark-through, 4b8d6e5fd ported to f5b860d6e) over B (height buckets, fc28f2b11). A2 fixes all 11 known stale reads of f5b860d6e with no new field, B 10 of 11 with +8 bytes per derived node. App scenarios: both inside noise everywhere except B S4a -4.5%, S12:50 +3.6%, S14 p95 +1.3%. Suites: A2 +0% to +6% on upstream, B +4% to +43% (updateSignals +43%), B +15% to +23% on effectChurn and +18% on moveBetweenEffects; both cut eagerChain 10 / 100 by 70% / 96%, which removes the n(n+1)/2 recomputes of a chain of observed nodes. A2 costs more on the cutoff shapes (Remaining known costs), B less, and B is faster on fanOutRepeat (-10% to -26%).
+- `markedUnneeded` written by index with a count and cleared by setting the entries in use to `undefined` (dab2e9f85, ablation ab10 on 66f0a1392), over `push` and `length = 0`. Suite: unobservedComputed -20% to -26%, cutoffWrite -35% / -26%, lazyGraphBehindCutoff -31% / -25%, hideAndShow -31%, moveBetweenEffects -22%, reorder 2 -17%; slower on repeatedUnretainedReads flat R1 +9.7% and R10 +4.2% and eagerChain 10 / 100 +11% / +8%. App: S4a p95 -4.3%, S6a p50 +8.4% [+0.4, +16.5]. A batched write takes 22.3 to 22.6 ns against 36.3 to 39.5 ns, because `length = 0` on every flush is an array length store that V8 does not make free on an empty array.
+- `onChange(value)` over an `onChange` with no argument (6a0d7a03e against 438a5ca1c). S4a p95 -5.4% [-6.8, -4.3], S8 p50 -2.7% [-3.9, -0.9], every other scenario and the suites within ±4% except moveBetweenEffects -15.5%.
 - A top-level read of an unneeded node links edges and puts the node on the cleanup queue (d56dc5ede, where the function was `readUnretained`) over read-and-dispose (6c963e2ae). repeatedUnretainedReads diamond R10 is 3.26 against 23.30 (explicit) and 25.10 (idle); flat R10 1.48 against 5.00. The trace replays with the idle scheduler compute 104 / 120 / 534 / 55 against 334 / 258 / 954 / 148.
 - A render retains its nodes until commit, so a node that a render reads is not disposed before commit. Without render retains, the synchronous scheduler gives 574 / 372 / 1085 / 235 against 392 / 285 / 669 / 116 with them, because each node that a render reads is disposed before the app retains the node. With the idle scheduler both give 104 / 120 / 534 / 55, which depends on the scheduler not running before commit.
 
 ### Remaining known costs
 
-- repeatedUnretainedReads R1 (one top-level read per node, with no retain) is about +25%: flat 5.25 against 4.23 (d56dc5ede) and 4.14 (ba3daedf7); diamond 27.81 against 22.34 and 22.77. The pushes onto `markedUnneeded` and the disposal at the end of each write cost this. At R10 and R100 f0b001a9d is 1.59 and 1.11 (flat), against 1.01 and 0.63 for ba3daedf7 with render retains.
+- repeatedUnretainedReads R1 (one top-level read per node, with no retain) is about +25%: flat 5.25 against 4.23 (d56dc5ede) and 4.14 (ba3daedf7); diamond 27.81 against 22.34 and 22.77. The additions to `markedUnneeded` and the disposal at the end of each write cost this. At R10 and R100 f0b001a9d is 1.59 and 1.11 (flat), against 1.01 and 0.63 for ba3daedf7 with render retains.
 - deep-first-pull at depth 50 is +4.7% [+0.5, +7.1] on f0b001a9d. With a warm-up pass it is within noise (+3.9% [-3.4, +5.8]; 1cf22dd6a +0.6%), and without one +6.7%, so the cost is a one-time compile of the first-retain path.
 - The heap after the gc-sweep sweep is 226.3 to 226.7 MB against 213.1 MB for ba3daedf7, because unneeded nodes stay computed until the scheduler disposes them.
 - `retainDerivedNode` allocates a 56.6-byte `Retain`, where ba3daedf7's retain allocated nothing.
-- A chain of n observed nodes, each reading the one before and the same source, recomputes n(n+1)/2 times per write (5,050 at n = 100, against 100 for alien-signals and Preact). The flush refreshes in flush-queue order, and a refresh of a dependent reads the old value of a dependency that is still on the flush queue, so the dependent is marked and refreshed again. Refreshing in dependency order makes it linear but costs 25% to 174% on every flush with two or more queued nodes (a min-heap per flush); refreshing a flush-queued dependency on read is incorrect when a lazy dependency is in between (random seed 28). The recorded app traces have no observed node with an observed dependency (0 of 344 retained nodes are read by another node), so the case does not occur in Isograph's use and the flush stays in queue order.
+- Marking goes past a node with an `onChange` (stale-read fix A2), so a node with an `onChange` that recomputes to its previous value no longer saves the nodes beyond it from being marked and verified. On f5b860d6e, A2 4b8d6e5fd: cutoffWrite +36.5% [+35.9, +38.6] at 1 and +180.0% [+172.2, +195.7] at 100; lazyGraphBehindCutoff +43.8% [+15.8, +54.5] at 1000 and +28.1% [+22.1, +30.5] at 10000; unobservedComputed +8.4% to +10.7%.
 
 ### Open items
 
