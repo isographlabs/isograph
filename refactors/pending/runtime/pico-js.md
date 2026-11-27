@@ -237,11 +237,11 @@ The exhaustive suite (Tests, Exhaustive suite) has no CI step yet, because it fa
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js is a TypeScript library for incremental computation. You write functions that compute values from inputs and from each other. pico-js remembers each function's result and which nodes it read. When an input changes, a function reruns the next time its result is needed, and only if at least one of the nodes it read last time has changed. A function with a change callback reruns before the update returns. A function whose result pico-js has freed reruns the next time its result is needed.
+pico-js is a TypeScript library for incremental computation. You write functions that compute values from inputs and from each other. pico-js remembers each function's result and which inputs and functions it read. When an input changes, a function reruns the next time its result is needed, and only if at least one of the nodes it read last time has changed. A function with a change callback reruns before the update returns. A function whose result pico-js has freed reruns the next time its result is needed.
 
 ## Priorities
 
-pico-js is designed to be the fastest JS reactivity library, even at the expense of ease of use. To achieve this performance, it does not enforce anything at runtime, and requires the user to follow certain contracts. For example, sources should only be updated when their value has changed, derived nodes should return the same previous value (i.e. `===`) if the result is unchanged, computations are synchronous and pure, and the graph has no cycles. A complete list of contracts is below.
+pico-js is designed to be the fastest JS reactivity library, even at the expense of ease of use. To achieve this performance, it does not enforce anything at runtime, and requires the user to follow contracts. For example, sources should only be updated when their value has changed, derived nodes should return their previous value when the new result is equal to it, so that `===` detects no change, computations are synchronous and pure, and the graph has no cycles. A complete list of contracts is below.
 
 ## How it works
 
@@ -259,7 +259,7 @@ import {
 } from '@isograph/pico-js';
 ```
 
-Inputs live in source nodes. Computed values live in derived nodes:
+A source node holds an input, and a derived node holds a computed value:
 
 ```ts
 const a = createSourceNode(1);
@@ -270,7 +270,7 @@ const sum = createDerivedNode(
 );
 ```
 
-`readSource` works only inside a computation. A source cannot be read from outside one, so keep the value you wrote if you need it elsewhere.
+pico-js has no top-level read of a source, so keep the value you wrote if you need it elsewhere.
 
 To read a derived node from outside a computation, call `readDerivedNode`. The first read computes the node. While the node is retained (see "Retaining nodes"), later reads return the cached value until something the node read changes:
 
@@ -287,7 +287,7 @@ readDerivedNode(doubled); // 6, doubledComputationCount === 1
 readDerivedNode(doubled); // 6, doubledComputationCount === 1
 ```
 
-Updating a source recomputes nothing right away, unless a node with a change callback depends on it. The nodes that depend on it recompute when they are next read:
+Updating a source recomputes nothing right away, unless a node with a change callback depends on it. The nodes that depend on it recompute when they are next read, if a value they read changed:
 
 ```ts
 writeSource(a, 10); // doubledComputationCount === 1
@@ -312,13 +312,13 @@ Retaining `chosen` computes it and keeps its result. While `useA` is true, `chos
 
 - `createSourceNode(value)` creates a source node.
 - `writeSource(source, value)` updates a source.
-- `createDerivedNode(computation)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `previous` has the type `TValue | undefined`. It is `undefined` the first time the node computes, and again the first time it computes after pico-js has freed it.
-- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
+- `createDerivedNode(computation)` creates a derived node. `computation(callingNode, previous)` returns its value. `previous` has the type `TValue | undefined`. It is `undefined` the first time the node computes, and again the first time it computes after pico-js has freed it.
+- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation.
 - `readDerivedNode(node)` reads a derived node from outside a computation.
-- `retainDerivedNode(node, onChange?)` computes the node if it is not up to date, keeps it cached between reads, and returns a retain. `onChange` takes no arguments. `releaseRetain(retain)` releases the retain.
+- `retainDerivedNode(node, onChange?)` computes the node if it is not up to date, keeps it cached between reads, and returns a retain. `releaseRetain(retain)` releases the retain.
 - `startWriteBatch()` and `endWriteBatch()` group updates.
-- `scheduler` is an object with a `schedule` field that you can assign a function to. `disposeNext()` and `disposeAll()` free unused nodes. `disposeNext()` returns whether the cleanup queue still has entries. See "Freeing unused nodes".
-- `SourceNode`, `DerivedNode`, and `Retain` are opaque handles. You pass them to the functions above and cannot read or write anything through them.
+- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed. See "Freeing unused nodes".
+- `SourceNode`, `DerivedNode`, and `Retain` are opaque handles. You pass them to the functions above.
 
 ## Returning the previous value
 
@@ -337,7 +337,7 @@ const evens = createDerivedNode((callingNode, previous) => {
 
 ## Nodes with parameters
 
-A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value, and look each node up however suits your app. For example, with a map:
+A computation receives only `callingNode` and `previous`. For a value that depends on a parameter, create one derived node per parameter value, and look each node up however suits your app. For example, with a map:
 
 ```ts
 const multipleNodes = new Map<number, DerivedNode<number>>();
@@ -366,11 +366,11 @@ Pass a callback to `retainDerivedNode` to run code when a node's value changes:
 retainDerivedNode(sum, () => console.log(readDerivedNode(sum)));
 ```
 
-`onChange` receives no arguments, so read the node inside it. pico-js does not call it when the retain is created. A node with a callback does not wait to be read. After each update that may change its value, pico-js brings it up to date right away, which recomputes it only if something it read changed, and calls the callback if the value changed. The call happens synchronously, before `writeSource` returns, or before the `endWriteBatch` that closes the batch returns. Releasing the last retain that has a callback makes the node lazy again.
+`onChange` receives no arguments, so read the node inside it. pico-js does not call it when the retain is created. pico-js updates a node with a callback without waiting for a read. After each update that may change its value, pico-js brings it up to date right away, which recomputes it only if something it read changed, and calls the callback if the value changed. The call happens synchronously, before `writeSource` returns, or before the `endWriteBatch` that closes the outermost batch returns. After the last retain with a callback is released, the node recomputes only when it is read. The step at the end of an update that brings such nodes up to date and calls their callbacks is the flush.
 
 ### Recomputing early to stop updates
 
-Normally an update marks every node that depends on the changed source, and each of those nodes later checks or recomputes when it is read. A node that recomputes right after the update, as a node with a callback does, stops this: if its value is unchanged, pico-js does not mark the nodes beyond it on its account, so they are neither checked nor recomputed on its account. Other paths from the update can still reach them. To get this without reacting to the change, retain the node with a callback that does nothing:
+Normally an update marks every node that depends on the changed source, and each of those nodes later checks or recomputes when it is read. A node with a callback recomputes right after the update. If its value is unchanged, pico-js does not mark the nodes that depend on it, so those nodes do not recompute on its account. Other paths from the update can still reach them. To get this without reacting to the change, retain the node with a callback that does nothing:
 
 ```ts
 const isEven = createDerivedNode(
@@ -379,18 +379,18 @@ const isEven = createDerivedNode(
 retainDerivedNode(isEven, () => {});
 ```
 
-This pays off for a node whose value usually stays the same and that many nodes depend on. For other nodes it only adds a recompute per update.
+This pays off for a node whose value usually stays the same and that many nodes depend on. For other nodes it costs a recompute in each update after which nothing would have read the node.
 
 ## Grouping updates
 
-Updates between `startWriteBatch()` and `endWriteBatch()` are flushed together. Nodes with callbacks recompute, and callbacks run, once at that point instead of after each update. Batches can nest. The flush runs once, in the `endWriteBatch` call that closes the first `startWriteBatch`, when no batch is open any more:
+pico-js brings nodes with callbacks up to date once, for all the updates between `startWriteBatch()` and the matching `endWriteBatch()`, and runs their callbacks once. Batches can nest. Only the `endWriteBatch` that closes the outermost batch does this:
 
 ```ts
 startWriteBatch();
 writeSource(a, 3);
 startWriteBatch();
 writeSource(b, 4);
-endWriteBatch(); // no flush: the first batch is still open
+endWriteBatch(); // no flush: the outer batch is still open
 endWriteBatch(); // flushes both writes
 ```
 
@@ -398,15 +398,15 @@ endWriteBatch(); // flushes both writes
 
 [Freeing nodes](./docs/freeing-nodes.md) explains how this works.
 
-A node becomes unneeded when nothing retains it and no other node reads it, after you release its last retain, after its last dependent stops reading it or is freed, or after a read of a node nothing retains. pico-js does not free an unneeded node right away. It puts the node on a cleanup queue and keeps its cached value until a cleanup runs, so a read or a retain before then reuses the cached value, and recomputes it only if something the node read has changed. An update that reaches an unneeded node frees it at the end of that update.
+A node becomes unneeded when nothing retains it and no other node reads it, after you release its last retain, after its last dependent stops reading it or is freed, or after a read of a node nothing retains. pico-js does not free an unneeded node right away. It puts the node on a cleanup queue and keeps its cached value until a cleanup runs, so a read or a retain before then reuses the cached value, and recomputes it only if something the node read has changed. An update that takes an unneeded node out of date frees it when the update ends, or when the outermost batch ends, if the node is still unneeded then.
 
-Cleanup is controlled by `scheduler`, an object with a `schedule` function field that you can assign. pico-js calls `scheduler.schedule()` with no arguments at the end of the first call into pico-js that completes after the cleanup queue went from empty to non-empty. That call is a `writeSource`, `retainDerivedNode`, `releaseRetain`, or `readDerivedNode` made outside a batch and outside a change callback, or the `endWriteBatch` that closes the first open batch. Nodes added while the queue is already non-empty do not call `schedule`. `disposeNext()` can empty the queue and then refill it by freeing a node, so `schedule` can be called again while an earlier drain is still in progress.
+Cleanup is controlled by `scheduler`, an object with a `schedule` function field that you can assign. pico-js calls `scheduler.schedule()` with no arguments at the end of the first call into pico-js that completes after the cleanup queue went from empty to non-empty. That call is a `writeSource`, `retainDerivedNode`, `releaseRetain`, or `readDerivedNode` made outside a batch and outside a change callback, or the `endWriteBatch` that closes the outermost batch. Adding a node to a non-empty queue does not cause another call to `schedule`. `disposeNext()` can empty the queue and then refill it by freeing a node, so `schedule` can be called again while an earlier drain is still in progress.
 
 `disposeNext()` takes the most recently queued node, frees it if it is still unneeded, and returns whether the queue still has entries. Freeing a node can queue the nodes it depended on. `disposeAll()` frees every queued node that is still unneeded, and every node that this leaves unneeded.
 
 The default `schedule` calls `disposeNext()` during idle time with `requestIdleCallback`, for as long as the idle period has time left, and asks for another idle period if nodes are left. Where `requestIdleCallback` does not exist, for example on a server, it frees nodes for 5 ms per `setTimeout` task.
 
-Your own `schedule` must not throw. After pico-js calls it, nodes are freed only if it calls `disposeAll()`, or calls `disposeNext()` until that returns `false`, either at once or later, for example in idle time or in chunks between frames. To free everything as soon as each call into pico-js returns:
+Your own `schedule` must not throw. After pico-js calls it, `schedule` must call `disposeAll()`, or call `disposeNext()` until that returns `false`, at once or later, for example in idle time or in chunks between frames. To free everything at the end of each call into pico-js:
 
 ```ts
 scheduler.schedule = disposeAll;
@@ -426,7 +426,7 @@ function freeInIdleTime(deadline: IdleDeadline) {
 scheduler.schedule = () => requestIdleCallback(freeInIdleTime);
 ```
 
-To never free automatically, make `schedule` do nothing and call `disposeAll()` yourself, for example when your app is idle. The contract then requires you to call `disposeAll()`, or to drain `disposeNext()`, later. Until you do, unneeded nodes stay cached, except that an update still frees the unneeded nodes it marks:
+To free only when you choose, make `schedule` do nothing and call `disposeAll()` yourself, for example when your app is idle. The contract then requires you to call `disposeAll()`, or to drain `disposeNext()`, later. Until you do, unneeded nodes stay cached, except that an update still frees the unneeded nodes it marks:
 
 ```ts
 scheduler.schedule = () => {};
@@ -434,7 +434,7 @@ scheduler.schedule = () => {};
 
 ## Servers
 
-pico-js keeps one graph per process. On a server, every request shares that graph, the cached values in it, and the open write batch.
+pico-js's state is module-level, so every caller that loads the same copy of the module shares it. On a server, every request shares the graph, the cached values in it, and the open write batch.
 
 ## Contracts
 
@@ -445,17 +445,29 @@ pico-js does not check these contracts at run time.
 Breaking one of these can give stale or wrong values, or leave pico-js's state inconsistent.
 
 - Computations must be synchronous and pure, and read other nodes only through `readSource` and `readDerived`, called with the `callingNode` the computation received. pico-js reruns a computation when something it read that way has changed, or after it has freed the node, so a computation that depends on anything else keeps returning its cached value after that other state changes. A computation must not keep its `callingNode` for use after it returns.
-- A computation must not call anything else in pico-js: not a write, a batch, `retainDerivedNode`, `releaseRetain`, a disposal, or `readDerivedNode`. Such a call can start an update inside an update, which pico-js does not support, so callbacks can run early or be dropped, and the graph can change while a recompute is walking it.
+- A computation must not call anything else in pico-js, such as a write, a batch, `retainDerivedNode`, `releaseRetain`, a disposal, or `readDerivedNode`. Such a call can start an update inside an update, which pico-js does not support, so callbacks can run early or be dropped, and the graph can change while a recompute is walking it.
 - Computations and change callbacks must not throw. pico-js does not specify what a node's value or the callbacks of the same update are after a throw.
 - The graph must not have cycles. A node that reads itself, directly or through other nodes, can recurse until the call stack overflows.
-- A change callback may call `readDerivedNode` and must not do anything else with pico-js. A write, batch, retain, or release inside a callback can start an update inside the update, so callbacks can run early or be dropped.
+- A change callback may call `readDerivedNode` and must not do anything else with pico-js. A write inside a callback that reaches no node with a callback only marks. A write that reaches a node with a callback starts a second flush that throws a `TypeError` and drops every pending callback of both flushes. A batch, retain, or release inside a callback is not supported either. Compute a value that can be computed from the graph in a derived node, not in a source that a callback writes. To reset a value when another changes, keep the raw value in the source and compute the effective value in a derived node:
+
+  ```ts
+  const query = createSourceNode('a');
+  const requested = createSourceNode({ page: 3, query: 'a' });
+  const page = createDerivedNode((callingNode) => {
+    const { page, query: requestedFor } = readSource(callingNode, requested);
+    return requestedFor === readSource(callingNode, query) ? page : 1;
+  });
+  ```
+
+  Starting work outside the graph from a callback, for example a fetch, is fine, and the `writeSource` from its response runs outside the flush. A write that must follow a change can be deferred with `queueMicrotask(() => writeSource(...))`, which runs after the flush returns.
+
 - Release each retain exactly once. Releasing a retain twice can corrupt the node's retain list, so later callbacks and cleanup can misbehave. A retain that is never released keeps its node and everything the node depends on cached for good.
-- Do not read derived nodes inside a write batch, and do not call `retainDerivedNode` there, because retaining computes the node, which is a read. Inside the batch, a read of a node with a callback, or of a node that depends on one, returns the value from before the batch's writes. Those nodes are brought up to date when the `endWriteBatch` that closes the first batch runs.
-- Every `startWriteBatch` needs one `endWriteBatch`, and no batch needs a second one. If the code between them can throw, call `endWriteBatch` in a `finally`. Until the matching `endWriteBatch`, no update is flushed, so no callback runs.
-- A write batch must not span an `await`. Requests share one graph (see "Servers"), so another request's writes join your batch and are flushed when you end it, and its reads of nodes with callbacks in the meantime return values from before the batch's writes.
+- Do not read derived nodes inside a write batch, and do not call `retainDerivedNode` there, because retaining computes the node, which is a read. Inside the batch, a read of a node with a callback, or of a node that depends on one, returns the value from before the batch's writes. The `endWriteBatch` that closes the outermost batch brings nodes with callbacks up to date and marks the nodes that depend on them.
+- Call `endWriteBatch` exactly once for each `startWriteBatch`. If the code between them can throw, call `endWriteBatch` in a `finally`. Until the outermost batch's `endWriteBatch`, the flush does not run, so no callback runs.
+- A write batch must not span an `await`. Requests share one graph (see "Servers"), so another request's writes join your batch, and nodes with callbacks are brought up to date when you end it, and its reads of nodes with callbacks in the meantime return values from before the batch's writes.
 - A custom scheduler must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`. If it stops early, the remaining unneeded nodes stay cached until something calls `disposeNext` or `disposeAll` again.
 - Do not mutate values after passing them to pico-js or reading them from it. A value changed in place is still `===` to itself, so nodes that depend on it can keep results computed from its old contents.
-- A chain of nodes computed for the first time, or of `DIRTY` nodes that each read the next, uses several call stack frames per node. In Node 24 the limit is around 2,000 nodes deep, and a longer chain can throw a `RangeError`.
+- Keep chains of nodes that each read the next shorter than about 2,000 nodes in Node 24. Each node in such a chain uses several call stack frames when it computes for the first time or recomputes, and a longer chain can throw a `RangeError`.
 
 ### Contracts for performance
 
@@ -466,7 +478,7 @@ Breaking one of these costs extra work. The results stay correct.
 
 ## Guarantees
 
-If you follow the contracts, every computation, top-level read, and change callback sees current values, and a node recomputes only when something it read changed, or after pico-js has freed it. A change callback runs at most once per update or batch, after every node with a callback is up to date.
+If you follow the contracts, every computation, top-level read, and change callback reads current values, and a node recomputes only when something it read changed, or after pico-js has freed it. A change callback runs at most once per update or batch, after every node with a callback is up to date.
 
 How pico-js works is in the [design document](./docs/design.md). [Freeing nodes](./docs/freeing-nodes.md) describes how pico-js decides when to free a cached node, and [performance](./docs/performance.md) describes the data structures and techniques that make it fast.
 ````
