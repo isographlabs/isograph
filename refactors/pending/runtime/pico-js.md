@@ -436,6 +436,109 @@ scheduler.schedule = () => {};
 
 pico-js's state is module-level, so every caller that loads the same copy of the module shares it. On a server, every request shares the graph, the cached values in it, and the open write batch.
 
+## Wrapping pico-js for an easier API
+
+pico-js keeps its API minimal for speed, and an app can wrap it. These wrappers are examples. They use the exports in "API", and each compiles against them.
+
+A module-level current node lets a computation read without passing `callingNode`, and a derived node become a function. `derived` saves the current node, sets it to its own `callingNode`, and restores it in a `finally`. A read inside a computation calls `readDerived` or `readSource`, and a read outside one calls `readDerivedNode`, or returns the last value written for a source. `derived` takes an `equal` function that returns `previous` when the new result is equal to it, which keeps the `===` cutoff for structurally equal results, for example with `deepEqual`. A source's `set` takes an `equal` function that skips `writeSource` when the value did not change. It keeps the current value itself, because pico-js has no top-level read of a source.
+
+```ts
+let current: CallingNode | undefined;
+
+type Derived<T> = (() => T) & { readonly node: DerivedNode<T> };
+
+function derived<T>(
+  compute: (previous: T | undefined) => T,
+  equal: (a: T, b: T) => boolean = Object.is,
+): Derived<T> {
+  const node = createDerivedNode<T>((callingNode, previous) => {
+    const saved = current;
+    current = callingNode;
+    try {
+      const next = compute(previous);
+      return previous !== undefined && equal(previous, next) ? previous : next;
+    } finally {
+      current = saved;
+    }
+  });
+  const read = () =>
+    current === undefined ? readDerivedNode(node) : readDerived(current, node);
+  return Object.assign(read, { node });
+}
+
+function source<T>(initial: T) {
+  const node = createSourceNode(initial);
+  let latest = initial;
+  return {
+    get: () => (current === undefined ? latest : readSource(current, node)),
+    set: (value: T, equal: (a: T, b: T) => boolean = Object.is) => {
+      if (!equal(latest, value)) {
+        latest = value;
+        writeSource(node, value);
+      }
+    },
+  };
+}
+
+const price = source(10);
+const evens = derived(
+  () => [price.get()].filter((n) => n % 2 === 0),
+  deepEqual,
+);
+price.set(12, deepEqual);
+```
+
+A wrapper that catches errors returns a result value, so nothing throws into pico-js. The reader decides what an error means. Inside a computation it can return a fallback, and outside one it can rethrow:
+
+```ts
+type Result<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+function safeDerived<T>(
+  compute: (previous: T | undefined) => T,
+): Derived<Result<T>> {
+  return derived<Result<T>>((previous) => {
+    try {
+      return {
+        ok: true,
+        value: compute(previous?.ok === true ? previous.value : undefined),
+      };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  });
+}
+
+function unwrap<T>(result: Result<T>): T {
+  if (!result.ok) {
+    throw result.error;
+  }
+  return result.value;
+}
+```
+
+`batch` closes the batch in a `finally`, and `subscribe` retains a node with a callback, passes it the current value, and returns a function that releases the retain:
+
+```ts
+function batch<T>(fn: () => T): T {
+  startWriteBatch();
+  try {
+    return fn();
+  } finally {
+    endWriteBatch();
+  }
+}
+
+function subscribe<T>(
+  node: Derived<T>,
+  onChange: (value: T) => void,
+): () => void {
+  const retain = retainDerivedNode(node.node, () => onChange(node()));
+  return () => releaseRetain(retain);
+}
+```
+
+Each wrapper has a cost, which is why pico-js does not do it itself. The current node costs about 5% to 7.5% per update and read on a chain of three nodes, and made no measurable difference in the app scenarios that were measured. `batch(fn)` costs 3% to 5% in a few scenarios. A `try` costs a little on every run. An equality check costs a comparison on every write or every recompute. pico-js leaves these to the app, so that an app that does not need one does not pay for it.
+
 ## Contracts
 
 pico-js does not check these contracts at run time.
