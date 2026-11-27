@@ -251,13 +251,23 @@ const greeting = createDerivedNode((callingNode) => {
 
 ## Updating a source
 
-Call `writeSource` to update a source's value:
+An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date, and a marked node recomputes the next time it is read:
 
 ```ts
-writeSource(featuredEconomist, { first: 'Milton', last: 'Friedman' });
-```
+let runs = 0;
+const greeting = createDerivedNode((callingNode) => {
+  runs += 1;
+  const { first, last } = readSource(callingNode, featuredEconomist);
+  return `Hello, ${first} ${last}`;
+});
+const retain = retainDerivedNode(greeting); // runs === 1 (retaining is explained below)
 
-An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date. A marked node recomputes the next time it is read, and only if something it read really changed.
+writeSource(featuredEconomist, { first: 'Milton', last: 'Friedman' });
+// runs === 1: the update only marked greeting
+
+readDerivedNode(greeting); // 'Hello, Milton Friedman', runs === 2
+readDerivedNode(greeting); // runs === 2: nothing changed since the last read
+```
 
 ## Stopping recomputation early
 
