@@ -317,7 +317,7 @@ function nameNode(id: string): DerivedNode<string> {
 }
 ```
 
-You manage the map. pico-js frees a node's cached value once nothing uses it, but the node object stays in your map until you delete the entry.
+The map does not retain the nodes. Retain a node where you read it, as with any other node. pico-js frees a node's cached value once nothing retains it, but the node object stays in your map until you delete the entry.
 
 ## API
 
