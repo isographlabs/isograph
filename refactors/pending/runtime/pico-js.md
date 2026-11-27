@@ -289,7 +289,7 @@ While `showFullName` is false, `label` reads only `showFullName` and `nickname`,
 
 ## Returning the previous value
 
-When a node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so it can return `previous` when its result is unchanged:
+When a derived node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so it can return `previous` when its result is unchanged:
 
 ```ts
 const economists = createSourceNode([
