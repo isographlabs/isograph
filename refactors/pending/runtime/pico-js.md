@@ -345,11 +345,11 @@ Pass a callback to `retainDerivedNode` to run code when a node's value changes:
 retainDerivedNode(greeting, () => render(readDerivedNode(greeting)));
 ```
 
-A node with a callback does not wait to be read. After each update, pico-js recomputes it right away, and calls the callback if the value changed.
+A node with a callback does not wait to be read. After each update that may change its value, pico-js recomputes it right away, and calls the callback if the value did change.
 
 ## Computing ahead of time
 
-A node created with `EAGER` is recomputed right after each update while it is retained, the same way a node with a callback is. Use it for a node whose value usually stays the same: computing it early means pico-js learns that nothing changed before it marks the nodes that depend on it.
+A node created with `EAGER` is recomputed right after each update that may change its value, while it is retained, the same way a node with a callback is. Use it for a node whose value usually stays the same: computing it early means pico-js learns that nothing changed before it marks the nodes that depend on it.
 
 ## Grouping updates
 
