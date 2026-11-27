@@ -53,3 +53,12 @@ Once the pico-js API settles (global current node, retain objects with `onChange
 ## Trace-replay benchmark for pico-js
 
 Once the Isograph runtime runs on pico-js, record every pico-js call a demo app (`demos/github-demo`) makes during scripted sessions (navigate, paginate, edit, refetch) and replay the traces against each engine variant and competitor. Per-scenario results from real traces replace the synthetic app benchmark as the basis for engine decisions; suite totals are not used, because summing tests weights them by their run time.
+
+## Reducers over event streams in pico-js
+
+Consider whether pico-js can handle a reducer over an event stream: a value that folds a sequence of events, `state = reduce(state, event)`, rather than a pure function of the current sources. The questions to answer:
+
+- How is an event stream represented? One option is a source that holds the latest event. Another is an append-only log source.
+- How does a derived node fold events? A computation receives only the current values of the nodes it reads and its `previous` value. Folding with `previous` is correct only if every event triggers exactly one recompute. Lazy evaluation and batching do not guarantee that. Two writes in one batch, or two writes with no read between them, drop an event: the computation runs once and sees only the latest event.
+- Does the fold belong outside the graph? One option is a source that the caller updates with `writeSource(state, reduce(current, event))`, so each event is applied exactly once and derived nodes read the result. That moves the reducer out of pico-js and leaves the graph a pure function of its sources.
+- What do the contracts and the eager optimization imply? A fold inside the graph depends on how many times a computation runs, and the contracts do not promise a count. The eager optimization changes when a computation runs, so it changes which events a fold-by-`previous` would see.
