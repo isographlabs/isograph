@@ -40,9 +40,9 @@ These are the caller's obligations. pico-js checks none of them at run time, and
 
 - The caller writes a source only when its value changed.
 - A scheduler does not throw. A computation or an `onChange` may throw. After a throw, the statuses and values of the nodes that the throwing operation was updating are unspecified. The engine's module state is restored (Guarantees).
-- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received, and makes no other read of a node: no `readDerivedNode`, no `readUnretained`, and no `source.value`.
+- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received, and makes no other read of a node: no `readDerivedNode`, and no `readUnretained`.
 - A computation does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`.
-- An `onChange` does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`. It may call `readDerivedNode` and read `source.value`.
+- An `onChange` does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`. It may call `readDerivedNode`.
 - A computation's result depends only on `previous` and on the values that its tracked reads return.
 - The derived nodes form a directed acyclic graph, counting the edges that a node keeps from its previous recompute.
 - `readDerivedNode` is called only on a retained node, and only outside computations.
@@ -362,7 +362,7 @@ pico-js aims for correctness first and performance second. Where a rule can be t
 - `disposeNext(): boolean` pops the next entry off the cleanup queue and disposes its node if the node is still unneeded, and returns whether the cleanup queue is non-empty. `disposeAll(): void` empties the cleanup queue.
 - `scheduler.schedule: () => void` is called with no arguments at the end of the outermost operation that put a node on an empty cleanup queue. The default disposes during `requestIdleCallback` time, or for 5 ms per `setTimeout` task where `requestIdleCallback` does not exist. Assign `disposeAll` to dispose when each operation ends.
 - `LAZY` and `EAGER`, of type `DerivedNodeEvaluation`, are the creation choices.
-- `SourceNode<TValue>`, `DerivedNode<TValue>`, and `Retain<TValue>` are the node and retain types. Every field is `readonly`. A node's status and computation are internal to the engine and are not fields of `DerivedNode`.
+- `SourceNode<TValue>`, `DerivedNode<TValue>`, and `Retain<TValue>` are opaque types. A caller cannot read or write any field of a node or a retain, and passes them only to the functions above. `DerivedNode<number>` is assignable to `DerivedNode<unknown>`, and each of the three types is not assignable to another.
 
 ```ts
 import {
@@ -447,9 +447,9 @@ These are the caller's obligations. pico-js checks none of them at run time, and
 
 - The caller writes a source only when its value changed.
 - A scheduler does not throw. A computation or an `onChange` may throw. After a throw, the statuses and values of the nodes that the throwing operation was updating are unspecified. The engine's module state is restored (Guarantees).
-- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received, and makes no other read of a node: no `readDerivedNode`, no `readUnretained`, and no `source.value`.
+- A computation is synchronous. It calls `readSource` and `readDerived` only with the `callingNode` it received, and makes no other read of a node: no `readDerivedNode`, and no `readUnretained`.
 - A computation does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`.
-- An `onChange` does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`. It may call `readDerivedNode` and read `source.value`.
+- An `onChange` does not write, start or end a batch, retain, release, call `readUnretained`, `disposeNext`, or `disposeAll`. It may call `readDerivedNode`.
 - A computation's result depends only on `previous` and on the values that its tracked reads return.
 - The derived nodes form a directed acyclic graph, counting the edges that a node keeps from its previous recompute.
 - `readDerivedNode` is called only on a retained node, and only outside computations.
@@ -502,7 +502,7 @@ pico-js upholds these while the caller meets every contract.
 - Whether a node behaves eagerly is encoded in its `evaluation` field, so marking, tracked reads, top-level reads, and verification test one field.
 - A node that becomes unneeded goes on the cleanup queue and is not disposed at once, so a node that receives a tracked read or a top-level read before the scheduler runs keeps its value. The end of a write disposes the unneeded nodes that its marking reached, so later writes do not walk them.
 - Each kind of node is one object shape, so property access stays monomorphic.
-- Public types are `readonly`, and the engine writes through an internal `Mutable` view, so the types enforce the field contract.
+- The public `SourceNode`, `DerivedNode`, and `Retain` are opaque: each has one field, keyed by a unique symbol that is declared and not exported, which carries `TValue`. A caller can read and write no field, and the engine works through the internal `Mutable` types.
 - pico-js checks no contract at run time. A future version may add the checks as a compile-time option.
 
 ### Module state
@@ -556,8 +556,8 @@ let changedCount = 0;
 - The flush's list of changed nodes, which the prototype allocated per flush on the first changed node, is the module-level `changedNodes` with `changedCount`. Each entry is set to `undefined` before its node's `onChange` calls run, so the array keeps no node reachable after the flush.
 - `flush` wraps `flushQueue` in `try`/`finally`, which sets `flushState` to `FLUSH_IDLE`, empties `markedUnneeded`, and clears the entries of `changedNodes` that a throw left, resetting their `onChangeStatus`. A computation or an `onChange` that throws therefore leaves the module state of an idle engine for the next operation. The prototype restored nothing and needed `resetForTests` after a throw.
 - `collectorStack` is renamed `cleanupQueue`, and `addToCollector` is renamed `addToCleanupQueue`.
-- The public API drops `Status` and the `status` field with `UNCOMPUTED`, `DIRTY`, `MAYBE_DIRTY`, and `CLEAN`, the encoded evaluation constants `EAGER_INACTIVE`, `LAZY_OBSERVED`, and `EAGER_ACTIVE`, and the types `EvaluationState` and `DependentsStatus`. `index.ts` exports `LAZY` and `EAGER` as the creation choices. `computation` is not a field of the public `DerivedNode`; it is a method of the internal `MutableDerivedNode`, which keeps `MutableDerivedNode<TValue>` assignable to `MutableDerivedNode<unknown>`. Tests read a node's status through the test helper `test/status.ts` (`statusOf(node)`), which casts to `MutableDerivedNode`.
-- The public `SourceNode`, `DerivedNode`, `Retain`, and `Edge` are `readonly`. The engine works on separate internal types written out field by field: `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, whose link fields (`dependency`, `nextDependency`, `previousDependent`, `nextDependent`) are mutable and whose `dependent` is `readonly`. Each exported function casts its public arguments to the internal type once, and the internal types reference each other, so edge walks need no casts. The generic `Mutable<T>` and the aliases `SourceEdge`, `DerivedEdge`, and `Queue` are removed.
+- The public API drops `Status` and the `status` field with `UNCOMPUTED`, `DIRTY`, `MAYBE_DIRTY`, and `CLEAN`, the encoded evaluation constants `EAGER_INACTIVE`, `LAZY_OBSERVED`, and `EAGER_ACTIVE`, and the types `EvaluationState` and `DependentsStatus`. `index.ts` exports `LAZY` and `EAGER` as the creation choices. `computation` is a method of the internal `MutableDerivedNode`, which keeps `MutableDerivedNode<TValue>` assignable to `MutableDerivedNode<unknown>`. Tests read a node's status through the test helper `test/status.ts` (`statusOf(node)`), which casts to `MutableDerivedNode`.
+- The public `SourceNode`, `DerivedNode`, and `Retain` are opaque, and there is no public `Edge`. The engine works on internal types written out field by field: `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain` (each an intersection of its public type with its fields), and `MutableEdge`, whose link fields (`dependency`, `nextDependency`, `previousDependent`, `nextDependent`) are mutable and whose `dependent` is `readonly`. Each exported function casts its public arguments to the internal type once, and the internal types reference each other, so edge walks need no casts. The generic `Mutable<T>` and the aliases `SourceEdge`, `DerivedEdge`, and `Queue` are removed.
 - `disposeNext` returning `false` and `disposeAll` set `scheduleStatus` to `SCHEDULE_NOT_PENDING`, because the cleanup queue they leave is empty, so a later push onto the cleanup queue schedules again.
 - `endWriteBatch`'s and `flushOrQueue`'s shared tail is the function `flushOrDisposeMarked`.
 - `scheduleIfOutermost` tests the batch depth and the flush state in `batch.ts`, and calls `scheduleIfPending` in `cleanup.ts`, which owns `scheduleStatus`.
@@ -614,15 +614,10 @@ markedUnneeded         marking.ts     markDirty, markCheck, their queue copies  
  * - s1 then s3: e2 is taken off s2's dependents and put on s3's.
  * - only s1: e2 is removed from d1's dependencies and from s2's dependents.
  *
- * A write to s2 walks s2's dependents to mark them. s2's list of dependents
- * contains one edge for every derived node whose computation read s2, so many
- * dependents share it, the list can be long, and e2 can be anywhere in it. The
- * list is doubly linked through the edges, so removing e2 takes two pointer
- * updates and no search through s2's other dependents. A list of dependencies
- * is singly linked, because a recompute only walks it from the start and a trim
- * cuts its end. The links live in the edges rather than in a Set or an array,
- * so recording a dependency allocates nothing beyond its edge. A node's retain
- * list is doubly linked the same way, through the `Retain` objects.
+ * A list of dependents is doubly linked through the edges, so removing e2
+ * takes constant time. A list of dependencies is singly linked, because a
+ * recompute only walks it from the start and a trim cuts its end. A node's
+ * retain list is doubly linked the same way, through the `Retain` objects.
  *
  * Internal invariant: an edge is in exactly one list of dependencies and one
  * list of dependents. A node's lists of dependencies stay linked while it is
@@ -640,14 +635,9 @@ export type Status =
   | typeof MAYBE_DIRTY
   | typeof CLEAN;
 
-/** An edge as the edge-list fields of a node expose it to a caller. */
-export type Edge<TDependency> = {
-  readonly dependency: TDependency;
-  readonly dependent: DerivedNode<unknown>;
-  readonly nextDependency: Edge<TDependency> | undefined;
-  readonly previousDependent: Edge<TDependency> | undefined;
-  readonly nextDependent: Edge<TDependency> | undefined;
-};
+declare const sourceBrand: unique symbol;
+declare const derivedBrand: unique symbol;
+declare const retainBrand: unique symbol;
 
 export type MutableEdge<TDependency> = {
   dependency: TDependency;
@@ -662,7 +652,7 @@ export type NodeWithDependents<TDependency> = {
   lastDependent: MutableEdge<TDependency> | undefined;
 };
 
-export type MutableSourceNode<TValue> = {
+export type MutableSourceNode<TValue> = SourceNode<TValue> & {
   value: TValue;
   firstDependent: MutableEdge<MutableSourceNode<unknown>> | undefined;
   lastDependent: MutableEdge<MutableSourceNode<unknown>> | undefined;
@@ -673,7 +663,7 @@ export type MutableSourceNode<TValue> = {
  * Internal invariant: `computation` is a method, which keeps
  * `MutableDerivedNode<TValue>` assignable to `MutableDerivedNode<unknown>`.
  */
-export type MutableDerivedNode<TValue> = {
+export type MutableDerivedNode<TValue> = DerivedNode<TValue> & {
   value: TValue;
   firstRetain: MutableRetain<TValue> | undefined;
   status: Status;
@@ -691,7 +681,7 @@ export type MutableDerivedNode<TValue> = {
   ): TValue;
 };
 
-export type MutableRetain<TValue> = {
+export type MutableRetain<TValue> = Retain<TValue> & {
   readonly node: MutableDerivedNode<TValue>;
   readonly onChange: (() => void) | undefined;
   previous: MutableRetain<TValue> | undefined;
@@ -711,16 +701,9 @@ export type DependentsStatus =
  * A node leaves `Dirty` only by a recompute, and a node joins the source's list
  * of dependents only through `readSource`.
  *
- * Contract: a caller writes no field. The type enforces the contract.
  */
-export type SourceNode<TValue> = {
-  readonly value: TValue;
-  readonly firstDependent: Edge<SourceNode<unknown>> | undefined;
-  readonly lastDependent: Edge<SourceNode<unknown>> | undefined;
-  readonly dependentsStatus: DependentsStatus;
-};
+export type SourceNode<TValue> = { readonly [sourceBrand]: TValue };
 
-/** The creation choice of a derived node that is always lazy. */
 export const LAZY = 0;
 /**
  * The creation choice of a derived node that behaves eagerly while it is
@@ -732,7 +715,6 @@ export const EAGER_INACTIVE = EAGER;
 export const LAZY_OBSERVED = 2;
 export const EAGER_ACTIVE = 3;
 
-/** The evaluation a caller chooses at creation. */
 export type DerivedNodeEvaluation = typeof LAZY | typeof EAGER;
 
 /**
@@ -770,51 +752,19 @@ type OnChangeStatus = typeof ON_CHANGE_NOT_QUEUED | typeof ON_CHANGE_QUEUED;
  * unneeded is on the cleanup queue, or on the marked-unneeded list of the
  * running write, except a node that `readDerived` has brought up to date but
  * has not yet linked to the calling node by an edge.
- *
- * Contract: a caller writes no field. The type enforces the contract.
  */
-export type DerivedNode<TValue> = {
-  readonly value: TValue;
-  /** The head of the node's retain list, most recent first. */
-  readonly firstRetain: Retain<TValue> | undefined;
-  readonly evaluation: EvaluationState;
-  readonly firstSourceDependency: Edge<SourceNode<unknown>> | undefined;
-  readonly lastSourceDependency: Edge<SourceNode<unknown>> | undefined;
-  readonly firstDerivedDependency: Edge<DerivedNode<unknown>> | undefined;
-  readonly lastDerivedDependency: Edge<DerivedNode<unknown>> | undefined;
-  readonly firstDependent: Edge<DerivedNode<unknown>> | undefined;
-  readonly lastDependent: Edge<DerivedNode<unknown>> | undefined;
-};
+export type DerivedNode<TValue> = { readonly [derivedBrand]: TValue };
 
-/**
- * A retain of a node. `retainDerivedNode` returns a retain and
- * `releaseRetain` releases a retain. A retain is in the retain list of its
- * node.
- */
-export type Retain<TValue> = {
-  readonly node: DerivedNode<TValue>;
-  /**
-   * Guarantee: the flush calls `onChange` once for each change of the node's
-   * value that the flush made, after the flush has refreshed every node on the
-   * flush queue. The first recompute of a node does not call `onChange`.
-   *
-   * Contract: the callback does not write, start or end a batch, retain,
-   * release, dispose, or call `readUnretained`. It may call `readDerivedNode`
-   * and read `source.value`.
-   */
-  readonly onChange: (() => void) | undefined;
-  readonly previous: Retain<TValue> | undefined;
-  readonly next: Retain<TValue> | undefined;
-};
+export type Retain<TValue> = { readonly [retainBrand]: TValue };
 
-/** Returns a source node that stores `value`. */
 export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
-  return {
+  const source = {
     value,
     firstDependent: undefined,
     lastDependent: undefined,
     dependentsStatus: DEPENDENTS_KNOWN_TO_BE_ALL_DIRTY,
-  };
+  } as MutableSourceNode<TValue>;
+  return source;
 }
 
 /**
@@ -833,7 +783,7 @@ export function createDerivedNode<TValue>(
   ) => TValue,
   evaluation: DerivedNodeEvaluation = LAZY,
 ): DerivedNode<TValue> {
-  const node: MutableDerivedNode<TValue> = {
+  const node = {
     value: undefined as unknown as TValue,
     firstRetain: undefined,
     onChangeStatus: ON_CHANGE_NOT_QUEUED,
@@ -846,7 +796,7 @@ export function createDerivedNode<TValue>(
     firstDependent: undefined,
     lastDependent: undefined,
     computation,
-  };
+  } as MutableDerivedNode<TValue>;
   return node;
 }
 ```
@@ -1927,7 +1877,13 @@ import { pull } from './pull';
  * created `EAGER`, and each retain with an `onChange`, make the node behave
  * eagerly.
  *
- * Contract: called outside computations and `onChange` callbacks.
+ * Guarantee: the flush calls `onChange` once for each change of the node's
+ * value that the flush made, after the flush has refreshed every node on the
+ * flush queue. The first recompute of a node does not call `onChange`.
+ *
+ * Contract: called outside computations and `onChange` callbacks. `onChange`
+ * does not write, start or end a batch, retain, release, dispose, or call
+ * `readUnretained`. It may call `readDerivedNode`.
  */
 export function retainDerivedNode<TValue>(
   node: DerivedNode<TValue>,
@@ -1938,12 +1894,12 @@ export function retainDerivedNode<TValue>(
   // when it starts to behave eagerly.
   pull(mutableNode);
   const head = mutableNode.firstRetain;
-  const retain: MutableRetain<TValue> = {
+  const retain = {
     node: mutableNode,
     onChange,
     previous: undefined,
     next: head,
-  };
+  } as MutableRetain<TValue>;
   if (head !== undefined) {
     head.previous = retain;
   }
@@ -1976,7 +1932,10 @@ export function releaseRetain<TValue>(retain: Retain<TValue>): void {
   if (next !== undefined) {
     next.previous = previous;
   }
-  if (mutableNode.firstRetain === undefined || retain.onChange !== undefined) {
+  if (
+    mutableNode.firstRetain === undefined ||
+    mutableRetain.onChange !== undefined
+  ) {
     updateEvaluation(mutableNode);
   }
   if (
@@ -2103,7 +2062,7 @@ export {
 - `verify` walks the lists of derived dependencies in the order of the tracked reads with an explicit stack of edges. `verify` moves into a lazy `MaybeDirty` dependency before its dependent continues, and brings any other dependency up to date with `pull`, so a `MaybeDirty` dependency that behaves eagerly returns its previous value. After a `pull` that leaves the current node `Dirty`, `verify` recomputes that node and moves back to the node's dependent. `verify` does not recompute `root`. `verify` returns `DIRTY` or `CLEAN` for its caller, because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change the status. `verify` pushes an edge only when the dependency it moves into has more than one dependent, and allocates the verify stack on the first push.
 - `trim` calls `unlinkDropped` only when the node has a derived edge to drop. A call with an empty list, on every recompute of a node that reads only sources, slowed the write-then-read loop of `bench/single`'s read case from 4.45 ns to 6.39 ns, and the guard brought it to 4.0 ns.
 - `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `createDerivedNode` and assigned in `disposeNode` and `disposeMarked`, where `value` is `unknown`. In the other three statuses, `value` is the value that a recompute returned, which can be `undefined`.
-- The exported `SourceNode`, `DerivedNode`, `Retain`, and `Edge` mark every field `readonly`, so a caller's write to any field is a type error. The public `DerivedNode` has no `status`, `onChangeStatus`, or `computation` field. `DerivedNode` still has `evaluation`, typed `EvaluationState`, which `index.ts` does not export. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast, and a caller reaching an edge through the public `node.firstDependent` sees only the `readonly` `Edge`.
+- The exported `SourceNode`, `DerivedNode`, and `Retain` are opaque: each is `{ readonly [brand]: TValue }` with its own unique symbol, declared in `nodes.ts` and not exported, so a caller can read or write no field, `DerivedNode<number>` is assignable to `DerivedNode<unknown>`, and the three types are not assignable to one another. There is no public `Edge`. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast. Tests read internal fields through `internal(node)` in `test/internal.ts`.
 - A block comment at the top of `nodes.ts` describes the edge lists. A comment in the source that states a caller's obligation starts with `Contract:`, and one that states what the engine ensures starts with `Guarantee:` or `Internal invariant:`. The `DerivedNode` doc comment lists the internal invariants, which the README does not list.
 
 ### Checks for a future debug build
