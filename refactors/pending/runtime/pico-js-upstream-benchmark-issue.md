@@ -1,6 +1,6 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the six operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the seven operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
@@ -10,6 +10,7 @@ The suite has no case for the six operations below, and each of them occurs in l
 | 4 | A computed reads the same computeds in a different order | - |
 | 5 | One batch writes the same input many times | - |
 | 6 | Many writes with no effect, then one read | - |
+| 7 | A rarely changing projection read by many effects | - |
 
 ## Cases
 
@@ -140,6 +141,23 @@ derived.read();
 for (let i = 1; i <= count; i++) framework.withBatch(() => input.write(i));
 derived.read();
 // derived should run once.
+```
+
+### 7. A rarely changing projection read by many effects
+
+`input` holds a large object and changes on every write, but `projection` reads one field that rarely changes. Many effects read `projection`. When `projection` recomputes to the same value, no effect should run, and the cost of a write should not grow with the number of effects.
+
+Failure mode: an implementation that notifies every effect that reads `projection` on every write, and only afterwards finds that `projection` did not change, does work proportional to the number of effects on every write, even though no effect reruns.
+
+```js
+const input = framework.signal({ field: 0, other: 0 });
+const projection = framework.computed(() => input.read().field);
+for (let i = 0; i < count; i++) framework.effect(() => projection.read());
+
+for (let i = 1; i <= writes; i++) {
+  framework.withBatch(() => input.write({ field: 0, other: i }));
+}
+// projection should rerun once per write, no effect should rerun, and the cost of a write should not grow with count.
 ```
 
 ## Harness
