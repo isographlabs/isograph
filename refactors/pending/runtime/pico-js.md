@@ -319,7 +319,7 @@ const evens = createDerivedNode((callingNode, previous) => {
 
 ## Nodes with parameters
 
-A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value and keep the nodes in a map:
+A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value, and look each node up however suits your app. For example, with a map:
 
 ```ts
 const multipleNodes = new Map<number, DerivedNode<number>>();
@@ -336,7 +336,7 @@ function multipleOfA(factor: number): DerivedNode<number> {
 }
 ```
 
-Delete entries you no longer need. pico-js frees a node's cached value when nothing uses it, but it cannot free the node object while your map still refers to it.
+pico-js frees a node's cached value when nothing uses it, but it cannot free the node object while your code still refers to it.
 
 ## Retaining nodes
 
