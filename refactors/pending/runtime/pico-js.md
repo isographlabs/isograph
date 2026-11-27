@@ -236,7 +236,7 @@ pico-js is a TypeScript library for incremental computation. You write functions
 
 ## How it works
 
-Inputs live in source nodes. Computed values live in derived nodes, whose computation reads other nodes:
+Inputs live in source nodes. Computed values live in derived nodes:
 
 ```ts
 const economist = createSourceNode({ first: 'John Maynard', last: 'Keynes' });
