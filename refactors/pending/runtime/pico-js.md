@@ -232,209 +232,137 @@ jobs:
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js keeps derived values up to date without recomputing more than it has to. You put raw data in source nodes, and you describe everything computed from that data as derived nodes. When the data changes, pico-js works out which derived values might be affected, and recomputes them only when someone actually needs them.
+pico-js caches values computed from other values. When an input changes, it recomputes only the cached values that depend on it, and only when they are read.
 
-## Sources and derived nodes
+## How it works
 
-A source node holds a value you set. A derived node holds a function that computes a value from other nodes. The function's first argument, `callingNode`, is the derived node being computed. Passing it to `readSource` and `readDerived` tells pico-js that `callingNode` depends on the node being read, which is how pico-js learns the graph:
+Inputs live in source nodes. Computed values live in derived nodes, whose computation reads other nodes:
 
 ```ts
-const featuredEconomist = createSourceNode({
-  first: 'John Maynard',
-  last: 'Keynes',
-});
-const greeting = createDerivedNode((callingNode) => {
-  const { first, last } = readSource(callingNode, featuredEconomist);
-  return `Hello, ${first} ${last}`;
+const economist = createSourceNode({ first: 'John Maynard', last: 'Keynes' });
+
+const fullName = createDerivedNode((callingNode) => {
+  const { first, last } = readSource(callingNode, economist);
+  return `${first} ${last}`;
 });
 ```
 
-## Updating a source
+The computation receives `callingNode`, the node being computed, and passes it to each read. That is how pico-js learns that `fullName` depends on `economist`.
 
-An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date, and a marked node recomputes the next time it is read:
+Reading a derived node computes it the first time, and returns the cached value after that:
 
 ```ts
 let runs = 0;
 const greeting = createDerivedNode((callingNode) => {
   runs += 1;
-  const { first, last } = readSource(callingNode, featuredEconomist);
-  return `Hello, ${first} ${last}`;
+  return `Hello, ${readDerived(callingNode, fullName)}`;
 });
-const retain = retainDerivedNode(greeting); // runs === 1 (retaining is explained below)
+const retain = retainDerivedNode(greeting);
 
-writeSource(featuredEconomist, { first: 'Milton', last: 'Friedman' });
-// runs === 1: the update only marked greeting
+readDerivedNode(greeting); // 'Hello, John Maynard Keynes', runs === 1
+readDerivedNode(greeting); // same value, runs === 1
+```
 
+Updating a source recomputes nothing. It marks the nodes that depend on the source as out of date, and they recompute when they are next read:
+
+```ts
+writeSource(economist, { first: 'Milton', last: 'Friedman' }); // runs === 1
 readDerivedNode(greeting); // 'Hello, Milton Friedman', runs === 2
-readDerivedNode(greeting); // runs === 2: nothing changed since the last read
 ```
 
-## Stopping recomputation early
-
-If a node recomputes to a value `===` to its previous value, the nodes that depend on it do not recompute. A computation that builds a new object every time defeats this, because the new object is never `===` to the old one. The computation receives its previous value as its second argument, so it can return that value when nothing it cares about changed:
+A node that recomputes to a value `===` to its old value stops the update there, and the nodes that depend on it keep their cached values. A computation receives its previous value as a second argument, so it can keep returning the same object when nothing it uses changed:
 
 ```ts
-const name = createDerivedNode<{
-  readonly first: string;
-  readonly last: string;
-}>((callingNode, previous) => {
-  const { first, last } = readSource(callingNode, featuredEconomist);
-  return previous !== undefined &&
-    previous.first === first &&
-    previous.last === last
+const name = createDerivedNode((callingNode, previous) => {
+  const { first, last } = readSource(callingNode, economist);
+  return previous?.first === first && previous?.last === last
     ? previous
     : { first, last };
 });
 ```
 
-`previous` is `undefined` the first time the node computes.
-
-## Retaining a node
-
-Retaining a node tells pico-js that you are using it. `retainDerivedNode(node)` computes the node and returns a retain. While a node has a retain, pico-js keeps it and everything it depends on, and you can read its current value with `readDerivedNode(node)`. When you are done, pass the retain to `releaseRetain`. A component typically retains the nodes it renders when it mounts and releases them when it unmounts.
-
-A retain can also subscribe to changes: `retainDerivedNode(node, onChange)` calls `onChange` whenever an update changes the node's value. A subscribed node is recomputed at the end of each write instead of waiting to be read, because otherwise nobody would find out that it changed. Creating a node with `EAGER` gives it the same treatment while it is retained, without a callback, which is useful for a node whose value often comes out unchanged, since recomputing it early stops the change from spreading further.
-
-To read a node once without keeping it, use `readUnretained(node)`.
-
-## What happens to nodes nobody uses
-
-When a node is no longer retained and nothing reads it, pico-js does not throw it away immediately. It keeps the value for a while, so if the node is used again soon, for example because a component remounts, the cached value is still there. The unused nodes wait on a cleanup queue, and pico-js disposes them during idle time. You can control this by assigning your own function to `scheduler.schedule`, which pico-js calls when the queue gets its first entry. From there you call `disposeNext()` as often as you like, or `disposeAll()` to clear the queue at once. Assigning `scheduler.schedule = disposeAll` disposes unused nodes as soon as each operation finishes.
-
-## Updating several sources at once
-
-Wrap related updates in `startWriteBatch()` and `endWriteBatch()`. Subscribed nodes then recompute and notify once, after the last update, instead of after every update. Batches can nest, and only the outermost `endWriteBatch` triggers the recompute.
-
-## Example
+A computation's dependencies are whatever it read on its latest run, so they can change from one run to the next:
 
 ```ts
-import {
-  createDerivedNode,
-  createSourceNode,
-  disposeAll,
-  EAGER,
-  endWriteBatch,
-  readDerived,
-  readDerivedNode,
-  readSource,
-  readUnretained,
-  releaseRetain,
-  retainDerivedNode,
-  scheduler,
-  startWriteBatch,
-  writeSource,
-} from '@isograph/pico-js';
+const showFullName = createSourceNode(false);
+const label = createDerivedNode((callingNode) =>
+  readSource(callingNode, showFullName)
+    ? readDerived(callingNode, fullName)
+    : readSource(callingNode, economist).last,
+);
+```
 
-// Dispose unused nodes at the end of each operation, so the comments below are true right away.
-scheduler.schedule = disposeAll;
+While `showFullName` is false, `label` does not depend on `fullName`, and updates that only affect `fullName` do not touch `label`.
 
-const featuredEconomist = createSourceNode({
-  first: 'John Maynard',
-  last: 'Keynes',
-  bestBook: 'A Treatise on Money',
-});
+## API
 
-// Returns its previous object when the name did not change, so readers of
-// `name` do not recompute when only `bestBook` changes.
-const name = createDerivedNode<{
-  readonly first: string;
-  readonly last: string;
-}>((callingNode, previous) => {
-  const { first, last } = readSource(callingNode, featuredEconomist);
-  return previous !== undefined &&
-    previous.first === first &&
-    previous.last === last
-    ? previous
-    : { first, last };
-});
+- `createSourceNode(value)` creates a source node.
+- `writeSource(source, value)` updates a source.
+- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value. `evaluation` is `LAZY` (the default) or `EAGER`; see "Computing ahead of time" below.
+- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation.
+- `retainDerivedNode(node, onChange?)` starts using a node and returns a retain. `releaseRetain(retain)` stops using it.
+- `readDerivedNode(node)` reads a node you have retained.
+- `readUnretained(node)` reads a node once, without retaining it.
+- `startWriteBatch()` and `endWriteBatch()` group updates.
+- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed.
 
-let greetingRuns = 0;
-const greeting = createDerivedNode((callingNode) => {
-  greetingRuns += 1;
-  const { first, last } = readDerived(callingNode, name);
-  return `Hello, ${first} ${last}`;
-});
+## Retaining nodes
 
-const greetingRetain = retainDerivedNode(greeting); // greetingRuns === 1
-readDerivedNode(greeting); // 'Hello, John Maynard Keynes'
+`readDerivedNode` only reads nodes you have retained. Retaining a node with `retainDerivedNode` tells pico-js you are using it, so it keeps the node and everything it depends on cached until you call `releaseRetain`. A component would typically retain the nodes it renders when it mounts and release them when it unmounts.
 
-writeSource(featuredEconomist, {
-  first: 'John Maynard',
-  last: 'Keynes',
-  bestBook: 'The General Theory',
-});
-readDerivedNode(greeting); // still 'Hello, John Maynard Keynes', and greetingRuns is still 1
+To read a node once without keeping it, use `readUnretained`. Do not use `readDerivedNode` on a node you have not retained: pico-js only frees nodes it knows are unused, and a node read that way is never marked unused, so it stays cached and attached to its sources until some update happens to reach it.
 
+## Reacting to changes
+
+Pass a callback to `retainDerivedNode` to run code when a node's value changes:
+
+```ts
+retainDerivedNode(greeting, () => render(readDerivedNode(greeting)));
+```
+
+A node with a callback does not wait to be read. After each update, pico-js recomputes it right away, and calls the callback if the value changed.
+
+## Computing ahead of time
+
+A node created with `EAGER` is recomputed right after each update while it is retained, the same way a node with a callback is. Use it for a node whose value usually stays the same: computing it early means pico-js learns that nothing changed before it marks the nodes that depend on it.
+
+## Grouping updates
+
+Updates inside `startWriteBatch()` and `endWriteBatch()` are applied together. Nodes with callbacks recompute, and callbacks run, once at the end, instead of after each update. Batches can nest.
+
+```ts
 startWriteBatch();
-writeSource(featuredEconomist, {
-  first: 'Milton',
-  last: 'Friedman',
-  bestBook: 'A Monetary History',
-});
-writeSource(featuredEconomist, {
-  first: 'Milton',
-  last: 'Friedman',
-  bestBook: 'Capitalism and Freedom',
-});
+writeSource(economist, { first: 'Adam', last: 'Smith' });
+writeSource(showFullName, true);
 endWriteBatch();
-readDerivedNode(greeting); // 'Hello, Milton Friedman', greetingRuns === 2
-
-// A subscribed node: onChange runs at the end of each update that changes it.
-const rendered: Array<string> = [];
-const view = createDerivedNode(
-  (callingNode) => readDerived(callingNode, greeting),
-  EAGER,
-);
-const viewRetain = retainDerivedNode(view, () =>
-  rendered.push(readDerivedNode(view)),
-);
-writeSource(featuredEconomist, {
-  first: 'Adam',
-  last: 'Smith',
-  bestBook: 'The Wealth of Nations',
-});
-// rendered is ['Hello, Adam Smith']
-
-const initials = createDerivedNode((callingNode) => {
-  const { first, last } = readDerived(callingNode, name);
-  return `${first[0]}${last[0]}`;
-});
-readUnretained(initials); // 'AS', and initials is disposed again
-
-releaseRetain(viewRetain);
-releaseRetain(greetingRetain); // view, greeting, and name are disposed
 ```
+
+## Freeing unused nodes
+
+When a node is released and nothing else reads it, pico-js keeps it cached for a while instead of freeing it at once, so using it again soon is free. By default it frees unused nodes during idle time. To control this, assign a function to `scheduler.schedule`. pico-js calls it when there is something to free, and your function calls `disposeNext()` as often as it likes, or `disposeAll()` to free everything. `scheduler.schedule = disposeAll` frees unused nodes as soon as each call into pico-js returns.
 
 ## Rules
 
-pico-js does not check these, so breaking one gives undefined behavior.
+pico-js does not check these. Breaking one gives undefined behavior.
 
 - Only update a source when its value actually changed.
-- Computations must be synchronous and pure. A computation reads other nodes only through `readSource` and `readDerived`, using the node it was given, and does nothing else with pico-js: no writes, batches, retains, releases, `readDerivedNode`, `readUnretained`, or disposal.
+- Computations must be synchronous and pure, read other nodes only through `readSource` and `readDerived` with their `callingNode`, and do nothing else with pico-js.
 - The graph must not have cycles.
-- An `onChange` may read with `readDerivedNode`, and must not do anything else with pico-js.
-- Only call `readDerivedNode` on a node you have retained.
-- Release each retain exactly once.
-- Do not use `readUnretained` for a value that has to stay current, such as a component's render up to its commit. Retain the node instead, because an unretained node can be disposed as soon as the read returns.
-- Inside a write batch, do not read derived nodes. Until the batch ends, a derived node can still hold a value computed from data you have already overwritten. Reading sources inside a batch is fine.
-- Every `startWriteBatch` needs exactly one `endWriteBatch`. If the code between them can throw, put `endWriteBatch` in a `finally`.
-- A write batch must not span an `await`. pico-js keeps one graph per process, so on a server another request's updates would land in your batch.
-- If you replace the scheduler, it must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`.
-- Do not mutate a value after passing it to `writeSource` or `createSourceNode`, or after reading it.
-- Very deep chains of nodes that compute for the first time, or that recompute because they are all out of date, use one call stack frame per node. In Node 24 with the default stack, that limit is around 2,000 nodes.
+- A change callback may call `readDerivedNode`, and must not do anything else with pico-js.
+- Call `readDerivedNode` only on a retained node, and release each retain exactly once.
+- Do not use `readUnretained` for a value that must stay current, such as a render until its commit. Retain the node instead.
+- Do not read derived nodes inside a write batch. Until the batch ends, they can hold values computed from data you have already replaced.
+- Every `startWriteBatch` needs one `endWriteBatch`. If the code between them can throw, call `endWriteBatch` in a `finally`.
+- A write batch must not span an `await`. pico-js keeps one graph per process, so on a server another request's updates would join your batch.
+- A custom scheduler must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`.
+- Do not mutate values after passing them to pico-js or reading them from it.
+- Chains of nodes computed for the first time use one call stack frame per node. In Node 24 the limit is around 2,000 nodes deep.
 
-## What pico-js promises
+## Guarantees
 
-As long as you follow the rules, `readDerivedNode` and `readUnretained` always return the value the node would have if you recomputed it from scratch, and a node only recomputes when something it read actually changed. Each `onChange` runs at most once per write or batch, after every subscribed node is up to date, and only when that node's value changed. A node you stop using keeps its value until it is disposed, so using it again before then costs nothing. If a computation or `onChange` throws, pico-js resets its own state before the exception reaches you, so other work in the process, including other requests on a server, is unaffected, although the nodes the failed operation was updating may be left partly updated.
+If you follow the rules, `readDerivedNode` and `readUnretained` return the value the node would have if you recomputed everything from scratch, and a node recomputes only when something it read changed. A change callback runs at most once per update or batch, only when its node's value changed, and only after every node with a callback is up to date. If a computation or callback throws, pico-js resets its own state before the exception reaches you, so the rest of the process is unaffected, though the nodes that update was changing may be left partly updated.
 
-## Why it is built this way
-
-- Each dependency is a small object linked into two lists, one on each node it connects, instead of being stored in sets. Adding or removing one takes constant time, and a computation that reads the same nodes every time it runs reuses its existing links and allocates nothing.
-- Walking the graph to mark, check, or dispose nodes uses explicit stacks rather than recursion, so a deep graph cannot overflow the call stack in those paths.
-- A computation is given the node it is computing and passes it to its reads, instead of pico-js tracking the running computation in a global. Passing the node is faster than reading and restoring a global around every computation.
-- Unused nodes are disposed later rather than immediately, because in real app sessions most of them are used again soon after they are released.
-- The public node types are opaque, so callers cannot depend on or corrupt a node's internals.
-- Contracts are not checked at run time, to keep the hot paths fast. A future version may offer the checks as a build option.
+How pico-js is built, and why, is in [DESIGN.md](./DESIGN.md).
 ````
 
 The Terms, Model, Contracts, and Guarantees sections at the top of this doc copy the README's sections word for word.
