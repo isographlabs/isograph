@@ -284,14 +284,15 @@ A node depends on whatever its computation read on its latest run, so its depend
 
 ```ts
 const showFullName = createSourceNode(false);
+const nickname = createSourceNode('Keynes');
 const label = createDerivedNode((callingNode) =>
   readSource(callingNode, showFullName)
     ? readDerived(callingNode, fullName)
-    : readSource(callingNode, economist).last,
+    : readSource(callingNode, nickname),
 );
 ```
 
-While `showFullName` is false, `label` does not read `fullName`, so updates that only change `fullName` do not recompute `label`.
+While `showFullName` is false, `label` reads only `showFullName` and `nickname`, so updating `economist` does not recompute `label`.
 
 ## Nodes with parameters
 
