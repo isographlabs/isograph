@@ -249,13 +249,21 @@ const greeting = createDerivedNode((callingNode) => {
 });
 ```
 
-When you write a source, pico-js does not recompute anything. It only marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date. A marked node recomputes the next time it is read, and only if one of the things it read really changed. If a node recomputes to the same value as before (`===`), nothing beyond it recomputes. To get that effect for objects, a computation can return its previous value, which it receives as its second argument, when the new result is structurally equal.
+## Updating a source
+
+Call `writeSource` to update a source's value:
+
+```ts
+writeSource(featuredEconomist, { first: 'Milton', last: 'Friedman' });
+```
+
+An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date. A marked node recomputes the next time it is read, and only if something it read really changed. If a node recomputes to the same value as before (`===`), nothing that depends on it recomputes. To get that effect for objects, a computation can return its previous value, which it receives as its second argument, when the new result is structurally equal.
 
 ## Retaining a node
 
 Retaining a node tells pico-js that you are using it. `retainDerivedNode(node)` computes the node and returns a retain. While a node has a retain, pico-js keeps it and everything it depends on, and you can read its current value with `readDerivedNode(node)`. When you are done, pass the retain to `releaseRetain`. A component typically retains the nodes it renders when it mounts and releases them when it unmounts.
 
-A retain can also subscribe to changes: `retainDerivedNode(node, onChange)` calls `onChange` whenever a write changes the node's value. A subscribed node is recomputed at the end of each write instead of waiting to be read, because otherwise nobody would find out that it changed. Creating a node with `EAGER` gives it the same treatment while it is retained, without a callback, which is useful for a node whose value often comes out unchanged, since recomputing it early stops the change from spreading further.
+A retain can also subscribe to changes: `retainDerivedNode(node, onChange)` calls `onChange` whenever an update changes the node's value. A subscribed node is recomputed at the end of each write instead of waiting to be read, because otherwise nobody would find out that it changed. Creating a node with `EAGER` gives it the same treatment while it is retained, without a callback, which is useful for a node whose value often comes out unchanged, since recomputing it early stops the change from spreading further.
 
 To read a node once without keeping it, use `readUnretained(node)`.
 
@@ -263,9 +271,9 @@ To read a node once without keeping it, use `readUnretained(node)`.
 
 When a node is no longer retained and nothing reads it, pico-js does not throw it away immediately. It keeps the value for a while, so if the node is used again soon, for example because a component remounts, the cached value is still there. The unused nodes wait on a cleanup queue, and pico-js disposes them during idle time. You can control this by assigning your own function to `scheduler.schedule`, which pico-js calls when the queue gets its first entry. From there you call `disposeNext()` as often as you like, or `disposeAll()` to clear the queue at once. Assigning `scheduler.schedule = disposeAll` disposes unused nodes as soon as each operation finishes.
 
-## Writing several sources at once
+## Updating several sources at once
 
-Wrap related writes in `startWriteBatch()` and `endWriteBatch()`. Subscribed nodes then recompute and notify once, after the last write, instead of after every write. Batches can nest, and only the outermost `endWriteBatch` triggers the recompute.
+Wrap related updates in `startWriteBatch()` and `endWriteBatch()`. Subscribed nodes then recompute and notify once, after the last update, instead of after every update. Batches can nest, and only the outermost `endWriteBatch` triggers the recompute.
 
 ## Example
 
@@ -341,7 +349,7 @@ writeSource(featuredEconomist, {
 endWriteBatch();
 readDerivedNode(greeting); // 'Hello, Milton Friedman', greetingRuns === 2
 
-// A subscribed node: onChange runs at the end of each write that changes it.
+// A subscribed node: onChange runs at the end of each update that changes it.
 const rendered: Array<string> = [];
 const view = createDerivedNode(
   (callingNode) => readDerived(callingNode, greeting),
@@ -371,7 +379,7 @@ releaseRetain(greetingRetain); // view, greeting, and name are disposed
 
 pico-js does not check these, so breaking one gives undefined behavior.
 
-- Only write a source when its value actually changed.
+- Only update a source when its value actually changed.
 - Computations must be synchronous and pure. A computation reads other nodes only through `readSource` and `readDerived`, using the node it was given, and does nothing else with pico-js: no writes, batches, retains, releases, `readDerivedNode`, `readUnretained`, or disposal.
 - The graph must not have cycles.
 - An `onChange` may read with `readDerivedNode`, and must not do anything else with pico-js.
@@ -380,9 +388,9 @@ pico-js does not check these, so breaking one gives undefined behavior.
 - Do not use `readUnretained` for a value that has to stay current, such as a component's render up to its commit. Retain the node instead, because an unretained node can be disposed as soon as the read returns.
 - Inside a write batch, do not read derived nodes. Until the batch ends, a derived node can still hold a value computed from data you have already overwritten. Reading sources inside a batch is fine.
 - Every `startWriteBatch` needs exactly one `endWriteBatch`. If the code between them can throw, put `endWriteBatch` in a `finally`.
-- A write batch must not span an `await`. pico-js keeps one graph per process, so on a server another request's writes would land in your batch.
+- A write batch must not span an `await`. pico-js keeps one graph per process, so on a server another request's updates would land in your batch.
 - If you replace the scheduler, it must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`.
-- Do not mutate a value after writing it or after reading it.
+- Do not mutate a value after passing it to `writeSource` or `createSourceNode`, or after reading it.
 - Very deep chains of nodes that compute for the first time, or that recompute because they are all out of date, use one call stack frame per node. In Node 24 with the default stack, that limit is around 2,000 nodes.
 
 ## What pico-js promises
