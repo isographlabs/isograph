@@ -232,7 +232,7 @@ jobs:
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js caches values computed from other values. When an input changes, it recomputes only the cached values that depend on it, and only when they are read.
+pico-js is a library for caching values that are computed from other values. When an input changes, pico-js recomputes only the cached values that depend on it, and only when they are read.
 
 ## How it works
 
