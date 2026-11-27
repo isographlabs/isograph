@@ -1,6 +1,6 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the seven operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the eight operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
@@ -11,6 +11,7 @@ The suite has no case for the seven operations below, and each of them occurs in
 | 5 | One batch writes the same input many times | - |
 | 6 | Many writes with no effect, then one read | - |
 | 7 | A rarely changing projection read by many effects | - |
+| 8 | A rarely changing projection read by many effects that also rerun for other reasons | - |
 
 ## Cases
 
@@ -158,6 +159,31 @@ for (let i = 1; i <= writes; i++) {
   framework.withBatch(() => input.write({ field: 0, other: i }));
 }
 // projection should rerun once per write, no effect should rerun, and the cost of a write should not grow with count.
+```
+
+### 8. A rarely changing projection read by many effects that also rerun for other reasons
+
+This is case 7, except that between writes to `input`, one effect reruns because of its own signal and reads `projection` again. `projection` does not change, so a write to `input` should cost the same as in case 7, however many effects have reread `projection` in between.
+
+Failure mode: an implementation that remembers it has already notified the effects of `projection`, and forgets that once any effect rereads `projection`, notifies every effect again on the next write. The cost of a write then grows with the number of effects, as soon as any one of them reruns between writes.
+
+```js
+const input = framework.signal({ field: 0, other: 0 });
+const projection = framework.computed(() => input.read().field);
+const own = [];
+for (let i = 0; i < count; i++) {
+  own.push(framework.signal(0));
+  framework.effect(() => {
+    own[i].read();
+    projection.read();
+  });
+}
+
+for (let i = 1; i <= writes; i++) {
+  framework.withBatch(() => own[i % count].write(i));
+  framework.withBatch(() => input.write({ field: 0, other: i }));
+}
+// The cost of each write to input should not grow with count.
 ```
 
 ## Harness
