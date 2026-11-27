@@ -291,6 +291,17 @@ const chosen = createDerivedNode((callingNode) =>
 
 While `useA` is true, `chosen` reads only `useA` and `a`. After an update to `b`, reading `chosen` returns its cached value without rerunning its computation.
 
+## API
+
+- `createSourceNode(value)` creates a source node.
+- `writeSource(source, value)` updates a source.
+- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
+- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
+- `readDerivedNode(node)` reads a derived node from outside a computation.
+- `retainDerivedNode(node, onChange?)` keeps a node cached between reads and returns a retain. `releaseRetain(retain)` releases it.
+- `startWriteBatch()` and `endWriteBatch()` group updates.
+- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed.
+
 ## Returning the previous value
 
 When a derived node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so it can return `previous` when its result is unchanged:
@@ -305,17 +316,6 @@ const evens = createDerivedNode((callingNode, previous) => {
 ```
 
 `filter` returns a new array every time, so without the check every update to `numbers` would give `evens` a new value. With it, updating `numbers` to `[1, 2, 5, 4]` leaves `evens` as the same `[2, 4]` array, and nothing that reads `evens` recomputes.
-
-## API
-
-- `createSourceNode(value)` creates a source node.
-- `writeSource(source, value)` updates a source.
-- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
-- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
-- `readDerivedNode(node)` reads a derived node from outside a computation.
-- `retainDerivedNode(node, onChange?)` keeps a node cached between reads and returns a retain. `releaseRetain(retain)` releases it.
-- `startWriteBatch()` and `endWriteBatch()` group updates.
-- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed.
 
 ## Nodes with parameters
 
