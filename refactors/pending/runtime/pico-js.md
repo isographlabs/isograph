@@ -259,23 +259,23 @@ const fullName = createDerivedNode((callingNode) => {
 To read a derived node from outside a computation, call `readDerivedNode`. The first read computes the node. While the node is retained (see "Retaining nodes"), later reads return the cached value:
 
 ```ts
-let runs = 0;
+let greetingComputationCount = 0;
 const greeting = createDerivedNode((callingNode) => {
-  // Counting runs is for demonstration only. Real computations should have no side effects.
-  runs += 1;
+  // Counting computations is for demonstration only. Real computations should have no side effects.
+  greetingComputationCount += 1;
   return `Hello, ${readDerived(callingNode, fullName)}`;
 });
 retainDerivedNode(greeting);
 
-readDerivedNode(greeting); // 'Hello, John Maynard Keynes', runs === 1
-readDerivedNode(greeting); // same value, runs === 1
+readDerivedNode(greeting); // 'Hello, John Maynard Keynes', greetingComputationCount === 1
+readDerivedNode(greeting); // same value, greetingComputationCount === 1
 ```
 
 Updating a source recomputes nothing right away. The nodes that depend on it recompute when they are next read:
 
 ```ts
-writeSource(economist, { first: 'Milton', last: 'Friedman' }); // runs === 1
-readDerivedNode(greeting); // 'Hello, Milton Friedman', runs === 2
+writeSource(economist, { first: 'Milton', last: 'Friedman' }); // greetingComputationCount === 1
+readDerivedNode(greeting); // 'Hello, Milton Friedman', greetingComputationCount === 2
 ```
 
 A node depends on whatever its computation read on its latest run, so its dependencies can change from one run to the next:
