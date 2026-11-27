@@ -232,7 +232,7 @@ jobs:
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js is a library for caching values that are computed from other values. When an input changes, pico-js recomputes only the cached values that depend on it, and only when they are read.
+pico-js is a TypeScript library for incremental computation. You write functions that compute values from inputs. pico-js remembers each function's result and which inputs it read, and after an input changes, it reruns only the functions that read something that changed.
 
 ## How it works
 
