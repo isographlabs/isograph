@@ -252,6 +252,7 @@ To read a derived node from outside a computation, retain it and call `readDeriv
 ```ts
 let runs = 0;
 const greeting = createDerivedNode((callingNode) => {
+  // Counting runs is for demonstration only. Real computations must have no side effects.
   runs += 1;
   return `Hello, ${readDerived(callingNode, fullName)}`;
 });
