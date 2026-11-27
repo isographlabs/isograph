@@ -396,6 +396,8 @@ endWriteBatch(); // flushes both writes
 
 ## Freeing unused nodes
 
+[Freeing nodes](./docs/freeing-nodes.md) explains how this works.
+
 A node becomes unneeded when nothing retains it and no other node reads it, after you release its last retain, after its last dependent stops reading it or is freed, or after a read of a node nothing retains. pico-js does not free an unneeded node right away. It puts the node on a cleanup queue and keeps its cached value until a cleanup runs, so a read or a retain before then reuses the cached value, and recomputes it only if something the node read has changed. An update that reaches an unneeded node frees it at the end of that update.
 
 Cleanup is controlled by `scheduler`, an object with a `schedule` function field that you can assign. pico-js calls `scheduler.schedule()` with no arguments at the end of the first call into pico-js that completes after the cleanup queue went from empty to non-empty. That call is a `writeSource`, `retainDerivedNode`, `releaseRetain`, or `readDerivedNode` made outside a batch and outside a change callback, or the `endWriteBatch` that closes the first open batch. Nodes added while the queue is already non-empty do not call `schedule`. `disposeNext()` can empty the queue and then refill it by freeing a node, so `schedule` can be called again while an earlier drain is still in progress.
@@ -466,7 +468,7 @@ Breaking one of these costs extra work. The results stay correct.
 
 If you follow the contracts, every computation, top-level read, and change callback sees current values, and a node recomputes only when something it read changed, or after pico-js has freed it. A change callback runs at most once per update or batch, after every node with a callback is up to date.
 
-How pico-js is built, and why, is in [the design document](./docs/design.md).
+How pico-js works is in the [design document](./docs/design.md). [Freeing nodes](./docs/freeing-nodes.md) describes how pico-js decides when to free a cached node, and [performance](./docs/performance.md) describes the data structures and techniques that make it fast.
 ````
 
 The Terms, Model, Contracts, and Guarantees sections at the top of this doc copy the README's sections word for word.
