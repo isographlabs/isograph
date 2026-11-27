@@ -247,8 +247,6 @@ const fullName = createDerivedNode((callingNode) => {
 });
 ```
 
-The computation receives `callingNode`, the node being computed, and passes it to each read. That is how pico-js learns that `fullName` depends on `economist`.
-
 Reading a derived node computes it the first time, and returns the cached value after that:
 
 ```ts
