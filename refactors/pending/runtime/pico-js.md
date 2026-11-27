@@ -277,7 +277,7 @@ A node depends on whatever its computation read on its latest run, so its depend
 
 ```ts
 const showFullName = createSourceNode(false);
-const nickname = createSourceNode('Keynes');
+const nickname = createSourceNode('Maynard');
 const label = createDerivedNode((callingNode) =>
   readSource(callingNode, showFullName)
     ? readDerived(callingNode, fullName)
@@ -338,8 +338,8 @@ Delete entries you no longer need. pico-js frees a node's cached value when noth
 
 - `createSourceNode(value)` creates a source node.
 - `writeSource(source, value)` updates a source.
-- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
-- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation.
+- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
+- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
 - `readDerivedNode(node)` reads a derived node from outside a computation.
 - `retainDerivedNode(node, onChange?)` keeps a node cached between reads and returns a retain. `releaseRetain(retain)` releases it.
 - `startWriteBatch()` and `endWriteBatch()` group updates.
@@ -388,7 +388,7 @@ pico-js does not check these contracts. Breaking one gives undefined behavior.
 
 - Only update a source when its value actually changed.
 - When a computation's result is structurally equal to its previous value, return the previous value (`previous`), so that `===` sees no change.
-- Computations must be synchronous and pure, read other nodes only through `readSource` and `readDerived` with their `callingNode`, and do nothing else with pico-js.
+- Computations must be synchronous and pure, read other nodes only through `readSource` and `readDerived`, and do nothing else with pico-js. The types prevent passing any node other than the `callingNode` to those functions. A computation must not keep its `callingNode` for use after it returns.
 - The graph must not have cycles.
 - A change callback may call `readDerivedNode`, and must not do anything else with pico-js.
 - Release each retain exactly once.
@@ -432,7 +432,9 @@ let flushing = 0;
 
 ```ts
 // from libs/pico-js/src/nodes.ts, src/retain.ts, src/cleanup.ts, src/batch.ts
-export function createDerivedNode<TValue>(computation: (callingNode: DerivedNode<unknown>, previous: TValue | undefined) => TValue, evaluation: DerivedNodeEvaluation = LAZY): DerivedNode<TValue>;
+export function createDerivedNode<TValue>(computation: (callingNode: CallingNode, previous: TValue | undefined) => TValue, evaluation: DerivedNodeEvaluation = LAZY): DerivedNode<TValue>;
+export function readSource<TValue>(callingNode: CallingNode, source: SourceNode<TValue>): TValue;
+export function readDerived<TValue>(callingNode: CallingNode, node: DerivedNode<TValue>): TValue;
 export function readDerivedNode<TValue>(node: DerivedNode<TValue>): TValue; // top-level only
 let scheduleStatus: ScheduleStatus = SCHEDULE_NOT_PENDING;
 let flushState: FlushState = FLUSH_IDLE;
@@ -531,6 +533,14 @@ export type Status =
 declare const sourceBrand: unique symbol;
 declare const derivedBrand: unique symbol;
 declare const retainBrand: unique symbol;
+declare const callingNodeBrand: unique symbol;
+
+/**
+ * The node whose computation is running. A computation receives it and passes
+ * it to `readSource` and `readDerived`. It has no runtime value of its own:
+ * the engine passes the derived node being computed.
+ */
+export type CallingNode = { readonly [callingNodeBrand]: true };
 
 export type MutableEdge<TDependency> = {
   dependency: TDependency;
@@ -568,10 +578,7 @@ export type MutableDerivedNode<TValue> = DerivedNode<TValue> & {
   lastDerivedDependency: MutableEdge<MutableDerivedNode<unknown>> | undefined;
   firstDependent: MutableEdge<MutableDerivedNode<unknown>> | undefined;
   lastDependent: MutableEdge<MutableDerivedNode<unknown>> | undefined;
-  computation(
-    callingNode: DerivedNode<unknown>,
-    previous: TValue | undefined,
-  ): TValue;
+  computation(callingNode: CallingNode, previous: TValue | undefined): TValue;
 };
 
 export type MutableRetain<TValue> = Retain<TValue> & {
@@ -666,12 +673,13 @@ export function createSourceNode<TValue>(value: TValue): SourceNode<TValue> {
  *
  * Contract: `computation` is synchronous. `computation` reads other nodes
  * only through `readSource` and `readDerived`, called with the `callingNode`
- * that `computation` receives. `computation` does not write, start or end a batch, retain, release, dispose,
- * or call `readDerivedNode`.
+ * that `computation` receives, and does not keep that `callingNode` for use
+ * after it returns. `computation` does not write, start or end a batch, retain,
+ * release, dispose, or call `readDerivedNode`.
  */
 export function createDerivedNode<TValue>(
   computation: (
-    callingNode: DerivedNode<unknown>,
+    callingNode: CallingNode,
     previous: TValue | undefined,
   ) => TValue,
   evaluation: DerivedNodeEvaluation = LAZY,
@@ -1202,6 +1210,7 @@ import {
   DIRTY,
   LAZY_OBSERVED,
   UNCOMPUTED,
+  type CallingNode,
   type DerivedNode,
   type MutableDerivedNode,
   type MutableEdge,
@@ -1218,10 +1227,11 @@ import { linkEdge, unlinkAll, unlinkEdge } from './edges';
  * Contract: called only while the computation of `callingNode` runs.
  */
 export function readSource<TValue>(
-  callingNode: DerivedNode<unknown>,
+  callingNode: CallingNode,
   source: SourceNode<TValue>,
 ): TValue {
-  const mutableCallingNode = callingNode as MutableDerivedNode<unknown>;
+  const mutableCallingNode =
+    callingNode as unknown as MutableDerivedNode<unknown>;
   const mutableSource = source as MutableSourceNode<TValue>;
   mutableSource.dependentsStatus = DEPENDENTS_NOT_NECESSARILY_ALL_DIRTY;
   const last = mutableCallingNode.lastSourceDependency;
@@ -1262,10 +1272,11 @@ export function readSource<TValue>(
  * Contract: called only while the computation of `callingNode` runs.
  */
 export function readDerived<TValue>(
-  callingNode: DerivedNode<unknown>,
+  callingNode: CallingNode,
   node: DerivedNode<TValue>,
 ): TValue {
-  const mutableCallingNode = callingNode as MutableDerivedNode<unknown>;
+  const mutableCallingNode =
+    callingNode as unknown as MutableDerivedNode<unknown>;
   const mutableNode = node as MutableDerivedNode<TValue>;
   const value = pull(mutableNode);
   const last = mutableCallingNode.lastDerivedDependency;
@@ -1387,7 +1398,7 @@ export function verify(
 }
 
 function computeFirst<TValue>(node: MutableDerivedNode<TValue>): TValue {
-  const value = node.computation(node, undefined);
+  const value = node.computation(node as unknown as CallingNode, undefined);
   trim(node);
   node.status = CLEAN;
   node.value = value;
@@ -1414,7 +1425,7 @@ export function rerun<TValue>(
 ): TValue {
   node.lastSourceDependency = undefined;
   node.lastDerivedDependency = undefined;
-  const value = node.computation(node, previous);
+  const value = node.computation(node as unknown as CallingNode, previous);
   trim(node);
   node.status = CLEAN;
   return value;
@@ -1912,6 +1923,7 @@ export { endWriteBatch, startWriteBatch, writeSource } from './batch';
 export { disposeAll, disposeNext, scheduler } from './cleanup';
 export { createDerivedNode, createSourceNode, EAGER, LAZY } from './nodes';
 export type {
+  CallingNode,
   DerivedNode,
   DerivedNodeEvaluation,
   Retain,
@@ -1938,7 +1950,7 @@ export { readDerivedNode, releaseRetain, retainDerivedNode } from './retain';
 - `verify` walks the lists of derived dependencies in the order of the tracked reads with an explicit stack of edges. `verify` moves into a lazy `MaybeDirty` dependency before its dependent continues, and brings any other dependency up to date with `pull`, so a `MaybeDirty` dependency that behaves eagerly returns its previous value. After a `pull` that leaves the current node `Dirty`, `verify` recomputes that node and moves back to the node's dependent. `verify` does not recompute `root`. `verify` returns `DIRTY` or `CLEAN` for its caller, because TypeScript narrows `node.status` in the caller's `switch` and does not see `verify` change the status. `verify` pushes an edge only when the dependency it moves into has more than one dependent, and allocates the verify stack on the first push.
 - `trim` calls `unlinkDropped` only when the node has a derived edge to drop. A call with an empty list, on every recompute of a node that reads only sources, slowed the write-then-read loop of `bench/single`'s read case from 4.45 ns to 6.39 ns, and the guard brought it to 4.0 ns.
 - `status === UNCOMPUTED` alone records that a node has no value. An `Uncomputed` node's `value` is `undefined`, cast to `TValue` once in `createDerivedNode` and assigned in `disposeNode` and `disposeMarked`, where `value` is `unknown`. In the other three statuses, `value` is the value that a recompute returned, which can be `undefined`.
-- The exported `SourceNode`, `DerivedNode`, and `Retain` are opaque: each is `{ readonly [brand]: TValue }` with its own unique symbol, declared in `nodes.ts` and not exported, so a caller can read or write no field, `DerivedNode<number>` is assignable to `DerivedNode<unknown>`, and the three types are not assignable to one another. There is no public `Edge`. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast. Tests read internal fields through `internal(node)` in `test/internal.ts`.
+- The exported `SourceNode`, `DerivedNode`, and `Retain` are opaque: each is `{ readonly [brand]: TValue }` with its own unique symbol, declared in `nodes.ts` and not exported, so a caller can read or write no field, `DerivedNode<number>` is assignable to `DerivedNode<unknown>`, and the three types are not assignable to one another. `CallingNode` is a fourth opaque type, `{ readonly [callingNodeBrand]: true }`, not assignable to or from `DerivedNode` or `SourceNode`. A computation receives one, `readSource` and `readDerived` take one as their first parameter, and the engine passes the node being computed and casts it back to `MutableDerivedNode` in those two functions. There is no public `Edge`. The engine works on `MutableSourceNode`, `MutableDerivedNode`, `MutableRetain`, and `MutableEdge`, each written out field by field in `nodes.ts`, and casts once per exported function that receives a public node or retain. A `MutableEdge` holds `MutableDerivedNode` and `MutableSourceNode` values, so marking, verification, and disposal reach nodes through edges with no cast. Tests read internal fields through `internal(node)` in `test/internal.ts`.
 - A block comment at the top of `nodes.ts` describes the edge lists. A comment in the source that states a caller's obligation starts with `Contract:`, and one that states what the engine ensures starts with `Guarantee:` or `Internal invariant:`. The `DerivedNode` doc comment lists the internal invariants, which the README does not list.
 
 ### Checks for a future debug build
