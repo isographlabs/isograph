@@ -85,3 +85,20 @@ Known costs:
 This is a wrapper or an experiment branch. It does not go into the core library. The S16 projection scenario and `cutoffWrite` are the benchmarks that judge it.
 
 Open question: whether the stale-read fix that ships (A2 with A5's skip bit, or a height variant) changes the payoff. Under A2 without A5, an eager node with many dependents costs O(dependents) per update, which may cancel the saving for exactly the nodes the heuristic selects.
+
+## pico-js: skip marking past nodes with callbacks that read only sources
+
+The case is a node with a change callback whose latest run read only sources. A projection of a record's source onto one field is the typical example. A source is always current, so such a node's recompute can never read a stale value. The engine identifies such a node for free with `firstDerivedDependency === undefined`. That needs no declaration and no requirement that the node's dependencies stay the same.
+
+The mechanism:
+
+- Marking stops at such a node.
+- The flush refreshes every such queued node first, before any other queued node.
+- Marking past one happens only from its own change callback, when its value changed.
+- That removes A5's walk past the projection.
+
+The hazard is a source-only node that, during its own refresh, switches branch and links its first derived edge, to a node D that sits past another source-only node not yet refreshed. The engine detects it at that link. Before the read returns, it marks past every source-only queued node not yet refreshed, using A2's beyond marking, so the read of D verifies and refreshes on demand. The node then stops being source-only. Under the contract (no derived reads in batches, `onChange` only reads), nothing else can read past such a node before the flush refreshes it.
+
+This saves A5's one extra marking pass per change of a projection's value. The S16c scenario (the projection changes on every event) and the pure-engine projection microbenchmark judge it. Build it only if A5 is measurably above the base there.
+
+It needs a written correctness proof before it lands, like the one for A5s in the scratchpad proofs.
