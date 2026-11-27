@@ -257,7 +257,27 @@ Call `writeSource` to update a source's value:
 writeSource(featuredEconomist, { first: 'Milton', last: 'Friedman' });
 ```
 
-An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date. A marked node recomputes the next time it is read, and only if something it read really changed. If a node recomputes to the same value as before (`===`), nothing that depends on it recomputes. To get that effect for objects, a computation can return its previous value, which it receives as its second argument, when the new result is structurally equal.
+An update recomputes nothing by itself. It marks the derived nodes that read the source, directly or through other derived nodes, as possibly out of date. A marked node recomputes the next time it is read, and only if something it read really changed.
+
+## Stopping recomputation early
+
+If a node recomputes to a value `===` to its previous value, the nodes that depend on it do not recompute. A computation that builds a new object every time defeats this, because the new object is never `===` to the old one. The computation receives its previous value as its second argument, so it can return that value when nothing it cares about changed:
+
+```ts
+const name = createDerivedNode<{
+  readonly first: string;
+  readonly last: string;
+}>((callingNode, previous) => {
+  const { first, last } = readSource(callingNode, featuredEconomist);
+  return previous !== undefined &&
+    previous.first === first &&
+    previous.last === last
+    ? previous
+    : { first, last };
+});
+```
+
+`previous` is `undefined` the first time the node computes.
 
 ## Retaining a node
 
