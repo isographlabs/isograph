@@ -347,7 +347,7 @@ Delete entries you no longer need. pico-js frees a node's cached value when noth
 
 ## Retaining nodes
 
-Reading a node never requires a retain. After `readDerivedNode` returns, a node that is not retained and that no other node depends on goes on the cleanup queue, and the next read after pico-js frees it computes it again (see "Freeing unused nodes").
+You can read a node without retaining it. If nothing retains the node and no other node depends on it, pico-js frees it some time after the read (see "Freeing unused nodes"). Once it has been freed, the next read computes it from scratch.
 
 Retaining a node with `retainDerivedNode` keeps the node and everything it depends on cached until you call `releaseRetain`. Updates still mark a retained node, so the next read recomputes only what changed. A retain with a callback is also how you subscribe to changes (see "Reacting to changes"). A component typically retains the nodes it renders when it mounts, and releases them when it unmounts.
 
