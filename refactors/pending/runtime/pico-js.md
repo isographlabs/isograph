@@ -239,9 +239,12 @@ pico-js keeps derived values up to date without recomputing more than it has to.
 A source node holds a value you set. A derived node holds a function that computes a value from other nodes. The function's first argument, `callingNode`, is the derived node being computed. Passing it to `readSource` and `readDerived` tells pico-js that `callingNode` depends on the node being read, which is how pico-js learns the graph:
 
 ```ts
-const economist = createSourceNode({ first: 'John Maynard', last: 'Keynes' });
+const featuredEconomist = createSourceNode({
+  first: 'John Maynard',
+  last: 'Keynes',
+});
 const greeting = createDerivedNode((callingNode) => {
-  const { first, last } = readSource(callingNode, economist);
+  const { first, last } = readSource(callingNode, featuredEconomist);
   return `Hello, ${first} ${last}`;
 });
 ```
@@ -287,7 +290,7 @@ import {
 // Dispose unused nodes at the end of each operation, so the comments below are true right away.
 scheduler.schedule = disposeAll;
 
-const economist = createSourceNode({
+const featuredEconomist = createSourceNode({
   first: 'John Maynard',
   last: 'Keynes',
   bestBook: 'A Treatise on Money',
@@ -299,7 +302,7 @@ const name = createDerivedNode<{
   readonly first: string;
   readonly last: string;
 }>((callingNode, previous) => {
-  const { first, last } = readSource(callingNode, economist);
+  const { first, last } = readSource(callingNode, featuredEconomist);
   return previous !== undefined &&
     previous.first === first &&
     previous.last === last
@@ -317,7 +320,7 @@ const greeting = createDerivedNode((callingNode) => {
 const greetingRetain = retainDerivedNode(greeting); // greetingRuns === 1
 readDerivedNode(greeting); // 'Hello, John Maynard Keynes'
 
-writeSource(economist, {
+writeSource(featuredEconomist, {
   first: 'John Maynard',
   last: 'Keynes',
   bestBook: 'The General Theory',
@@ -325,12 +328,12 @@ writeSource(economist, {
 readDerivedNode(greeting); // still 'Hello, John Maynard Keynes', and greetingRuns is still 1
 
 startWriteBatch();
-writeSource(economist, {
+writeSource(featuredEconomist, {
   first: 'Milton',
   last: 'Friedman',
   bestBook: 'A Monetary History',
 });
-writeSource(economist, {
+writeSource(featuredEconomist, {
   first: 'Milton',
   last: 'Friedman',
   bestBook: 'Capitalism and Freedom',
@@ -347,7 +350,7 @@ const view = createDerivedNode(
 const viewRetain = retainDerivedNode(view, () =>
   rendered.push(readDerivedNode(view)),
 );
-writeSource(economist, {
+writeSource(featuredEconomist, {
   first: 'Adam',
   last: 'Smith',
   bestBook: 'The Wealth of Nations',
