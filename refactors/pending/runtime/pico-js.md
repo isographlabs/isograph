@@ -304,7 +304,7 @@ const evens = createDerivedNode((callingNode, previous) => {
 });
 ```
 
-`deepEqual` stands for any deep-equality function, such as one from a utility library. `filter` returns a new array every time, so without the check every update to `numbers` would give `evens` a new value. With it, updating `numbers` to `[1, 2, 5, 4]` leaves `evens` as the same `[2, 4]` array, and nothing that reads `evens` recomputes.
+`filter` returns a new array every time, so without the check every update to `numbers` would give `evens` a new value. With it, updating `numbers` to `[1, 2, 5, 4]` leaves `evens` as the same `[2, 4]` array, and nothing that reads `evens` recomputes.
 
 ## API
 
