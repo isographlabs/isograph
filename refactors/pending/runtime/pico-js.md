@@ -285,7 +285,7 @@ const label = createDerivedNode((callingNode) =>
 );
 ```
 
-While `showFullName` is false, `label` reads only `showFullName` and `nickname`, so updating `economist` does not recompute `label`.
+While `showFullName` is false, `label` reads only `showFullName` and `nickname`, so after an update to `economist`, reading `label` does not rerun its computation.
 
 ## Returning the previous value
 
