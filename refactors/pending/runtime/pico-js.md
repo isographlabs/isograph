@@ -236,9 +236,9 @@ pico-js is a TypeScript library for incremental computation. You write functions
 
 ## Priorities
 
-pico-js puts correctness first, speed second, and convenience last. It never trades a correct result for speed, and it gives up convenience wherever that makes it faster: you pass `callingNode` to every read, retain and release nodes yourself, and pair every `startWriteBatch` with an `endWriteBatch`.
+pico-js is built to be correct and fast, and it accepts a less convenient API to get there. You pass `callingNode` to every read, and you retain and release nodes yourself.
 
-To keep its hot paths fast, pico-js does not check the rules in "Rules" at run time. Following them is your responsibility. If you break one, pico-js does not throw. You may get stale values, wasted recomputation, or memory that is never freed.
+pico-js does not check its rules at run time, because the checks would slow down every read and write. Following the rules in "Rules" is up to you. Code that breaks one keeps running, and pico-js may return stale values or hold on to memory it should have freed.
 
 ## How it works
 
