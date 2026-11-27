@@ -446,7 +446,21 @@ Breaking one of these can give stale or wrong values, or leave pico-js's state i
 
 - Computations must be synchronous and pure, and read other nodes only through `readSource` and `readDerived`, called with the `callingNode` the computation received. pico-js reruns a computation when something it read that way has changed, or after it has freed the node, so a computation that depends on anything else keeps returning its cached value after that other state changes. A computation must not keep its `callingNode` for use after it returns.
 - A computation must not call anything else in pico-js, such as a write, a batch, `retainDerivedNode`, `releaseRetain`, a disposal, or `readDerivedNode`. Such a call can start an update inside an update, which pico-js does not support, so callbacks can run early or be dropped, and the graph can change while a recompute is walking it.
-- Computations and change callbacks must not throw. pico-js does not specify what a node's value or the callbacks of the same update are after a throw.
+- Computations and change callbacks must not throw. To handle an error, catch it inside the computation and return a value that represents it:
+
+  ```ts
+  const text = createSourceNode('{"a": 1}');
+  const parsed = createDerivedNode((callingNode) => {
+    try {
+      return { value: JSON.parse(readSource(callingNode, text)) };
+    } catch (error) {
+      return { error };
+    }
+  });
+  ```
+
+  pico-js adds no handling for a throw. After a throw out of a flush, the node that threw, the nodes the flush had not refreshed yet, and their dependents can keep old values, and later updates may not refresh them. The callbacks that had not run yet are dropped. pico-js clears its own flush bookkeeping, which is the flush state, the list of unneeded nodes, and the list of changed nodes, so the next update starts a new flush.
+
 - The graph must not have cycles. A node that reads itself, directly or through other nodes, can recurse until the call stack overflows.
 - A change callback may call `readDerivedNode` and must not do anything else with pico-js. A write inside a callback that reaches no node with a callback only marks. A write that reaches a node with a callback starts a second flush that throws a `TypeError` and drops every pending callback of both flushes. A batch, retain, or release inside a callback is not supported either. Compute a value that can be computed from the graph in a derived node, not in a source that a callback writes. To reset a value when another changes, keep the raw value in the source and compute the effective value in a derived node:
 
@@ -2018,7 +2032,7 @@ test/collector.test.ts  13 tests, the cleanup queue, observers, readUnretained, 
 test/scheduler.test.ts  2 tests, the default scheduler
 ```
 
-`225f893e5` folds the shims into the tests, so every test calls the engine's exported functions and no file under `test/` re-exports or emulates an API. Its files are `test/graph.test.ts` (108 tests), `test/collector.test.ts` (31 tests), `test/scheduler.test.ts` (4 tests), `test/consistency.test.ts` (17 tests), `test/contracts.test.ts` (8 tests), `test/graph.test-d.ts`, and the helper `test/status.ts`, which reads a node's status for assertions because the public `DerivedNode` has no `status` field. The folding follows these rules:
+`225f893e5` folds the shims into the tests, so every test calls the engine's exported functions and no file under `test/` re-exports or emulates an API. Its files are `test/graph.test.ts` (108 tests), `test/collector.test.ts` (28 tests), `test/scheduler.test.ts` (4 tests), `test/consistency.test.ts` (13 tests), `test/contracts.test.ts` (8 tests), `test/graph.test-d.ts`, and the helper `test/status.ts`, which reads a node's status for assertions because the public `DerivedNode` has no `status` field. The folding follows these rules:
 
 - `graph.test.ts` and `retain.test.ts` merge into `test/graph.test.ts`. A test that both files hold in two versions is kept once, in the version that calls the engine API. The `describe` blocks keep the names of `retain.test.ts` (ba3daedf7's), and the roots-era blocks `roots and the collector` and `setDerivedNodeEvaluation with the evaluation the node has` move into `test/collector.test.ts` or are removed, by the rules below.
 - `graph.test-d.ts` and `retain.test-d.ts` merge into `test/graph.test-d.ts`, which checks the value types of the constructors and reads, that `createDerivedNode` takes only a computation, and that a caller cannot write a field of a source, a derived node, or a retain.
@@ -2027,10 +2041,10 @@ test/scheduler.test.ts  2 tests, the default scheduler
 - A file sets `scheduler.schedule` in `beforeEach`: `disposeAll` in the tests ported from `retain.test.ts`, so they keep ba3daedf7's immediate cleanup, and a function that records its calls in the collector and scheduler tests. `afterEach` calls `disposeAll`, so no node on the cleanup queue reaches the next test. vitest gives each file its own module instance.
 - Tests of `setDerivedNodeEvaluation`, of untracked reads, of nested `startWriteBatch(body)` semantics, and of an `onChange` on a lazy node without a retain are removed with the API they test. The prototype's `// Removed under this variant:` comments are removed too (AGENTS.md: no comment that describes what was not done).
 - A test of an observed node retains the node with an `onChange`, which may do nothing.
-- `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endWriteBatch` leaves a later `startWriteBatch`, `writeSource`, `endWriteBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same; after a throwing flush, `scheduler.schedule` is called at the end of the next outermost operation.
+- `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endWriteBatch` leaves a later `startWriteBatch`, `writeSource`, `endWriteBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same.
 - The `README example` test runs the README's example and asserts the values and run counts its comments state.
-- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands. The cases are the stale reads of a refresh that receives a queued observed node (a chain, a fan-in, a branch switch, a lazy node over a queued node), a change callback that runs although its node ends the flush with its previous value, and nodes left stale after a computation throws in the flush.
-- `test/contracts.test.ts` (8 tests) asserts the consequences the README states that are definite behaviors: an unchanged write, a new equal value instead of `previous`, a read inside a batch, an unmatched `endWriteBatch`, a retain that is never released, and a scheduler that stops early. The README states no result after a throw, for a double release, a cycle, a mutated value, a call from inside a computation or an `onChange`, or call stack depth, and these have no test.
+- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands. The cases are the stale reads of a refresh that receives a queued observed node (a chain, a fan-in, a branch switch, a lazy node over a queued node), and a change callback that runs although its node ends the flush with its previous value.
+- `test/contracts.test.ts` (8 tests) asserts the consequences the README states that are definite behaviors: an unchanged write, a new equal value instead of `previous`, a read inside a batch, an unmatched `endWriteBatch`, a retain that is never released, and a scheduler that stops early. The README makes throwing a contract (an error is caught inside the computation and returned as a value, and after a throw the nodes the flush had not refreshed can keep old values) and states no further result for a double release, a cycle, a mutated value, a call from inside a computation or an `onChange`, or call stack depth, and these have no test.
 
 Top-level reads go through a test-local `read(node)`. `read(node)` retains the node on its first call for that node and never releases the retain, so a test that does not test lifetime never has a node disposed.
 
