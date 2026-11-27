@@ -17,10 +17,11 @@ libs/pico-js/
   README.md
   tsconfig.json             references tsconfig.package.json and tsconfig.test.json
   tsconfig.package.json     extends ../../tsconfig.build.json, includes src/**/*.ts
-  tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts and test-random/**/*.ts
+  tsconfig.test.json        extends ../../tsconfig.build.json, includes test/**/*.ts, test-random/**/*.ts, and test-exhaustive/**/*.ts
   tsdown.config.ts          merges ../../tsdown.config.ts, dts.build true
   vitest.config.ts          typecheck enabled with tsconfig.test.json
   vitest.random.config.ts   runs test-random/random.ts only
+  vitest.exhaustive.config.ts   runs test-exhaustive/exhaustive.ts only
   src/nodes.ts              node, edge, and retain types, their constants, createSourceNode, createDerivedNode
   src/edges.ts              linkEdge, unlinkEdge, unlinkAll
   src/marking.ts            storeValue, marking, the marked-unneeded list
@@ -31,6 +32,7 @@ libs/pico-js/
   src/index.ts              the public exports
   test/graph.test.ts, test/collector.test.ts, test/scheduler.test.ts, test/consistency.test.ts, test/graph.test-d.ts   Tests
   test-random/random.ts     Random differential test, run by `pnpm test:random`
+  test-exhaustive/checker.ts, test-exhaustive/exhaustive.ts   Exhaustive bounded model checker, run by `pnpm test:exhaustive`
 ```
 
 Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm install`), which the same commit includes.
@@ -52,6 +54,7 @@ Adding the package changes `pnpm-lock.yaml` (a new importer, written by `pnpm in
     "test": "vitest run",
     "test-watch": "vitest watch",
     "test:random": "vitest run --config vitest.random.config.ts",
+    "test:exhaustive": "vitest run --config vitest.exhaustive.config.ts",
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile-libs",
     "tsc": "tsc -b",
@@ -126,7 +129,7 @@ export default mergeConfig(baseConfig, {
   "compilerOptions": {
     "noUnusedLocals": false
   },
-  "include": ["test/**/*.ts", "test-random/**/*.ts"],
+  "include": ["test/**/*.ts", "test-random/**/*.ts", "test-exhaustive/**/*.ts"],
   "exclude": ["**/node_modules", "**/dist"]
 }
 ```
@@ -157,7 +160,7 @@ export default defineConfig({
 
 Delta of `vitest.random.config.ts` from the prototype's: `include` names `test-random/random.ts` instead of `test-random/*.ts`, because the prototype's `random-retain.ts` is renamed back to `random.ts` (Tests, Random differential test).
 
-`vitest.config.ts` keeps vitest's default `include`, which matches `*.test.ts` and `*.spec.ts`, so `pnpm test` and the `pico-js-test` hook do not run the random test. `tsconfig.test.json` includes `test-random/**/*.ts`, so `tsc -b` and the `pico-js-typecheck` hook type-check it without running it. vitest runs each test file in its own module instance, so the module state of one file does not reach another.
+`vitest.config.ts` keeps vitest's default `include`, which matches `*.test.ts` and `*.spec.ts`, so `pnpm test` and the `pico-js-test` hook run neither the random test nor the exhaustive suite. `tsconfig.test.json` includes `test-random/**/*.ts` and `test-exhaustive/**/*.ts`, so `tsc -b` and the `pico-js-typecheck` hook type-check them without running them. vitest runs each test file in its own module instance, so the module state of one file does not reach another.
 
 TypeScript rules (AGENTS.md, TypeScript): the engine has no `any`. The engine has no class and no private field. oxlint's `strict-boolean-expressions` (`.oxlintrc.json`) applies to every condition. oxlint's `switch-exhaustiveness-check` applies to every `switch`, and no `switch` has a `default` arm.
 
@@ -223,6 +226,8 @@ jobs:
     name: pico-js
     uses: ./.github/workflows/pico-js.yml
 ```
+
+The exhaustive suite (Tests, Exhaustive suite) has no CI step yet, because it fails on the current engine. The step is added together with the fix.
 
 `js.yml` runs no pico-js step. Its `babel-plugin` job runs `pnpm compile-libs`, which turbo runs for every workspace package with a `compile-libs` script; turbo's `compile-libs` task depends on `tsc` (`turbo.json`), so the engine is type-checked and built there with no change. The random differential test runs seeds 1 to 2,000.
 
@@ -392,7 +397,7 @@ pico-js does not check these contracts. Breaking one gives undefined behavior.
 - The graph must not have cycles.
 - A change callback may call `readDerivedNode`, and must not do anything else with pico-js.
 - Release each retain exactly once.
-- Do not read derived nodes inside a write batch. Until the batch ends, they can hold values computed from data you have already replaced.
+- Do not read derived nodes inside a write batch, and do not call `retainDerivedNode` there, because retaining computes the node, which is a read. Until the batch ends, derived nodes can hold values computed from data you have already replaced.
 - Every `startWriteBatch` needs one `endWriteBatch`. If the code between them can throw, call `endWriteBatch` in a `finally`.
 - A write batch must not span an `await`. pico-js keeps one graph per process, so on a server another request's updates would join your batch.
 - A custom scheduler must not throw, and once called it must keep calling `disposeNext` until it returns `false`, or call `disposeAll`.
@@ -401,7 +406,11 @@ pico-js does not check these contracts. Breaking one gives undefined behavior.
 
 ## Guarantees
 
-If you follow the contracts, `readDerivedNode` returns the value the node would have if you recomputed everything from scratch, and a node recomputes only when something it read changed. A change callback runs at most once per update or batch, only when its node's value changed, and only after every node with a callback is up to date. If a computation or callback throws, pico-js resets its own state before the exception reaches you, so the rest of the process is unaffected, though the nodes that update was changing may be left partly updated.
+If you follow the contracts, `readDerivedNode` returns the value the node would have if you recomputed everything from scratch, and a node recomputes only when something it read changed. A change callback runs at most once per update or batch, after every node with a callback is up to date. It runs when the update recomputed its node to a changed value at least once, even if a later recompute in the same update returned the node to its previous value, so the callback can run for a node whose value is the same as before the update.
+
+If a computation throws, the nodes that update was refreshing may stay stale until something recomputes them: the node that threw and the nodes queued after it keep their old values, and later writes do not update them. If a change callback throws, the change callbacks that came after it in that update do not run. In both cases pico-js resets its own state before the exception reaches you, so the rest of the process is unaffected.
+
+`test/consistency.test.ts` lists the known stale reads and these throw cases as expected failures.
 
 How pico-js is built, and why, is in [DESIGN.md](./DESIGN.md).
 ````
@@ -1785,9 +1794,9 @@ import { pull } from './pull';
  * value that the flush made, after the flush has refreshed every node on the
  * flush queue. The first recompute of a node does not call `onChange`.
  *
- * Contract: called outside computations and `onChange` callbacks. `onChange`
- * does not write, start or end a batch, retain, release, or dispose. It may
- * call `readDerivedNode`.
+ * Contract: called outside computations, `onChange` callbacks, and write
+ * batches. `onChange` does not write, start or end a batch, retain, release,
+ * or dispose. It may call `readDerivedNode`.
  */
 export function retainDerivedNode<TValue>(
   node: DerivedNode<TValue>,
@@ -1958,6 +1967,7 @@ export { readDerivedNode, releaseRetain, retainDerivedNode } from './retain';
 A `__DEV__` build can restore these checks. Each throws `new Error(message)`.
 
 - `readDerivedNode`: the batch depth is 0; "a derived node was read between startWriteBatch and endWriteBatch."
+- `retainDerivedNode`: the batch depth is 0; "retainDerivedNode was called between startWriteBatch and endWriteBatch." Retaining computes the node, which is a read.
 - `markDirty`, `markMaybeDirty`, and `markMaybeDirtyDependentsDirty`: a dependent's `status === UNCOMPUTED`; "An Uncomputed node is in a dependents list. This is indicative of a bug in pico-js."
 - `markMaybeDirtyDependentsDirty`: a dependent's `status === CLEAN`; "A Clean node depends on a Dirty node. This is indicative of a bug in pico-js."
 - `verify`: `node.firstDependent === undefined` for a node it moved into; "A node that verify moved into has no dependents. This is indicative of a bug in pico-js."
@@ -1995,9 +2005,15 @@ test/scheduler.test.ts  2 tests, the default scheduler
 - A test of a node that behaves eagerly creates the node `EAGER` and retains it, or retains a `LAZY` node with an `onChange`.
 - `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endWriteBatch` leaves a later `startWriteBatch`, `writeSource`, `endWriteBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same; after a throwing flush, `scheduler.schedule` is called at the end of the next outermost operation.
 - The `README example` test runs the README's example and asserts the values and run counts its comments state.
-- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands.
+- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands. The cases are the stale reads of a refresh that receives a queued eager node (a chain, a fan-in, a branch switch, a lazy node over a queued node), a change callback that runs although its node ends the flush with its previous value, nodes left stale after a computation throws in the flush, and change callbacks skipped after one throws.
 
 Top-level reads go through a test-local `read(node)`. `read(node)` retains the node on its first call for that node and never releases the retain, so a test that does not test lifetime never has a node disposed.
+
+### Exhaustive suite
+
+`test-exhaustive/checker.ts` is a bounded model checker and `test-exhaustive/exhaustive.ts` runs it against the public API (`createSourceNode`, `createDerivedNode`, `readSource`, `readDerived`, `readDerivedNode`, `retainDerivedNode`, `releaseRetain`, `startWriteBatch`, `endWriteBatch`, `writeSource`, `disposeNext`, `disposeAll`, `scheduler`) and `statusOf` from `test/status.ts`. Its handles are opaque, and it reads one internal field, `firstDependent`, through an untyped cast. It enumerates graphs of up to 4 derived nodes over up to 2 sources (static reads, branching reads, lazy and eager nodes, injective and parity computations), retain setups with and without `onChange`, and operation sequences of writes, batches, reads, retains, releases, disposals, and throwing computations and `onChange` calls. It compares every value a computation, a top-level read, or an `onChange` receives with a reference evaluator that shares no code with the engine, and checks that each `onChange` ran exactly once when its node's value changed and not otherwise.
+
+`pnpm test:exhaustive` runs the `ci` preset by default (about 2.5 minutes); `PICO_EXHAUSTIVE_BOUND` selects `medium`, `full`, or a JSON object of bounds, and `PICO_EXHAUSTIVE_SHARD` with `PICO_EXHAUSTIVE_SHARDS` run one shard. A top-level read that no contract forbids is a read of any node, retained or not, outside a batch. An operation that breaks a contract (a read or a retain inside a batch, a second release) marks the run contract-broken and its violations are not failures. Violations after a throw are printed and do not fail the test, because the README leaves those values unspecified. On the current engine the `ci` preset fails with 8 distinct violation signatures, each a computation that receives an old value of a queued eager node. The CI step is added together with the fix that makes the suite pass.
 
 ### Random differential test
 
