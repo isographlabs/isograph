@@ -1,6 +1,6 @@
 Proposal: benchmark cases for graph operations the suite does not test
 
-The suite has no case for the five operations below, and each of them occurs in large apps. Would you accept PRs that add them?
+The suite has no case for the six operations below, and each of them occurs in large apps. Would you accept PRs that add them?
 
 | Case | Operation | Needs |
 | --- | --- | --- |
@@ -9,6 +9,7 @@ The suite has no case for the five operations below, and each of them occurs in 
 | 3 | A computed that was read once and has no effect, while its input changes | - |
 | 4 | A computed reads the same computeds in a different order | - |
 | 5 | One batch writes the same input many times | - |
+| 6 | Many writes with no effect, then one read | - |
 
 ## Cases
 
@@ -123,6 +124,22 @@ framework.withBatch(() => {
   for (let i = 1; i <= count; i++) input.write(i);
 });
 // derived and the effect should run once.
+```
+
+### 6. Many writes with no effect, then one read
+
+`derived` has no effect. `input` is written `count` times, each write in its own batch, and then `derived` is read once. `derived` should run once, however many writes came before the read.
+
+Failure mode: an implementation that does work per write for nodes nobody is watching pays that work `count` times for one read. Every write in the suite today is followed by an effect run or a read, so no case shows how a read's cost grows with the number of writes since the last read.
+
+```js
+const input = framework.signal(0);
+const derived = framework.computed(() => input.read() * 2);
+derived.read();
+
+for (let i = 1; i <= count; i++) framework.withBatch(() => input.write(i));
+derived.read();
+// derived should run once.
 ```
 
 ## Harness
