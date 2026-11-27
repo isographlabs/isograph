@@ -338,7 +338,7 @@ function multipleOfA(factor: number): DerivedNode<number> {
 
 ## Retaining nodes
 
-A node that is read but not retained can be garbage collected, which means pico-js drops its cached result. So, you should call `retainDerivedNode` on any node whose result should stay cheap to read, for example because you will read it again. It keeps the node and everything it depends on cached until you call `releaseRetain`. A component typically retains the nodes it renders when it mounts, and releases them when it unmounts.
+A node that is read but not retained can be garbage collected, which means pico-js drops its cached result. So, you should call `retainDerivedNode` on any node whose result should stay cheap to read, for example because you will read it again. It keeps the node and everything it depends on cached until you call `releaseRetain`. A React component, for example, typically retains the nodes it renders when it mounts, and releases them when it unmounts.
 
 ## Reacting to changes
 
