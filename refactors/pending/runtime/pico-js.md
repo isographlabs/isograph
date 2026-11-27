@@ -304,7 +304,7 @@ While `useA` is true, `chosen` reads only `useA` and `a`. After an update to `b`
 
 ## Returning the previous value
 
-When a derived node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so it can return `previous` when its result is unchanged:
+Derived nodes should return the previous value if their results are unchanged. When a derived node recomputes to a value `===` to its previous value, the nodes that depend on it do not recompute. A computation receives its previous value as its second argument:
 
 ```ts
 const numbers = createSourceNode([1, 2, 3, 4]);
