@@ -241,7 +241,7 @@ pico-js is a TypeScript library for incremental computation. You write functions
 
 ## Priorities
 
-pico-js is designed to be the fastest JS reactivity library, even at the expense of ease of use. In order to achieve this performance, it doesn't enforce anything at runtime, and requires the user to follow certain contracts. For example, sources should only be updated when their value has actually changed; derived nodes should return the same previous value (i.e. `===`) if the result is unchanged; computations are synchronous and pure; and the graph has no cycles. A complete list of contracts is below.
+pico-js is designed to be the fastest JS reactivity library, even at the expense of ease of use. In order to achieve this performance, it doesn't enforce anything at runtime, and requires the user to follow certain contracts. For example, sources should only be updated when their value has actually changed, derived nodes should return the same previous value (i.e. `===`) if the result is unchanged, computations are synchronous and pure, and the graph has no cycles. A complete list of contracts is below.
 
 ## How it works
 
