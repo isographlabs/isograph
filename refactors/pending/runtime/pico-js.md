@@ -29,7 +29,7 @@ libs/pico-js/
   src/batch.ts              startWriteBatch, endWriteBatch, writeSource, the flush, the end-of-operation check
   src/retain.ts             retainDerivedNode, releaseRetain, readDerivedNode, evaluation state
   src/index.ts              the public exports
-  test/graph.test.ts, test/collector.test.ts, test/scheduler.test.ts, test/graph.test-d.ts   Tests
+  test/graph.test.ts, test/collector.test.ts, test/scheduler.test.ts, test/consistency.test.ts, test/graph.test-d.ts   Tests
   test-random/random.ts     Random differential test, run by `pnpm test:random`
 ```
 
@@ -1995,6 +1995,7 @@ test/scheduler.test.ts  2 tests, the default scheduler
 - A test of a node that behaves eagerly creates the node `EAGER` and retains it, or retains a `LAZY` node with an `onChange`.
 - `collector.test.ts` gains tests for the server guarantees: a computation that throws inside the flush of `endWriteBatch` leaves a later `startWriteBatch`, `writeSource`, `endWriteBatch` of other nodes flushing and calling their `onChange`; an `onChange` that throws leaves the same; after a throwing flush, `scheduler.schedule` is called at the end of the next outermost operation.
 - The `README example` test runs the README's example and asserts the values and run counts its comments state.
+- `test/consistency.test.ts` holds the consistency tests, which record every derived value a computation or a top-level read receives and compare it with the value computed from the current sources. Each test that fails on the current engine is a `test.fails` test with a comment naming the stale read, and stays one until the fix lands.
 
 Top-level reads go through a test-local `read(node)`. `read(node)` retains the node on its first call for that node and never releases the retain, so a test that does not test lifetime never has a node disposed.
 
