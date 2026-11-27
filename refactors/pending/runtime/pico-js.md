@@ -294,6 +294,31 @@ const label = createDerivedNode((callingNode) =>
 
 While `showFullName` is false, `label` does not depend on `fullName`, and updates that only affect `fullName` do not touch `label`.
 
+## Nodes with parameters
+
+A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value and keep the nodes in a map:
+
+```ts
+const nameNodes = new Map<string, DerivedNode<string>>();
+
+function nameNode(id: string): DerivedNode<string> {
+  let node = nameNodes.get(id);
+  if (node === undefined) {
+    node = createDerivedNode((callingNode) => {
+      const { first, last } = readSource(
+        callingNode,
+        economistSources.get(id)!,
+      );
+      return `${first} ${last}`;
+    });
+    nameNodes.set(id, node);
+  }
+  return node;
+}
+```
+
+Other signal libraries work the same way: a computed value takes no arguments, and helpers such as Jotai's `atomFamily` keep this map for you. The map is yours to manage. pico-js frees a node's cached value and dependencies once nothing uses it, but the node object stays in your map until you delete the entry.
+
 ## API
 
 - `createSourceNode(value)` creates a source node.
