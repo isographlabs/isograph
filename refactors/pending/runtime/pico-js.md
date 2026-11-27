@@ -277,7 +277,7 @@ A node depends on whatever its computation read on its latest run, so its depend
 
 ```ts
 const showFullName = createSourceNode(false);
-const nickname = createSourceNode('Maynard');
+const nickname = createSourceNode('Snout');
 const label = createDerivedNode((callingNode) =>
   readSource(callingNode, showFullName)
     ? readDerived(callingNode, fullName)
