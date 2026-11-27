@@ -236,12 +236,12 @@ pico-js keeps derived values up to date without recomputing more than it has to.
 
 ## Sources and derived nodes
 
-A source node holds a value you set. A derived node holds a function that computes a value from other nodes. The function receives the node being computed, and reads other nodes by passing that node along, so pico-js learns what each derived node depends on:
+A source node holds a value you set. A derived node holds a function that computes a value from other nodes. The function's first argument, `callingNode`, is the derived node being computed. Passing it to `readSource` and `readDerived` tells pico-js that `callingNode` depends on the node being read, which is how pico-js learns the graph:
 
 ```ts
-const person = createSourceNode({ first: 'Ada', last: 'Lovelace' });
-const greeting = createDerivedNode((self) => {
-  const { first, last } = readSource(self, person);
+const economist = createSourceNode({ first: 'John Maynard', last: 'Keynes' });
+const greeting = createDerivedNode((callingNode) => {
+  const { first, last } = readSource(callingNode, economist);
   return `Hello, ${first} ${last}`;
 });
 ```
@@ -287,15 +287,19 @@ import {
 // Dispose unused nodes at the end of each operation, so the comments below are true right away.
 scheduler.schedule = disposeAll;
 
-const person = createSourceNode({ first: 'Ada', last: 'Lovelace', age: 36 });
+const economist = createSourceNode({
+  first: 'John Maynard',
+  last: 'Keynes',
+  bestBook: 'A Treatise on Money',
+});
 
 // Returns its previous object when the name did not change, so readers of
-// `name` do not recompute when only `age` changes.
+// `name` do not recompute when only `bestBook` changes.
 const name = createDerivedNode<{
   readonly first: string;
   readonly last: string;
-}>((self, previous) => {
-  const { first, last } = readSource(self, person);
+}>((callingNode, previous) => {
+  const { first, last } = readSource(callingNode, economist);
   return previous !== undefined &&
     previous.first === first &&
     previous.last === last
@@ -304,38 +308,57 @@ const name = createDerivedNode<{
 });
 
 let greetingRuns = 0;
-const greeting = createDerivedNode((self) => {
+const greeting = createDerivedNode((callingNode) => {
   greetingRuns += 1;
-  const { first, last } = readDerived(self, name);
+  const { first, last } = readDerived(callingNode, name);
   return `Hello, ${first} ${last}`;
 });
 
 const greetingRetain = retainDerivedNode(greeting); // greetingRuns === 1
-readDerivedNode(greeting); // 'Hello, Ada Lovelace'
+readDerivedNode(greeting); // 'Hello, John Maynard Keynes'
 
-writeSource(person, { first: 'Ada', last: 'Lovelace', age: 37 });
-readDerivedNode(greeting); // still 'Hello, Ada Lovelace', and greetingRuns is still 1
+writeSource(economist, {
+  first: 'John Maynard',
+  last: 'Keynes',
+  bestBook: 'The General Theory',
+});
+readDerivedNode(greeting); // still 'Hello, John Maynard Keynes', and greetingRuns is still 1
 
 startWriteBatch();
-writeSource(person, { first: 'Ada', last: 'Lovelace', age: 38 });
-writeSource(person, { first: 'Ada', last: 'King', age: 38 });
+writeSource(economist, {
+  first: 'Milton',
+  last: 'Friedman',
+  bestBook: 'A Monetary History',
+});
+writeSource(economist, {
+  first: 'Milton',
+  last: 'Friedman',
+  bestBook: 'Capitalism and Freedom',
+});
 endWriteBatch();
-readDerivedNode(greeting); // 'Hello, Ada King', greetingRuns === 2
+readDerivedNode(greeting); // 'Hello, Milton Friedman', greetingRuns === 2
 
 // A subscribed node: onChange runs at the end of each write that changes it.
 const rendered: Array<string> = [];
-const view = createDerivedNode((self) => readDerived(self, greeting), EAGER);
+const view = createDerivedNode(
+  (callingNode) => readDerived(callingNode, greeting),
+  EAGER,
+);
 const viewRetain = retainDerivedNode(view, () =>
   rendered.push(readDerivedNode(view)),
 );
-writeSource(person, { first: 'Augusta', last: 'King', age: 38 });
-// rendered is ['Hello, Augusta King']
+writeSource(economist, {
+  first: 'Adam',
+  last: 'Smith',
+  bestBook: 'The Wealth of Nations',
+});
+// rendered is ['Hello, Adam Smith']
 
-const initials = createDerivedNode((self) => {
-  const { first, last } = readDerived(self, name);
+const initials = createDerivedNode((callingNode) => {
+  const { first, last } = readDerived(callingNode, name);
   return `${first[0]}${last[0]}`;
 });
-readUnretained(initials); // 'AK', and initials is disposed again
+readUnretained(initials); // 'AS', and initials is disposed again
 
 releaseRetain(viewRetain);
 releaseRetain(greetingRetain); // view, greeting, and name are disposed
