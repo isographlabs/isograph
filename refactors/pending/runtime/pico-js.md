@@ -248,67 +248,63 @@ pico-js is designed to be the fastest JS reactivity library, even at the expense
 Inputs live in source nodes. Computed values live in derived nodes:
 
 ```ts
-const economist = createSourceNode({ first: 'John Maynard', last: 'Keynes' });
+const a = createSourceNode(1);
+const b = createSourceNode(2);
 
-const fullName = createDerivedNode((callingNode) => {
-  const { first, last } = readSource(callingNode, economist);
-  return `${first} ${last}`;
-});
+const sum = createDerivedNode(
+  (callingNode) => readSource(callingNode, a) + readSource(callingNode, b),
+);
 ```
 
 To read a derived node from outside a computation, call `readDerivedNode`. The first read computes the node. While the node is retained (see "Retaining nodes"), later reads return the cached value:
 
 ```ts
-let greetingComputationCount = 0;
-const greeting = createDerivedNode((callingNode) => {
+let doubledComputationCount = 0;
+const doubled = createDerivedNode((callingNode) => {
   // Counting computations is for demonstration only. Real computations should have no side effects.
-  greetingComputationCount += 1;
-  return `Hello, ${readDerived(callingNode, fullName)}`;
+  doubledComputationCount += 1;
+  return readDerived(callingNode, sum) * 2;
 });
-retainDerivedNode(greeting);
+retainDerivedNode(doubled);
 
-readDerivedNode(greeting); // 'Hello, John Maynard Keynes', greetingComputationCount === 1
-readDerivedNode(greeting); // same value, greetingComputationCount === 1
+readDerivedNode(doubled); // 6, doubledComputationCount === 1
+readDerivedNode(doubled); // 6, doubledComputationCount === 1
 ```
 
 Updating a source recomputes nothing right away. The nodes that depend on it recompute when they are next read:
 
 ```ts
-writeSource(economist, { first: 'Milton', last: 'Friedman' }); // greetingComputationCount === 1
-readDerivedNode(greeting); // 'Hello, Milton Friedman', greetingComputationCount === 2
+writeSource(a, 10); // doubledComputationCount === 1
+readDerivedNode(doubled); // 24, doubledComputationCount === 2
 ```
 
 A node depends on whatever its computation read on its latest run, so its dependencies can change from one run to the next:
 
 ```ts
-const showFullName = createSourceNode(false);
-const nickname = createSourceNode('Snout');
-const label = createDerivedNode((callingNode) =>
-  readSource(callingNode, showFullName)
-    ? readDerived(callingNode, fullName)
-    : readSource(callingNode, nickname),
+const useA = createSourceNode(true);
+const chosen = createDerivedNode((callingNode) =>
+  readSource(callingNode, useA)
+    ? readSource(callingNode, a)
+    : readSource(callingNode, b),
 );
 ```
 
-While `showFullName` is false, `label` reads only `showFullName` and `nickname`, so after an update to `economist`, reading `label` does not rerun its computation.
+While `useA` is true, `chosen` reads only `useA` and `a`. After an update to `b`, reading `chosen` returns its cached value without rerunning its computation.
 
 ## Returning the previous value
 
 When a derived node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so it can return `previous` when its result is unchanged:
 
 ```ts
-const economists = createSourceNode([
-  { name: 'Keynes', nobel: false },
-  { name: 'Friedman', nobel: true },
-]);
+const numbers = createSourceNode([1, 2, 3, 4]);
 
-const laureates = createDerivedNode((callingNode, previous) => {
-  const next = readSource(callingNode, economists).filter((e) => e.nobel);
+const evens = createDerivedNode((callingNode, previous) => {
+  const next = readSource(callingNode, numbers).filter((n) => n % 2 === 0);
   return deepEqual(previous, next) ? previous : next;
 });
 ```
 
-`deepEqual` stands for any deep-equality function, such as one from a utility library. `filter` returns a new array every time, so `laureates` returns `previous` when the filtered elements are the same. An update to `economists` that does not change who has a Nobel therefore leaves `laureates` unchanged, and nothing that reads `laureates` recomputes.
+`deepEqual` stands for any deep-equality function, such as one from a utility library. `filter` returns a new array every time, so without the check every update to `numbers` would give `evens` a new value. With it, updating `numbers` to `[1, 2, 5, 4]` leaves `evens` as the same `[2, 4]` array, and nothing that reads `evens` recomputes.
 
 ## API
 
@@ -326,19 +322,15 @@ const laureates = createDerivedNode((callingNode, previous) => {
 A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value and keep the nodes in a map:
 
 ```ts
-const nameNodes = new Map<string, DerivedNode<string>>();
+const multipleNodes = new Map<number, DerivedNode<number>>();
 
-function nameNode(id: string): DerivedNode<string> {
-  let node = nameNodes.get(id);
+function multipleOfA(factor: number): DerivedNode<number> {
+  let node = multipleNodes.get(factor);
   if (node === undefined) {
-    node = createDerivedNode((callingNode) => {
-      const { first, last } = readSource(
-        callingNode,
-        economistSources.get(id)!,
-      );
-      return `${first} ${last}`;
-    });
-    nameNodes.set(id, node);
+    node = createDerivedNode(
+      (callingNode) => readSource(callingNode, a) * factor,
+    );
+    multipleNodes.set(factor, node);
   }
   return node;
 }
@@ -359,7 +351,7 @@ Retain a node whose reads must stay cheap until a later point, such as a node th
 Pass a callback to `retainDerivedNode` to run code when a node's value changes:
 
 ```ts
-retainDerivedNode(greeting, () => render(readDerivedNode(greeting)));
+retainDerivedNode(sum, () => console.log(readDerivedNode(sum)));
 ```
 
 A node with a callback does not wait to be read. After each update that may change its value, pico-js recomputes it right away, and calls the callback if the value did change.
@@ -374,8 +366,8 @@ Updates inside `startWriteBatch()` and `endWriteBatch()` are applied together. N
 
 ```ts
 startWriteBatch();
-writeSource(economist, { first: 'Adam', last: 'Smith' });
-writeSource(showFullName, true);
+writeSource(a, 3);
+writeSource(b, 4);
 endWriteBatch();
 ```
 
