@@ -309,6 +309,17 @@ const laureates = createDerivedNode((callingNode, previous) => {
 
 `filter` returns a new array every time, so `laureates` returns `previous` when the filtered elements are the same. An update to `economists` that does not change who has a Nobel therefore leaves `laureates` unchanged, and nothing that reads `laureates` recomputes.
 
+## API
+
+- `createSourceNode(value)` creates a source node.
+- `writeSource(source, value)` updates a source.
+- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
+- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
+- `readDerivedNode(node)` reads a derived node from outside a computation.
+- `retainDerivedNode(node, onChange?)` keeps a node cached between reads and returns a retain. `releaseRetain(retain)` releases it.
+- `startWriteBatch()` and `endWriteBatch()` group updates.
+- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed.
+
 ## Nodes with parameters
 
 A computation takes no parameters of its own. For a value that depends on a parameter, create one derived node per parameter value and keep the nodes in a map:
@@ -333,17 +344,6 @@ function nameNode(id: string): DerivedNode<string> {
 ```
 
 Delete entries you no longer need. pico-js frees a node's cached value when nothing uses it, but it cannot free the node object while your map still refers to it.
-
-## API
-
-- `createSourceNode(value)` creates a source node.
-- `writeSource(source, value)` updates a source.
-- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value, where `callingNode` has the type `CallingNode`. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
-- `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation. Their first parameter has the type `CallingNode`, which only a computation receives.
-- `readDerivedNode(node)` reads a derived node from outside a computation.
-- `retainDerivedNode(node, onChange?)` keeps a node cached between reads and returns a retain. `releaseRetain(retain)` releases it.
-- `startWriteBatch()` and `endWriteBatch()` group updates.
-- `scheduler`, `disposeNext()`, and `disposeAll()` control when unused nodes are freed.
 
 ## Retaining nodes
 
