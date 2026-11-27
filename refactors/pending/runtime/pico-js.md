@@ -7,7 +7,7 @@ This doc is the complete source and package of `@isograph/pico-js` in `libs/pico
 - A source node stores a value that the caller writes. A derived node stores a computation and the value that computation last returned.
 - An edge connects a dependent (a derived node) to a dependency (a source node or a derived node that the dependent's computation read).
 - A tracked read is a call to `readSource` or `readDerived` inside a computation. A top-level read is a call to `readDerivedNode` or `readUnretained`.
-- A retain is the `Retain` object that `retainDerivedNode` returns. A node is retained while it has at least one retain. `releaseRetain` releases a retain.
+- A node is retained from a `retainDerivedNode` call until `releaseRetain` is called with the `Retain` that call returned. A node with several such calls outstanding stays retained until every one is released.
 - A node is needed while it has a retain or a dependent, and unneeded otherwise.
 - To mark is to set a node `Dirty` or `MaybeDirty` in a write. To recompute is to run a node's computation, including the first run of an `Uncomputed` node. To verify is to walk a `MaybeDirty` node's derived dependencies to find whether one changed. To refresh is for the flush to recompute or verify a node on the flush queue.
 - A node behaves eagerly while it is retained and was created `EAGER`, or while it has a retain with an `onChange`. Every other node is lazy.
@@ -316,7 +316,7 @@ pico-js is a push-pull memoization engine. A write to a source node eagerly mark
 - A source node stores a value that the caller writes. A derived node stores a computation and the value that computation last returned.
 - An edge connects a dependent (a derived node) to a dependency (a source node or a derived node that the dependent's computation read).
 - A tracked read is a call to `readSource` or `readDerived` inside a computation. A top-level read is a call to `readDerivedNode` or `readUnretained`.
-- A retain is the `Retain` object that `retainDerivedNode` returns. A node is retained while it has at least one retain. `releaseRetain` releases a retain.
+- A node is retained from a `retainDerivedNode` call until `releaseRetain` is called with the `Retain` that call returned. A node with several such calls outstanding stays retained until every one is released.
 - A node is needed while it has a retain or a dependent, and unneeded otherwise.
 - To mark is to set a node `Dirty` or `MaybeDirty` in a write. To recompute is to run a node's computation, including the first run of an `Uncomputed` node. To verify is to walk a `MaybeDirty` node's derived dependencies to find whether one changed. To refresh is for the flush to recompute or verify a node on the flush queue.
 - A node behaves eagerly while it is retained and was created `EAGER`, or while it has a retain with an `onChange`. Every other node is lazy.
@@ -502,7 +502,7 @@ pico-js upholds these while the caller meets every contract.
 - Whether a node behaves eagerly is encoded in its `evaluation` field, so marking, tracked reads, top-level reads, and verification test one field.
 - A node that becomes unneeded goes on the cleanup queue and is not disposed at once, so a node that receives a tracked read or a top-level read before the scheduler runs keeps its value. The end of a write disposes the unneeded nodes that its marking reached, so later writes do not walk them.
 - Each kind of node is one object shape, so property access stays monomorphic.
-- The public `SourceNode`, `DerivedNode`, and `Retain` are opaque: each has one field, keyed by a unique symbol that is declared and not exported, which carries `TValue`. A caller can read and write no field, and the engine works through the internal `Mutable` types.
+- Public types are `readonly`, and the engine writes through an internal `Mutable` view, so the types enforce the field contract.
 - pico-js checks no contract at run time. A future version may add the checks as a compile-time option.
 
 ### Module state
