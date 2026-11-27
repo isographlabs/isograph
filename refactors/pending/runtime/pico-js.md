@@ -236,9 +236,9 @@ pico-js is a TypeScript library for incremental computation. You write functions
 
 ## Priorities
 
-pico-js is built to be correct and fast, and it accepts a less convenient API to get there. You pass `callingNode` to every read, and you retain and release nodes yourself.
+pico-js values correctness and speed over ease of use. For example, you pass `callingNode` to every read, and you retain and release nodes yourself.
 
-pico-js does not check its rules at run time, because the checks would slow down every read and write. Following the rules in "Rules" is up to you. Code that breaks one keeps running, and pico-js may return stale values or hold on to memory it should have freed.
+pico-js does not check its rules at run time, because the checks would slow down every read and write. It is up to you to follow the rules below. If you break one, your code keeps running, but it may see stale values or leak memory.
 
 ## How it works
 
@@ -323,13 +323,13 @@ function nameNode(id: string): DerivedNode<string> {
 }
 ```
 
-Delete entries you no longer need: pico-js can free a node's cached value, but not the node object while your map still holds it.
+Delete entries you no longer need. pico-js frees a node's cached value when nothing uses it, but it cannot free the node object while your map still refers to it.
 
 ## API
 
 - `createSourceNode(value)` creates a source node.
 - `writeSource(source, value)` updates a source.
-- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value. `evaluation` is `LAZY` (the default) or `EAGER`; see "Computing ahead of time" below.
+- `createDerivedNode(computation, evaluation?)` creates a derived node. `computation(callingNode, previous)` returns its value. `evaluation` is `LAZY` (the default) or `EAGER` (see "Computing ahead of time").
 - `readSource(callingNode, source)` and `readDerived(callingNode, node)` read a node from inside a computation.
 - `retainDerivedNode(node, onChange?)` starts using a node and returns a retain. `releaseRetain(retain)` stops using it.
 - `readDerivedNode(node)` reads a node you have retained.
@@ -339,9 +339,9 @@ Delete entries you no longer need: pico-js can free a node's cached value, but n
 
 ## Retaining nodes
 
-`readDerivedNode` only reads nodes you have retained. Retaining a node with `retainDerivedNode` tells pico-js you are using it, so it keeps the node and everything it depends on cached until you call `releaseRetain`. A component would typically retain the nodes it renders when it mounts and release them when it unmounts.
+Retaining a node with `retainDerivedNode` tells pico-js you are using it. pico-js then keeps the node and everything it depends on cached until you call `releaseRetain`. A component typically retains the nodes it renders when it mounts, and releases them when it unmounts.
 
-To read a node once without keeping it, use `readUnretained`. Do not use `readDerivedNode` on a node you have not retained: pico-js only frees nodes it knows are unused, and a node read that way is never marked unused, so it stays cached and attached to its sources until some update happens to reach it.
+Call `readDerivedNode` only on nodes you have retained. To read a node once without keeping it, use `readUnretained`. If you read an unretained node with `readDerivedNode`, pico-js never learns that the node is unused, so the node stays in memory until an update happens to reach it.
 
 ## Reacting to changes
 
@@ -355,7 +355,7 @@ A node with a callback does not wait to be read. After each update that may chan
 
 ## Computing ahead of time
 
-A node created with `EAGER` is recomputed right after each update that may change its value, while it is retained, the same way a node with a callback is. Use it for a node whose value usually stays the same: computing it early means pico-js learns that nothing changed before it marks the nodes that depend on it.
+While it is retained, a node created with `EAGER` is recomputed right after each update that may change its value, like a node with a callback. Use it for a node whose value usually stays the same. Computing it early lets pico-js see that nothing changed before it marks the nodes that depend on it.
 
 ## Grouping updates
 
@@ -374,7 +374,7 @@ When a node is released and nothing else reads it, pico-js keeps it cached for a
 
 ## Rules
 
-pico-js does not check these (see "Priorities"). Breaking one gives undefined behavior.
+pico-js does not check these rules. Breaking one gives undefined behavior.
 
 - Only update a source when its value actually changed.
 - Computations must be synchronous and pure, read other nodes only through `readSource` and `readDerived` with their `callingNode`, and do nothing else with pico-js.
