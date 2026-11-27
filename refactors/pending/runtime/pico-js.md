@@ -247,7 +247,7 @@ const fullName = createDerivedNode((callingNode) => {
 });
 ```
 
-Reading a derived node computes it the first time, and returns the cached value after that:
+To read a derived node from outside a computation, retain it and call `readDerivedNode` (see "Retaining nodes"). The first read computes the node, and later reads return the cached value:
 
 ```ts
 let runs = 0;
@@ -255,20 +255,20 @@ const greeting = createDerivedNode((callingNode) => {
   runs += 1;
   return `Hello, ${readDerived(callingNode, fullName)}`;
 });
-const retain = retainDerivedNode(greeting);
+retainDerivedNode(greeting);
 
 readDerivedNode(greeting); // 'Hello, John Maynard Keynes', runs === 1
 readDerivedNode(greeting); // same value, runs === 1
 ```
 
-Updating a source recomputes nothing. It marks the nodes that depend on the source as out of date, and they recompute when they are next read:
+Updating a source recomputes nothing right away. The nodes that depend on it recompute when they are next read:
 
 ```ts
 writeSource(economist, { first: 'Milton', last: 'Friedman' }); // runs === 1
 readDerivedNode(greeting); // 'Hello, Milton Friedman', runs === 2
 ```
 
-A node that recomputes to a value `===` to its old value stops the update there, and the nodes that depend on it keep their cached values. A computation receives its previous value as a second argument, so it can keep returning the same object when nothing it uses changed:
+When a node recomputes to the same value as before (`===`), the nodes that depend on it do not recompute. A computation receives its previous value as a second argument, so for an object it can return `previous` when nothing it uses changed:
 
 ```ts
 const name = createDerivedNode((callingNode, previous) => {
@@ -279,7 +279,7 @@ const name = createDerivedNode((callingNode, previous) => {
 });
 ```
 
-A computation's dependencies are whatever it read on its latest run, so they can change from one run to the next:
+A node depends on whatever its computation read on its latest run, so its dependencies can change from one run to the next:
 
 ```ts
 const showFullName = createSourceNode(false);
@@ -290,7 +290,7 @@ const label = createDerivedNode((callingNode) =>
 );
 ```
 
-While `showFullName` is false, `label` does not depend on `fullName`, and updates that only affect `fullName` do not touch `label`.
+While `showFullName` is false, `label` does not read `fullName`, so updates that only change `fullName` do not recompute `label`.
 
 ## Nodes with parameters
 
@@ -315,7 +315,7 @@ function nameNode(id: string): DerivedNode<string> {
 }
 ```
 
-Other signal libraries work the same way: a computed value takes no arguments, and helpers such as Jotai's `atomFamily` keep this map for you. The map is yours to manage. pico-js frees a node's cached value and dependencies once nothing uses it, but the node object stays in your map until you delete the entry.
+You manage the map. pico-js frees a node's cached value once nothing uses it, but the node object stays in your map until you delete the entry.
 
 ## API
 
