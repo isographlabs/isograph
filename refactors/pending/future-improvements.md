@@ -102,3 +102,34 @@ The hazard is a source-only node that, during its own refresh, switches branch a
 This saves A5's one extra marking pass per change of a projection's value. The S16c scenario (the projection changes on every event) and the pure-engine projection microbenchmark judge it. Build it only if A5 is measurably above the base there.
 
 It needs a written correctness proof before it lands, like the one for A5s in the scratchpad proofs.
+
+## pico-js: derived nodes that declare what they may read
+
+The case is a derived node whose possible reads are known when it is created, such as a projection of a record's source onto one field, or a chain of such projections. The API is `createFixedDerivedNode(mayRead, compute)`:
+
+- `mayRead` is a tuple of sources or other such nodes, declared at creation. It plays the role of the dependency array of React's `useEffect`, except that the engine enforces it.
+- `compute` receives a `read` and `previous`. The type of `read` accepts only members of `mayRead`. `compute` reads any subset of them, conditionally, and only what it reads is pulled.
+
+The mechanism:
+
+- The height of the node is 1 plus the highest height in `mayRead`. A source has height 0. The height is set at creation and never changes.
+- Marking stops at such a node.
+- The flush refreshes these nodes in height order, before any other queued node.
+- Marking past one happens only from its own change.
+- Edges are linked only for what the computation actually read.
+
+This gives the eager short circuit at any depth with no height maintenance, no per-read check, no walk, and no suspended computations. Every edge points down by construction, so when one of these nodes is refreshed, everything pending beneath it is already refreshed.
+
+Limits:
+
+- A declared node may read only sources or other declared nodes. A regular node beneath it could change its dependencies and raise its height, which breaks the ordering.
+- It cannot express data-dependent reads, such as following a record link to a node chosen by data. Those stay regular nodes on A5's path.
+- Regular nodes may read declared nodes. Declared nodes cannot read regular nodes.
+
+The cost is a height field on each node.
+
+The proof obligation is a written proof of the ordering argument and an independent check of it before it lands, like the proofs for A5 in the scratchpad.
+
+The benchmark is S16 with the projection behind several layers of declared nodes (S16d).
+
+A partial build may exist at `/private/tmp/claude-501/-Users-rbalicki-code-i2/bc4814a8-ba1e-4822-8e64-1dc5fc1cc7c0/scratchpad/experiments/patches/A7-wip.patch`. It was missing when this entry was written.
