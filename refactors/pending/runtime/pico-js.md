@@ -336,15 +336,11 @@ function multipleOfA(factor: number): DerivedNode<number> {
 }
 ```
 
-pico-js frees a node's cached value when nothing uses it, but it cannot free the node object while your code still refers to it.
-
 ## Retaining nodes
 
 You can read a node without retaining it. If nothing retains the node and no other node depends on it, pico-js frees it some time after the read (see "Freeing unused nodes"). Once it has been freed, the next read computes it from scratch.
 
 Retaining a node with `retainDerivedNode` keeps the node and everything it depends on cached until you call `releaseRetain`. Updates still mark a retained node, so the next read recomputes only what changed. A retain with a callback is also how you subscribe to changes (see "Reacting to changes"). A component typically retains the nodes it renders when it mounts, and releases them when it unmounts.
-
-Retain a node whose reads must stay cheap until a later point, such as a node that a render reads until its commit. With a scheduler that frees nodes immediately, such as `scheduler.schedule = disposeAll`, pico-js frees a node that is not retained and that no other node depends on when the read returns, and the next read recomputes it.
 
 ## Reacting to changes
 
