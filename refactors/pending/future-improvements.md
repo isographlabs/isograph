@@ -62,3 +62,26 @@ Consider whether pico-js can handle a reducer over an event stream: a value that
 - How does a derived node fold events? A computation receives only the current values of the nodes it reads and its `previous` value. Folding with `previous` is correct only if every event triggers exactly one recompute. Lazy evaluation and batching do not guarantee that. Two writes in one batch, or two writes with no read between them, drop an event: the computation runs once and sees only the latest event.
 - Does the fold belong outside the graph? One option is a source that the caller updates with `writeSource(state, reduce(current, event))`, so each event is applied exactly once and derived nodes read the result. That moves the reducer out of pico-js and leaves the graph a pure function of its sources.
 - What do the contracts and the eager optimization imply? A fold inside the graph depends on how many times a computation runs, and the contracts do not promise a count. The eager optimization changes when a computation runs, so it changes which events a fold-by-`previous` would see.
+
+## Automatic eager derived nodes in pico-js
+
+An experiment outside the core library: a wrapper that makes a derived node eager by itself. A derived node is eager when it holds a retain whose `onChange` does nothing. The flush then recomputes the node right after updates, which saves work when the node is likely to return its previous value and many nodes depend on it.
+
+Per node, the wrapper measures:
+
+- how often a recompute returns the previous value, which is the cutoff rate;
+- the number of dependents;
+- how many nodes an update reaches past this node;
+- optionally the cost of the computation.
+
+The candidate heuristic makes a node eager when its cutoff rate is high and many nodes depend on it, which is the projection pattern: a rarely changing value derived from a frequently written source and read by many effects. The wrapper makes the node lazy again, by releasing the no-op retain, when that stops holding.
+
+Known costs:
+
+- Timing each computation with `performance.now()` costs tens of nanoseconds per run, so the wrapper has to sample the timing instead of timing every run.
+- The counters add fields to each node or a side table keyed by node.
+- Toggling eagerness churns retains. A node that crosses the threshold back and forth pays a retain and a release each time, so the heuristic needs hysteresis or a minimum number of samples between toggles.
+
+This is a wrapper or an experiment branch. It does not go into the core library. The S16 projection scenario and `cutoffWrite` are the benchmarks that judge it.
+
+Open question: whether the stale-read fix that ships (A2 with A5's skip bit, or a height variant) changes the payoff. Under A2 without A5, an eager node with many dependents costs O(dependents) per update, which may cancel the saving for exactly the nodes the heuristic selects.
