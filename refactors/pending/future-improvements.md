@@ -132,4 +132,4 @@ The proof obligation is a written proof of the ordering argument and an independ
 
 The benchmark is S16 with the projection behind several layers of declared nodes (S16d).
 
-A partial build may exist at `/private/tmp/claude-501/-Users-rbalicki-code-i2/bc4814a8-ba1e-4822-8e64-1dc5fc1cc7c0/scratchpad/experiments/patches/A7-wip.patch`. It was missing when this entry was written.
+Design notes from a stopped first attempt, written for an earlier API that passed values and needing rework for the mayRead/read API, are at /private/tmp/claude-501/-Users-rbalicki-code-i2/bc4814a8-ba1e-4822-8e64-1dc5fc1cc7c0/scratchpad/experiments/patches/A7-wip.md.
