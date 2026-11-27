@@ -304,15 +304,11 @@ const economists = createSourceNode([
 
 const laureates = createDerivedNode((callingNode, previous) => {
   const next = readSource(callingNode, economists).filter((e) => e.nobel);
-  return previous !== undefined &&
-    previous.length === next.length &&
-    previous.every((e, i) => e === next[i])
-    ? previous
-    : next;
+  return deepEqual(previous, next) ? previous : next;
 });
 ```
 
-`filter` returns a new array every time, so `laureates` returns `previous` when the filtered elements are the same. An update to `economists` that does not change who has a Nobel therefore leaves `laureates` unchanged, and nothing that reads `laureates` recomputes.
+`deepEqual` stands for any deep-equality function, such as one from a utility library. `filter` returns a new array every time, so `laureates` returns `previous` when the filtered elements are the same. An update to `economists` that does not change who has a Nobel therefore leaves `laureates` unchanged, and nothing that reads `laureates` recomputes.
 
 ## API
 
@@ -391,7 +387,7 @@ When a node is released and nothing else reads it, pico-js keeps it cached for a
 
 pico-js does not check these contracts. Breaking one gives undefined behavior.
 
-- Only update a source when its value actually changed.
+- Only update a source when its value actually changed, for example by checking `deepEqual(current, next)` before calling `writeSource`.
 - When a computation's result is structurally equal to its previous value, return the previous value (`previous`), so that `===` sees no change.
 - Computations must be synchronous and pure, read other nodes only through `readSource` and `readDerived`, and do nothing else with pico-js. The types prevent passing any node other than the `callingNode` to those functions. A computation must not keep its `callingNode` for use after it returns.
 - The graph must not have cycles.
