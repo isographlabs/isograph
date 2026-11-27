@@ -237,7 +237,7 @@ The exhaustive suite (Tests, Exhaustive suite) has no CI step yet, because it fa
 <!-- from libs/pico-js/README.md -->
 # pico-js
 
-pico-js is a TypeScript library for incremental computation. You write functions that compute values from inputs. pico-js remembers each function's result and which inputs it read, and after an input changes, it reruns only the functions that read something that changed.
+pico-js is a TypeScript library for incremental computation. You write functions that compute values from inputs and from each other. pico-js remembers each function's result and the values it read. When an input changes, a function reruns the next time its result is needed, and only if at least one of the values it read last time is now different.
 
 ## Priorities
 
