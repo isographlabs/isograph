@@ -1,6 +1,6 @@
 # pico-js: dependency arrays and joins
 
-This is a design sketch for a pico-js engine in which every derived node receives its dependencies as an array at creation, and the only dependency that changes after creation is the target of a join. A computation receives the values of its dependencies. It reads nothing inline. Eager nodes are scheduled in height order, as Jane Street's Incremental schedules its necessary nodes. Nothing here is implemented in `libs/pico-js`.
+This is a design sketch for a pico-js engine in which every derived node declares its dependencies when it is created. A static derived node lists the nodes it always reads in `reads` and the nodes a run may read in `mayRead`, and a join follows data to a target node. A computation receives the values of its `reads` as a parameter and reads a `mayRead` node by calling `read`. Eager nodes are scheduled in height order, as Jane Street's Incremental schedules its necessary nodes. Nothing here is implemented in `libs/pico-js`.
 
 Sources this doc cites:
 
@@ -14,13 +14,15 @@ Upstream isograph has no dependency graph to compare against. `callSubscriptions
 ## The model
 
 - A source node holds a value and a list of dependents. It is a distinct type and a distinct object shape (research part (f)).
-- A static derived node is `createDerivedNode(dependencies, compute)`. The array is fixed at creation. pico-js links one edge per element into that element's list of dependents when the node is created, and the set of edges never changes. `compute(values, previous)` receives the values of the dependencies in array order. It receives no `callingNode`.
-- Every dependency exists before its reader, so creation order is a topological order. A node's height at creation is one more than the greatest height among its dependencies, with a source at 0. A computation runs after its dependencies have values, so a read never points up, nothing suspends, and nothing walks.
-- A join follows data. Its outer node's value is a node, the target. The join's value is the target's value. This is Incremental's `join : 'a t t -> 'a t`, which "returns an incremental that behaves like the incremental that [t] currently holds" (`src/incremental_intf.ml:1177-1179`). The edge from a join to its target is the graph's only dynamic edge.
-- `bind` is `join(map(...))`: a static selector node whose value is a node, and a join of it.
+- A static derived node is `createDerivedNode({ reads, mayRead }, compute)`. `reads` is a fixed array of nodes that every run reads. pico-js brings them up to date before it calls `compute`, passes their values as the first parameter in array order, and links one edge per element into that element's list of dependents when the node is created. Those edges never change. A change to one of them marks the reader `Dirty` directly, with no verification, as a change to a source does today.
+- `mayRead` is a fixed array of nodes that a run may read. `compute` receives `read` as its second parameter, typed to accept only the node types in `mayRead`. Calling `read(node)` brings the node up to date, links an edge for this run, reused by position, and returns the node's value. These are the only edges tracked per run, and they are verified in read order. A `mayRead` node that the last run did not read has no edge, so its changes do not reach the reader. `compute(values, read, previous)` receives no `callingNode`.
+- Every node in `reads` and `mayRead` exists before its reader, so creation order is a topological order. A node's height at creation is one more than the greatest height among its `reads` and `mayRead`, with a source at 0, and 1 for a node with neither. A conditional read never raises anything, because the height already covers it. A computation runs after its `reads` have values, and no read suspends the computation.
+- Declaring a node in `reads` and not reading it on some runs costs extra recomputes and is never stale. That is a performance contract, not a correctness contract.
+- A join follows data. Its outer node's value is a node, the target. The join's value is the target's value. This is Incremental's `join : 'a t t -> 'a t`, which "returns an incremental that behaves like the incremental that [t] currently holds" (`src/incremental_intf.ml:1177-1179`). A join's target edge moves only when the selection changes.
+- `bind` is a general join, `join(map(...))`: a static selector node whose value is a node, and a join of it.
 - Eager nodes are the necessary nodes and every cached join. A node is necessary if it is observed or a necessary node depends on it (`src/incremental_intf.ml:96-103`). Every other derived node is lazy and keeps v0's marking and pull.
 - The flush takes eager nodes from a bucketed intrusive heap in height order. A node that recomputes to a value `===` to its previous value queues nothing. Callbacks run after the heap is empty.
-- Heights only rise. Only a join that switches to a target at or above its own height raises heights.
+- Heights only rise. Only a general join that switches to a target at or above its own height starts a raise. A `read` of a `mayRead` node makes the same compare, and it fires only when a general join raised that node after the reader's height was set.
 - Owners store nodes. pico-js frees cached values and edges, and owners remove node objects.
 
 ## Public API
@@ -34,7 +36,7 @@ declare const retainBrand: unique symbol;
 
 export type SourceNode<TValue> = { readonly [sourceBrand]: TValue };
 
-/** A static derived node or a join. */
+/** A static derived node or a join. Covariant in `TValue`: a `DerivedNode<A>` is a `DerivedNode<A | B>`. */
 export type DerivedNode<TValue> = { readonly [derivedBrand]: TValue };
 
 /** A join that writeSource keeps current. It stores no value of its own. */
@@ -46,19 +48,38 @@ export type GraphNode<TValue> = SourceNode<TValue> | DerivedNode<TValue>;
 
 export type Retain<TValue> = { readonly [retainBrand]: TValue };
 
-/** The dependencies an uncached join's selector may receive. */
+/** The `reads` an uncached join's selector may receive. */
 export type UncachedSelectorInput<TValue> =
   | SourceNode<TValue>
   | UncachedJoinNode<TValue>;
 
-export type ValuesOf<
-  TDependencies extends ReadonlyArray<GraphNode<unknown>>,
+/** The value type of a node. It distributes over a union of node types. */
+export type ValueOf<TNode> = TNode extends GraphNode<infer TValue>
+  ? TValue
+  : never;
+
+export type ValuesOf<TNodes extends ReadonlyArray<GraphNode<unknown>>> = {
+  readonly [K in keyof TNodes]: ValueOf<TNodes[K]>;
+};
+
+/**
+ * The `read` that a computation receives. It accepts a node whose type is a
+ * member of the element type of `mayRead`. A node that is not in `mayRead` and
+ * has the same type as a member is accepted by the type and breaks the
+ * contract.
+ */
+export type ReadMayRead<TMayRead extends ReadonlyArray<GraphNode<unknown>>> = <
+  TNode extends TMayRead[number],
+>(
+  node: TNode,
+) => ValueOf<TNode>;
+
+export type DerivedDependencies<
+  TReads extends ReadonlyArray<GraphNode<unknown>>,
+  TMayRead extends ReadonlyArray<GraphNode<unknown>>,
 > = {
-  readonly [K in keyof TDependencies]: TDependencies[K] extends GraphNode<
-    infer TValue
-  >
-    ? TValue
-    : never;
+  readonly reads?: TReads;
+  readonly mayRead?: TMayRead;
 };
 
 /** Selects the cached form where the uncached form is the default. */
@@ -72,12 +93,14 @@ export function writeSource<TValue>(
 ): void;
 
 export function createDerivedNode<
-  const TDependencies extends ReadonlyArray<GraphNode<unknown>>,
   TValue,
+  const TReads extends ReadonlyArray<GraphNode<unknown>> = readonly [],
+  const TMayRead extends ReadonlyArray<GraphNode<unknown>> = readonly [],
 >(
-  dependencies: TDependencies,
+  dependencies: DerivedDependencies<TReads, TMayRead>,
   compute: (
-    values: ValuesOf<TDependencies>,
+    values: ValuesOf<TReads>,
+    read: ReadMayRead<TMayRead>,
     previous: TValue | undefined,
   ) => TValue,
 ): DerivedNode<TValue>;
@@ -126,48 +149,48 @@ export function joinListDerivedHoldingDerived<TValue>(
   outer: DerivedNode<ReadonlyArray<DerivedNode<TValue>>>,
 ): DerivedNode<ReadonlyArray<TValue>>;
 
-// bind: join(createDerivedNode(dependencies, select)).
+// bind: join(createDerivedNode({ reads }, select)). A general join.
 export function bindSource<
-  const TDependencies extends ReadonlyArray<UncachedSelectorInput<unknown>>,
+  const TReads extends ReadonlyArray<UncachedSelectorInput<unknown>>,
   TValue,
 >(
-  dependencies: TDependencies,
-  select: (values: ValuesOf<TDependencies>) => SourceNode<TValue>,
+  reads: TReads,
+  select: (values: ValuesOf<TReads>) => SourceNode<TValue>,
 ): UncachedJoinNode<TValue>;
 export function bindSource<
-  const TDependencies extends ReadonlyArray<GraphNode<unknown>>,
+  const TReads extends ReadonlyArray<GraphNode<unknown>>,
   TValue,
 >(
-  dependencies: TDependencies,
-  select: (values: ValuesOf<TDependencies>) => SourceNode<TValue>,
+  reads: TReads,
+  select: (values: ValuesOf<TReads>) => SourceNode<TValue>,
   options?: CachedJoinOptions,
 ): DerivedNode<TValue>;
 
 export function bindDerived<
-  const TDependencies extends ReadonlyArray<GraphNode<unknown>>,
+  const TReads extends ReadonlyArray<GraphNode<unknown>>,
   TValue,
 >(
-  dependencies: TDependencies,
-  select: (values: ValuesOf<TDependencies>) => DerivedNode<TValue>,
+  reads: TReads,
+  select: (values: ValuesOf<TReads>) => DerivedNode<TValue>,
 ): DerivedNode<TValue>;
 
 export function bindListSources<
-  const TDependencies extends ReadonlyArray<GraphNode<unknown>>,
+  const TReads extends ReadonlyArray<GraphNode<unknown>>,
   TValue,
 >(
-  dependencies: TDependencies,
+  reads: TReads,
   select: (
-    values: ValuesOf<TDependencies>,
+    values: ValuesOf<TReads>,
   ) => ReadonlyArray<SourceNode<TValue>>,
 ): DerivedNode<ReadonlyArray<TValue>>;
 
 export function bindListDerived<
-  const TDependencies extends ReadonlyArray<GraphNode<unknown>>,
+  const TReads extends ReadonlyArray<GraphNode<unknown>>,
   TValue,
 >(
-  dependencies: TDependencies,
+  reads: TReads,
   select: (
-    values: ValuesOf<TDependencies>,
+    values: ValuesOf<TReads>,
   ) => ReadonlyArray<DerivedNode<TValue>>,
 ): DerivedNode<ReadonlyArray<TValue>>;
 
@@ -191,7 +214,7 @@ export function disposeNext(): boolean;
 export function disposeAll(): void;
 ```
 
-`readSource`, `readDerived`, and `CallingNode` do not exist. `readDerivedNode`, `retainDerivedNode`, `releaseRetain`, the batch functions, `scheduler`, `disposeNext`, and `disposeAll` keep v0's meaning, and they accept every join because `UncachedJoinNode<TValue>` is a `DerivedNode<TValue>`.
+`readSource`, `readDerived`, and `CallingNode` do not exist. `readDerivedNode`, `retainDerivedNode`, `releaseRetain`, the batch functions, `scheduler`, `disposeNext`, and `disposeAll` keep v0's meaning, and they accept every join because `UncachedJoinNode<TValue>` is a `DerivedNode<TValue>`. Inside a computation, `read` is the only way to read a node, and it accepts only the nodes in `mayRead`.
 
 The README's first graph, before and after:
 
@@ -212,12 +235,90 @@ const chosen = createDerivedNode((callingNode) =>
 
 ```ts
 // from libs/pico-js/README.md
-const sum = createDerivedNode([a, b], ([a, b]) => a + b);
-const doubled = createDerivedNode([sum], ([sum]) => sum * 2);
-const chosen = bindSource([useA], ([useA]) => (useA ? a : b));
+const sum = createDerivedNode({ reads: [a, b] }, ([a, b]) => a + b);
+const doubled = createDerivedNode({ reads: [sum] }, ([sum]) => sum * 2);
+const chosen = createDerivedNode(
+  { reads: [useA], mayRead: [a, b] },
+  ([useA], read) => read(useA ? a : b),
+);
 ```
 
-`chosen` is an uncached join. A write to `b` while `useA` is true reaches nothing, as it does in v0, because the join's target edge is on `a`.
+`chosen` has a `reads` edge on `useA` and, while `useA` is true, a `mayRead` edge on `a`. A write to `b` while `useA` is true reaches nothing, as it does in v0, because the last run did not read `b`.
+
+## Dependency forms
+
+The forms run from the cheapest to the most general. Use the first one that expresses the computation.
+
+### Which form to use
+
+- Use `reads` for every node the computation reads on every run, and for a node it reads on nearly every run. A reader with only `reads` has fixed edges, keeps no per-run state, and verifies nothing in read order.
+- Use `mayRead` when a computation reads some nodes only on some runs, such as `a ? b : c` or a switch on the variant of a union whose cases name nodes that exist at creation. The reader keeps one edge per node its last run read, linked on that read, and verifies those edges in read order. A `mayRead` node that the last run did not read costs the reader nothing.
+- Use a general join when no declaration at creation names the node: a node that the selector creates from the values it received, a node that an owner creates per key on demand, a chain of records whose length data decides, or a list of any of these.
+
+### reads
+
+`reads` is a fixed array of nodes. Its edges are linked once, when the node is created, and never change.
+
+- Before it calls `compute`, pico-js brings every `reads` node up to date in array order and passes their values as the first parameter.
+- A change to a `reads` node marks the reader `Dirty`, and the reader recomputes with no verification, as a changed source does today. A reader marked `MaybeDirty` because a lazy `reads` node is not yet verified pulls its `reads` in array order and becomes `Dirty` at the first one that changed.
+- Listing a node in `reads` that some runs do not read costs extra recomputes when that node changes. The reader is never stale. This is a performance contract. Reading a node that is in neither list is a correctness contract (see "Contracts").
+
+### mayRead
+
+`mayRead` is a fixed array of nodes. `compute` receives `read` as its second parameter. A node with a `mayRead` has its `reads` edges, then one edge per `read` call of its last run, in read order.
+
+```ts
+// from libs/pico-js/src/read.ts
+function readMayRead(
+  reader: MutableDerivedNode<unknown>,
+  dependency: AnyNode,
+): unknown {
+  if (dependency.kind !== SOURCE && dependency.height >= reader.height) {
+    adjustHeights(reader, dependency.height + 1, dependency);
+  }
+  const previousDependency = linkReadEdge(reader, dependency);
+  const value =
+    dependency.kind === SOURCE ? dependency.value : pullCurrent(dependency);
+  if (previousDependency !== dependency && isNecessary(reader)) {
+    becomeNecessary(dependency);
+    if (previousDependency !== undefined) {
+      becomeUnnecessary(previousDependency);
+    }
+  }
+  return value;
+}
+
+function trimMayReadEdges(reader: MutableDerivedNode<unknown>): void {
+  const cursor = reader.readCursor;
+  let edge =
+    cursor === undefined ? reader.firstDependency : cursor.nextDependency;
+  if (cursor === undefined) {
+    reader.firstDependency = undefined;
+  } else {
+    cursor.nextDependency = undefined;
+  }
+  while (edge !== undefined) {
+    const next = edge.nextDependency;
+    unlinkEdge(edge);
+    if (isNecessary(reader)) {
+      becomeUnnecessary(edge.dependency);
+    }
+    edge = next;
+  }
+  reader.readCursor = undefined;
+}
+```
+
+- `readMayRead` makes the height compare before it links the edge. It links the edge before it pulls, so a raise during the pull reaches the reader. A reader that is necessary makes `dependency` necessary after the pull, and the node an edge moved away from unnecessary after that. `becomeNecessary` and `becomeUnnecessary` return at once for a source.
+- `linkReadEdge` takes the edge after `reader.readCursor`, or `firstDependency` when `readCursor` is `undefined`. It appends a new edge when there is none. It moves the edge when its dependency differs. It sets `readCursor` to the edge and returns the dependency the edge held before, or `undefined` for a new edge. Reading the same node twice in one run links two edges.
+- Before `compute`, a recompute sets `readCursor` to `lastReadsEdge`. After `compute` returns, `trimMayReadEdges` unlinks every edge the run did not use.
+- A change to a node that the last run read reaches the reader through its edge. It marks the reader `Dirty` when the change is known, and `MaybeDirty` through a lazy node whose change is not yet known. A `MaybeDirty` reader pulls its `mayRead` edges one at a time in read order and stops at the first that changed. The order matters because a changed earlier read can end the reads after it, and pico-js must not pull a node that the recomputation will not read.
+- A `mayRead` node that the last run did not read has no edge, so a change to it does not reach the reader.
+- The height covers `reads` and `mayRead`, so a conditional read never raises anything. The compare in `readMayRead` fires only when a general join raised a `mayRead` node after the reader's height was set, because the reader had no edge to it at the time.
+
+### General joins
+
+A general join takes any node: `bindSource`, `bindDerived`, `bindListSources`, `bindListDerived`, and the single and list join constructors over a node-valued node. Its target is chosen by the value of an outer node, so its height cannot cover the target at creation, and a switch to a target at or above it raises heights. "Joins" describes them.
 
 ## Joins
 
@@ -235,7 +336,7 @@ An uncached join is the default when its selector reads only sources or other un
 
 - writeSource computes it. A write that reaches an uncached join through its selector's edges runs the selector on the new values and moves the target edge if the selected source differs. A write that reaches it through its target edge changes its value. writeSource knows the written source's old and new values, so it decides whether the join's value changed without storing that value on the join.
 - It stores no value, has no status, and never enters the flush heap. A read of it returns its target source's value.
-- Its height is one more than the greatest height among its selector's dependencies, with a source at 0. Its target is a source, so a switch never raises a height.
+- Its height is one more than the greatest height among its selector's `reads`, with a source at 0. Its target is a source, so a switch never raises a height.
 - `bindSource` in the uncached form allocates one node. The selector's edges and the target edge belong to the join, and there is no separate map node, because writeSource evaluates the selector and nothing caches its result.
 - `CachedJoinOptions` selects the cached form instead.
 
@@ -258,7 +359,7 @@ A list join's outer value is an array of nodes, and its value is the array of th
 
 ### bind
 
-`bindDerived(dependencies, select)` is `joinDerivedHoldingDerived(createDerivedNode(dependencies, (values) => select(values)))`. `bindSource` with derived dependencies, `bindListSources`, and `bindListDerived` are the same over their join constructors. A cached bind is two nodes: the selector node and the join. The selector node is internal, and only the join's outer edge points at it.
+`bindDerived(reads, select)` is `joinDerivedHoldingDerived(createDerivedNode({ reads }, (values) => select(values)))`. `bindSource` with derived dependencies, `bindListSources`, and `bindListDerived` are the same over their join constructors. A cached bind is two nodes: the selector node and the join. The selector node is internal, and only the join's outer edge points at it.
 
 There are no scopes. Incremental's scopes invalidate the nodes a bind's right-hand side created when the left-hand side changes (`src/incremental_intf.ml:315-325`). pico-js has a contract instead:
 
@@ -270,7 +371,64 @@ Nodes stored by owners under their own key, as in the examples below, meet this 
 
 ## Examples
 
-The examples share this record type and these owners:
+Every example retains the node it ends with, and `render` is the callback.
+
+```ts
+function render(value: unknown): void {
+  console.log(value);
+}
+```
+
+### A conditional between two sources
+
+```ts
+const a = createSourceNode(true);
+const b = createSourceNode('b0');
+const c = createSourceNode('c0');
+
+const chosen = createDerivedNode(
+  { reads: [a], mayRead: [b, c] },
+  ([condition], read) => read(condition ? b : c),
+);
+const shout = createDerivedNode({ reads: [chosen] }, ([value]) =>
+  value.toUpperCase(),
+);
+retainDerivedNode(shout, render);
+```
+
+`chosen` is `a ? b : c`. It reads `a` on every run, so `a` is in `reads`, and it reads one of `b` and `c`, so both are in `mayRead`. Its height is 1. Its first run reads `b`, so it has a `reads` edge on `a` and a `mayRead` edge on `b`. `shout` is a static node at height 2 with a `reads` edge on `chosen`.
+
+- A change of the node that was read: `writeSource(b, 'b1')`. The `mayRead` edge marks `chosen` `Dirty`. It recomputes to `'b1'`, reads `b` again and reuses the edge, and `shout` recomputes to `'B1'`.
+- A change of the node that was not read: `writeSource(c, 'c1')`. `c` has no dependent, because the last run did not read it. The write only stores the value.
+- A change of the condition: `writeSource(a, false)`. The `reads` edge marks `chosen` `Dirty`. It recomputes, reads `c`, and moves its second edge from `b` to `c`. `'b1'` is not `'c1'`, so `shout` recomputes. Had `c` held `'b1'`, `chosen` would return the same value and `shout` would not be queued. A write to `b` now reaches nothing.
+- Putting `b` and `c` in `reads` gives the same output, and every write to either one recomputes `chosen`.
+
+### A record and one of two names
+
+```ts
+type Entry = { readonly id: number; readonly showNickname: boolean };
+
+const entry = createSourceNode<Entry>({ id: 7, showNickname: true });
+const legalName = createSourceNode('Alexandra');
+const nickname = createSourceNode('Alex');
+
+const badge = createDerivedNode(
+  { reads: [entry], mayRead: [legalName, nickname] },
+  ([{ id, showNickname }], read) =>
+    `#${id} ${read(showNickname ? nickname : legalName)}`,
+);
+retainDerivedNode(badge, render);
+```
+
+`badge` reads `entry` on every run, so `entry` is in `reads`. It reads one of the two names, so both are in `mayRead`. Its height is 1. The first run reads `nickname` and links a second edge to it, after the `reads` edge to `entry`.
+
+- A change of the record: `writeSource(entry, { id: 8, showNickname: true })`. The `reads` edge marks `badge` `Dirty`. It recomputes, reads `nickname` again, and reuses the second edge.
+- A change of the name that was read: `writeSource(nickname, 'Lex')`. The second edge reaches `badge`, which recomputes.
+- A change of the name that was not read: `writeSource(legalName, 'Alexandria')`. `legalName` has no dependent, because the last run did not read it. The write only stores the value.
+- A switch of the name: `writeSource(entry, { id: 8, showNickname: false })`. `badge` is `Dirty` through its `reads` edge, recomputes, and reads `legalName`. The second edge moves from `nickname` to `legalName`, so a write to `nickname` reaches nothing from here on.
+- Putting both names in `reads` gives the same output, and every write to either name recomputes `badge`.
+
+The remaining examples share this record type and these owners:
 
 ```ts
 type Person = {
@@ -285,10 +443,6 @@ function createPerson(name: string, parent: Person | null): Person {
     bestFriend: createSourceNode<Person | null>(null),
     parent: createSourceNode(parent),
   };
-}
-
-function render(value: string): void {
-  console.log(value);
 }
 ```
 
@@ -316,7 +470,7 @@ const carol = createPerson('Carol', null);
 writeSource(alice.bestFriend, bob);
 
 const greeting = createDerivedNode(
-  [bestFriendName(alice)],
+  { reads: [bestFriendName(alice)] },
   ([name]) => `Hello, ${name}`,
 );
 retainDerivedNode(greeting, render);
@@ -347,8 +501,9 @@ function parentOrOwnName(person: Person): UncachedJoinNode<string> {
 const dana = createPerson('Dana', null);
 const erin = createPerson('Erin', dana);
 
-const label = createDerivedNode([parentOrOwnName(erin)], ([name]) =>
-  name.toUpperCase(),
+const label = createDerivedNode(
+  { reads: [parentOrOwnName(erin)] },
+  ([name]) => name.toUpperCase(),
 );
 retainDerivedNode(label, render);
 ```
@@ -367,7 +522,7 @@ const ownNameNodes = new Map<Person, DerivedNode<string>>();
 function ownName(person: Person): DerivedNode<string> {
   let node = ownNameNodes.get(person);
   if (node === undefined) {
-    node = createDerivedNode([person.name], ([name]) => name);
+    node = createDerivedNode({ reads: [person.name] }, ([name]) => name);
     ownNameNodes.set(person, node);
   }
   return node;
@@ -391,7 +546,10 @@ const ari = createPerson('Ari', rhea);
 const bo = createPerson('Bo', ari);
 const cy = createPerson('Cy', bo);
 
-const banner = createDerivedNode([rootName(cy)], ([name]) => `House ${name}`);
+const banner = createDerivedNode(
+  { reads: [rootName(cy)] },
+  ([name]) => `House ${name}`,
+);
 retainDerivedNode(banner, render);
 ```
 
@@ -412,15 +570,172 @@ The final heights are `ownName(rhea)` 1, each selector node 1, `rootName(rhea)` 
 - A link change that pulls a join on demand: `writeSource(ari.parent, wren)`, where `wren.parent` is `yara` and `rootName(wren)` was never created. The flush takes `rootName(ari)` at 3. Its selector node created `rootName(wren)` at height 2, so there is no raise, and `rootName(ari)` pulls `rootName(wren)`. `rootName(wren)` is a waiting reader's dependency and cannot requeue. It selects `rootName(yara)` at 9 and rises to 10, and through its linked edge `rootName(ari)` rises to 11 and the nodes above follow. Its pull of `rootName(yara)` is a pull of a node at or above the flush position 3, so the fallback runs first. `rootName(ari)` then stores its new value, and the flush finishes with marking that goes past eager nodes.
 - An unrelated field change: `writeSource(bo.name, 'Bea')` or `writeSource(cy.bestFriend, ari)`. `ownName(bo)` does not exist, because `bo` is not a root, and nothing reads `bo.name` or `cy.bestFriend`.
 
+### A link that is one of two variants
+
+The next three examples follow a link that is one of two variants of a union, with `bob`, `carol`, and `ownName` as defined above. Each uses a general join, because the node it ends at belongs to a person or pet that is not known when the join is created.
+
+```ts
+type Circle =
+  | { readonly kind: 'HasFriends'; readonly bestFriend: Person }
+  | { readonly kind: 'HasEnemies'; readonly worstEnemy: Person };
+
+const circle = createSourceNode<Circle>({
+  kind: 'HasFriends',
+  bestFriend: bob,
+});
+
+const circleName = bindSource([circle], ([value]) =>
+  value.kind === 'HasFriends'
+    ? value.bestFriend.name
+    : value.worstEnemy.name,
+);
+const circleLabel = createDerivedNode(
+  { reads: [circleName] },
+  ([name]) => name.toUpperCase(),
+);
+retainDerivedNode(circleLabel, render);
+```
+
+One join serves both variants. Its selector picks the `name` source of the friend or of the enemy. `circleName` is an uncached join at height 1, and `circleLabel` is at height 2.
+
+- A change of the selected name: `writeSource(bob.name, 'Bobby')`. The target edge reaches the join. The selector picks `bob.name` again, the compare finds a change, and `circleLabel` recomputes.
+- A switch of the variant: `writeSource(circle, { kind: 'HasEnemies', worstEnemy: carol })`. The selector edge reaches the join. The selector picks `carol.name`, the target edge moves, and the compare decides whether `circleLabel` recomputes.
+- A rewrite that selects the same link: `writeSource(circle, { kind: 'HasFriends', bestFriend: bob })` while the variant is already `HasFriends` with `bob`. The selector picks `bob.name` again, the compare finds no change, and `circleLabel` is not queued.
+- A change of the name that was not selected: `writeSource(carol.name, 'Caro')` while the variant is `HasFriends`. `carol.name` has no dependent, and the write only stores the value.
+
+```ts
+type Pet = {
+  readonly name: SourceNode<string>;
+  readonly age: SourceNode<number>;
+};
+
+const rex: Pet = { name: createSourceNode('Rex'), age: createSourceNode(3) };
+
+type Companion =
+  | { readonly kind: 'HasFriends'; readonly bestFriend: Person }
+  | { readonly kind: 'HasPets'; readonly pet: Pet };
+
+const companion = createSourceNode<Companion>({
+  kind: 'HasFriends',
+  bestFriend: bob,
+});
+
+const petAgeNodes = new Map<Pet, DerivedNode<number>>();
+
+function petAge(pet: Pet): DerivedNode<number> {
+  let node = petAgeNodes.get(pet);
+  if (node === undefined) {
+    node = createDerivedNode({ reads: [pet.age] }, ([age]) => age);
+    petAgeNodes.set(pet, node);
+  }
+  return node;
+}
+
+const companionDetail = bindDerived(
+  [companion],
+  ([value]): DerivedNode<string | number> =>
+    value.kind === 'HasFriends' ? ownName(value.bestFriend) : petAge(value.pet),
+);
+const companionLabel = createDerivedNode(
+  { reads: [companionDetail] },
+  ([detail]) => `Companion: ${detail}`,
+);
+retainDerivedNode(companionLabel, render);
+```
+
+One join has the value type `string | number`. `DerivedNode` is covariant, so the friend variant's `DerivedNode<string>` and the pet variant's `DerivedNode<number>` are both a `DerivedNode<string | number>`, and the return type of the selector names that type. `bindDerived` creates a selector node at height 1 over `companion` and a join at height 2. `ownName(bob)` and `petAge(rex)` are at height 1, so no switch raises anything.
+
+- A change of the friend's name: `writeSource(bob.name, 'Bobby')`. `ownName(bob)` is necessary through the join's target edge, so it goes on the flush heap at height 1 and recomputes. The join, queued at height 2, reads the new value, and `companionLabel` recomputes.
+- A switch to the pet: `writeSource(companion, { kind: 'HasPets', pet: rex })`. The selector node refreshes at height 1 and returns `petAge(rex)`, which is a different node, so the join goes on the flush heap at height 2. The flush moves the target edge and pulls `petAge(rex)`, which computes `3`. `ownName(bob)` loses its only necessary dependent, becomes lazy, has no other dependent, and goes on the cleanup queue. `'Bobby'` is not `3`, so `companionLabel` recomputes.
+- A change of the pet's age: `writeSource(rex.age, 4)` with the pet variant selected. `petAge(rex)` recomputes at height 1, the join refreshes at 2, and `companionLabel` recomputes. With the friend variant selected, nothing that is queued reads `rex.age`.
+
+```ts
+type FriendSummary = {
+  readonly kind: 'HasFriends';
+  readonly friendName: string;
+};
+
+type PetSummary = {
+  readonly kind: 'HasPets';
+  readonly petCount: number;
+};
+
+type Household =
+  | { readonly kind: 'HasFriends'; readonly bestFriend: Person }
+  | { readonly kind: 'HasPets'; readonly petCount: number };
+
+const household = createSourceNode<Household>({
+  kind: 'HasFriends',
+  bestFriend: bob,
+});
+
+const friendSummaryNodes = new Map<Person, DerivedNode<FriendSummary>>();
+
+function friendSummary(person: Person): DerivedNode<FriendSummary> {
+  let node = friendSummaryNodes.get(person);
+  if (node === undefined) {
+    node = createDerivedNode(
+      { reads: [person.name] },
+      ([friendName]): FriendSummary => ({ kind: 'HasFriends', friendName }),
+    );
+    friendSummaryNodes.set(person, node);
+  }
+  return node;
+}
+
+const householdSummary = bindDerived(
+  [household],
+  ([value]): DerivedNode<FriendSummary | PetSummary> =>
+    value.kind === 'HasFriends'
+      ? friendSummary(value.bestFriend)
+      : createDerivedNode(
+          {},
+          (): PetSummary => ({ kind: 'HasPets', petCount: value.petCount }),
+        ),
+);
+retainDerivedNode(householdSummary, render);
+```
+
+The join's value is the tagged union. The friend variant targets `friendSummary(person)`, a cached node per person that the owner stores under its key and that produces `{ kind: 'HasFriends', friendName }`. The pets variant targets a node that the selection creates, which captures `petCount` from the value the selector received and produces `{ kind: 'HasPets', petCount }`. It is stored nowhere, which meets the bind ownership contract. The variant and the value come from the same selection, so a reader never sees `kind: 'HasPets'` with a friend's name. The selector node is at height 1, the join at 2, and every target at 1, so no switch raises anything.
+
+- A change of the friend's name: `writeSource(bob.name, 'Bobby')`. `friendSummary(bob)` recomputes at height 1 to a new object, and the join refreshes at 2 and stores it.
+- A switch to pets: `writeSource(household, { kind: 'HasPets', petCount: 2 })`. The selector node refreshes and creates a node at height 1 with no dependencies. The join moves its target edge to it and pulls `{ kind: 'HasPets', petCount: 2 }`. `friendSummary(bob)` loses its only necessary dependent and goes on the cleanup queue.
+- A change of the count: `writeSource(household, { kind: 'HasPets', petCount: 3 })`. The selector runs again, creates a new node, and the join moves its target edge to it. The previous node loses its only dependent, goes on the cleanup queue, and is freed. The new object is not `===` to the previous one, so the readers see a change.
+- A switch back: `writeSource(household, { kind: 'HasFriends', bestFriend: carol })`. The selector returns `friendSummary(carol)` from its owner, created at height 1 if it did not exist, and the join moves its edge to it.
+
+### A join in reads and a join in mayRead
+
+A join is a node, so it is orthogonal to `reads` and `mayRead`. A node may list a join in either one, and the join's kind does not change how the reader treats it.
+
+```ts
+const showParent = createSourceNode(false);
+const friendName = bestFriendName(alice);
+const parentName = parentOrOwnName(erin);
+
+const summary = createDerivedNode(
+  { reads: [friendName, showParent], mayRead: [parentName] },
+  ([friend, withParent], read) =>
+    withParent ? `${friend} and ${read(parentName)}` : friend,
+);
+retainDerivedNode(summary, render);
+```
+
+`friendName` and `parentName` are uncached joins at height 1, `showParent` is a source, and `summary` is a static node at height 2. `summary` has `reads` edges on `friendName` and `showParent`. While `showParent` is false, its run does not read `parentName`, so it has no edge to it.
+
+- A change of the friend's name: `writeSource(bob.name, 'Robert')`. writeSource finds that `friendName` changed and marks `summary` `Dirty` through the `reads` edge. `summary` recomputes.
+- A change of the parent's name while `showParent` is false: `writeSource(dana.name, 'Danielle')`. `parentName` changes and reaches `label`, which has an edge to it. `summary` has none, so it is not marked.
+- A switch: `writeSource(showParent, true)`. The `reads` edge marks `summary` `Dirty`. The run calls `read(parentName)`, which links a third edge after the two `reads` edges. A write to `dana.name` now reaches `summary` through `parentName`.
+- A link change under the switch: `writeSource(erin.parent, null)` while `showParent` is true. `parentName` moves its target edge to `erin.name`, finds a change, and marks `summary` `Dirty` through its edge.
+
 ## Scheduling
 
 ### Heights
 
-- A static node's height is set at creation, one more than the greatest height among its dependencies, with a source at 0 and an uncached join at its own height.
-- A cached join's height at creation is one more than its outer node's height. Its target is unknown until its first refresh.
+- A static node's height is set at creation, one more than the greatest height among its `reads` and `mayRead`, with a source at 0 and an uncached join at its own height. A node with neither has height 1.
+- A general cached join's height at creation is one more than its outer node's height. Its target is unknown until its first refresh.
 - A raise is Incremental's `adjust_heights`: it lifts the node and every dependent whose height is not above the new height of the node below it, in increasing order of pre-adjusted height, and moves each one that is on the flush heap (`src/adjust_heights_heap.ml:136-203`). It throws if it reaches the new target, which is its cycle check (`src/adjust_heights_heap.mli:39-71`).
-- Only a join starts a raise, when it switches to a derived target whose height is at or above its own.
-- A freed node is out of its dependencies' lists, so a raise does not reach it. When it links its edges again, its height becomes the greater of its old height and one more than its dependencies' heights, and the raise continues to its dependents. This catches up with raises that joins made while it was unlinked.
+- Only a general join starts a raise, when it switches to a derived target whose height is at or above its own. A `read` of a `mayRead` node makes the same compare before it links the edge, and starts a raise when it fires. It fires only when a general join raised that node after the reader's height was set, because the reader had no edge to the node at the time.
+- A freed node is out of its dependencies' lists, so a raise does not reach it. When it links its edges again, its height becomes the greater of its old height and one more than its `reads` heights, and the raise continues to its dependents. This catches up with raises that joins made while it was unlinked.
 - Heights never go down. This is Incremental's pseudo-height, which "never goes down" so a bind that flips between targets does not renumber the graph each time (talk ¶211-213).
 - The bucket array grows with the greatest height. Incremental bounds height at 128 by default (`src/incremental_intf.ml:134-139`). pico-js does not, as research part (e) states under "Bounded heights".
 
@@ -511,10 +826,10 @@ function flush(): void {
 
 `refreshTaken` dispatches on `kind`:
 
-- A static node that is `Dirty` recomputes. One that is `MaybeDirty` is verified first. One that is `Clean` was refreshed on demand after a fallback, and is skipped.
+- A static node that is `Dirty` recomputes. One that is `MaybeDirty` is verified first. One that is `Clean` was refreshed on demand after a fallback, and is skipped. Verification pulls the node's `reads` in array order and then its `mayRead` edges in read order, and stops at the first dependency whose value changed.
 - A cached join refreshes as "Cached joins" describes, with `TAKEN_FROM_HEAP`.
 
-A recompute pulls each derived dependency, then calls `compute(values, previous)`. In `FLUSH_ORDERED`, every dependency is below the node and final, so each pull is a status check. If the result is `===` to the previous value, nothing else happens, and nothing past the node is visited. Otherwise `propagateChange` visits each dependent: a needed eager one goes on the flush heap as `Dirty`, and a lazy one is marked `Dirty` with the in-line walk beyond it. An observed node goes on the list of changed nodes. Callbacks run in `callOnChanges` after the heap is empty, at most once per node per flush, as Incremental's on-update handlers do (`src/state.ml:1321-1363`).
+A recompute pulls each derived node in `reads`, then calls `compute(values, read, previous)`. Each `read` call pulls its node and links an edge, and `trimMayReadEdges` unlinks the edges the run did not reuse. In `FLUSH_ORDERED`, every `reads` and `mayRead` node is below the node and final, so each pull is a status check. If the result is `===` to the previous value, nothing else happens, and nothing past the node is visited. Otherwise `propagateChange` visits each dependent: a needed eager one goes on the flush heap as `Dirty`, and a lazy one is marked `Dirty` with the in-line walk beyond it. An observed node goes on the list of changed nodes. Callbacks run in `callOnChanges` after the heap is empty, at most once per node per flush, as Incremental's on-update handlers do (`src/state.ml:1321-1363`).
 
 An observed uncached join that changed during the batch is on the list of changed nodes with its value before the batch. `callOnChanges` calls its `onChange` only if its current value is not `===` to that value.
 
@@ -538,12 +853,12 @@ function refreshJoinDerivedHoldingDerived(
     }
   }
   const previousTarget = moveTargetEdge(join, target);
-  const value = pullTarget(target);
+  const value = pullCurrent(target);
   transferNecessity(join, previousTarget, target);
   storeJoinValue(join, value, taken);
 }
 
-function pullTarget<TValue>(target: MutableDerivedNode<TValue>): TValue {
+function pullCurrent<TValue>(target: MutableDerivedNode<TValue>): TValue {
   if (flushState === FLUSH_ORDERED && target.height >= flushHeight) {
     fallBack();
   }
@@ -553,9 +868,9 @@ function pullTarget<TValue>(target: MutableDerivedNode<TValue>): TValue {
 
 The other cached kinds differ only in the shapes they read. A source outer is read as `outer.value`. A source target skips the height compare and `transferNecessity`. A list join runs the same steps over its target edges by position and raises once, above its tallest target.
 
-A join taken from the heap is at `flushHeight`. After the raise check its target is below it, so `pullTarget` never falls back for it, and a lazy target's pull reads only nodes below the flush position.
+A join taken from the heap is at `flushHeight`. After the raise check its target is below it, so `pullCurrent` never falls back for it, and a lazy target's pull reads only nodes below the flush position.
 
-A join pulled by a waiting reader cannot requeue, because its reader is waiting for its value. It raises, links the edge, and pulls the target. The edge is linked before the pull, so a raise of the target during its own pull reaches the join. If the target is at or above the flush position, `pullTarget` runs the fallback first.
+A join pulled by a waiting reader cannot requeue, because its reader is waiting for its value. It raises, links the edge, and pulls the target. The edge is linked before the pull, so a raise of the target during its own pull reaches the join. If the target is at or above the flush position, `pullCurrent` runs the fallback first.
 
 The same compare runs where a freed node links its edges again during a flush and pulls its dependencies, because the catch-up can put a dependency at or above the flush position.
 
@@ -585,11 +900,11 @@ Lazy nodes keep their edges, stay cached, and can be read at any time. Increment
 
 ### Cleanup and ownership
 
-- A node is needed while it has a retain or a dependent, as in v0 (`libs/pico-js/docs/freeing-nodes.md`). A dependent counts from the moment its edge is linked, which for a static node is its creation.
+- A node is needed while it has a retain or a dependent, as in v0 (`libs/pico-js/docs/freeing-nodes.md`). A dependent counts from the moment its edge is linked, which for a `reads` edge is the reader's creation and for a `mayRead` edge is the run that reads the node.
 - A new node has no retain and no dependent, so `createDerivedNode` and the join constructors put it on the cleanup queue. Without that, a node created and never read would never be freed, and its edges would keep it and its dependencies reachable after its owner dropped it. `scheduler.schedule` runs at the end of the next outermost operation, as v0 states for the cleanup queue.
-- Freeing a node unlinks each of its edges from its dependency's list of dependents, drops its value, and sets it `Uncomputed`. The node keeps its edge objects. Its next pull links the same edges again, catches up its height, and computes. A dependency that a free leaves unneeded goes on the cleanup queue.
+- Freeing a node unlinks each of its edges from its dependency's list of dependents, drops its value, and sets it `Uncomputed`. The node keeps the edge objects of its `reads` and drops its `mayRead` edge objects, which describe the run whose value the free discards. Its next pull links the `reads` edges again, catches up its height, and computes, and that run links `mayRead` edges again. A dependency that a free leaves unneeded goes on the cleanup queue.
 - An update frees the unneeded nodes it took out of `Clean`, after the flush and before the callbacks, as v0's `disposeMarked` does (`libs/pico-js/src/cleanup.ts:163-202`).
-- A join's old target loses the join as a dependent, and goes on the cleanup queue if that leaves it unneeded.
+- A join's old target loses the join as a dependent, and goes on the cleanup queue if that leaves it unneeded. A node that loses a reader because `trimMayReadEdges` unlinked an edge, or because `read` moved the edge to another node, goes on the cleanup queue in the same case.
 - A necessary node is needed, so cleanup never frees it.
 - pico-js never removes a node from an owner. Owners are module variables or maps keyed by a parameter, and an owner removes a node object when it chooses. A freed node that an owner keeps costs its object and its unlinked edge objects, and computes again when read.
 
@@ -653,9 +968,10 @@ type MutableSourceNode<TValue> = SourceNode<TValue> & {
 
 /**
  * Every derived kind is this one object literal, so marking and the heaps
- * read one shape. A static node's edges are its dependencies in array order.
- * A single join's edges are its target edge, once it has selected a target,
- * then its outer edge or its selector's edges. A list join's edges are its
+ * read one shape. A static node's edges are its `reads` in array order, ending
+ * at `lastReadsEdge`, then the edges its last run linked through `read`, in
+ * read order. A single join's edges are its target edge, once it has selected
+ * a target, then its outer edge or its selector's `reads` edges. A list join's edges are its
  * outer edge, then its target edges in order. An uncached join leaves
  * `value`, `status`, and `necessaryDependentCount` unused.
  */
@@ -670,14 +986,20 @@ type MutableDerivedNode<TValue> = DerivedNode<TValue> & {
   heapNext: MutableDerivedNode<unknown> | undefined;
   firstRetain: MutableRetain<TValue> | undefined;
   firstDependency: Edge | undefined;
+  /** The last `reads` edge, set at creation. `undefined` when `reads` is empty. */
+  lastReadsEdge: Edge | undefined;
+  /** The edge of the latest `read` of the running computation. Meaningful only during a run. */
+  readCursor: Edge | undefined;
   firstDependent: Edge | undefined;
   lastDependent: Edge | undefined;
   readonly compute: Compute<TValue> | Select | undefined;
+  /** The `read` that `compute` receives, bound to this node. */
+  readonly readFunction: ReadFunction;
 };
 
 type AnyNode = MutableSourceNode<unknown> | MutableDerivedNode<unknown>;
 
-/** v0's edge. Only a target edge changes its `dependency`. */
+/** v0's edge. Only a target edge and an edge that `read` links change their `dependency`. */
 type Edge = {
   dependency: AnyNode;
   readonly dependent: MutableDerivedNode<unknown>;
@@ -686,8 +1008,14 @@ type Edge = {
   nextDependent: Edge | undefined;
 };
 
+type ReadFunction = (node: AnyNode) => unknown;
+
 type Compute<TValue> = {
-  method(values: ReadonlyArray<unknown>, previous: TValue | undefined): TValue;
+  method(
+    values: ReadonlyArray<unknown>,
+    read: ReadFunction,
+    previous: TValue | undefined,
+  ): TValue;
 }['method'];
 
 type Select = (values: ReadonlyArray<unknown>) => AnyNode;
@@ -723,7 +1051,7 @@ const PULLED = 1;
 type Taken = typeof TAKEN_FROM_HEAP | typeof PULLED;
 ```
 
-v0's derived node for comparison. The new literal drops `evaluation` (now the `OBSERVED` bit), the four dependency-list fields (now `firstDependency`), and `BEYOND_DONE`, and adds `kind`, `height`, `necessaryDependentCount`, `heapPrevious`, and `heapNext`: 13 fields against 12.
+v0's derived node for comparison. The new literal drops `evaluation` (now the `OBSERVED` bit), the four dependency-list fields (now `firstDependency`), and `BEYOND_DONE`, and adds `kind`, `height`, `necessaryDependentCount`, `heapPrevious`, `heapNext`, `lastReadsEdge`, `readCursor`, and `readFunction`: 16 fields against 12.
 
 ```ts
 // from libs/pico-js/src/nodes.ts
@@ -813,7 +1141,20 @@ function verify(root: MutableDerivedNode<unknown>): typeof DIRTY | typeof CLEAN;
 function recompute<TValue>(node: MutableDerivedNode<TValue>, taken: Taken): TValue;
 /** Links a freed node's edges again and catches up its height. */
 function relink(node: MutableDerivedNode<unknown>): void;
+/** Pulls each `reads` dependency in array order and returns the values. Skips a join's target edge. */
 function gatherValues(node: MutableDerivedNode<unknown>): ReadonlyArray<unknown>;
+
+// from libs/pico-js/src/read.ts
+function readMayRead(
+  reader: MutableDerivedNode<unknown>,
+  dependency: AnyNode,
+): unknown;
+/** Returns the dependency the edge held before, or `undefined` for a new edge. */
+function linkReadEdge(
+  reader: MutableDerivedNode<unknown>,
+  dependency: AnyNode,
+): AnyNode | undefined;
+function trimMayReadEdges(reader: MutableDerivedNode<unknown>): void;
 
 // from libs/pico-js/src/join.ts
 function outerOf(join: MutableDerivedNode<unknown>): AnyNode;
@@ -822,7 +1163,8 @@ function moveTargetEdge(
   join: MutableDerivedNode<unknown>,
   target: AnyNode,
 ): AnyNode | undefined;
-function pullTarget<TValue>(target: MutableDerivedNode<TValue>): TValue;
+/** Pulls `target`, running the fallback first if it is at or above the flush position. */
+function pullCurrent<TValue>(target: MutableDerivedNode<TValue>): TValue;
 function transferNecessity(
   join: MutableDerivedNode<unknown>,
   previousTarget: AnyNode | undefined,
@@ -852,6 +1194,7 @@ function refreshJoinDerivedHoldingDerived(
 function refreshListJoin(join: MutableDerivedNode<unknown>, taken: Taken): void;
 
 // from libs/pico-js/src/necessity.ts
+function isNecessary(node: MutableDerivedNode<unknown>): boolean;
 function becomeNecessary(node: MutableDerivedNode<unknown>): void;
 function becomeUnnecessary(node: MutableDerivedNode<unknown>): void;
 
@@ -867,9 +1210,11 @@ function disposeMarked(): void;
 
 pico-js checks none of these at run time, except the cycle check that `adjustHeights` performs as part of a raise.
 
-- Computations and selectors are synchronous and pure. A computation depends only on its `values`, its `previous`, and values its owner key fixes. A selector depends only on its `values` and its owner key. Looking a node up in its owner, and storing a node it creates there, is allowed.
-- Computations and selectors may create nodes. They may not write, retain, release, batch, or throw. As in v0, they call nothing else in pico-js.
+- Computations and selectors are synchronous and pure. A computation depends only on its `values`, the values `read` returns, its `previous`, and values its owner key fixes. A selector depends only on its `values` and its owner key. Looking a node up in its owner, and storing a node it creates there, is allowed.
+- Computations and selectors may create nodes. They may not write, retain, release, batch, or throw. As in v0, they call nothing else in pico-js, except `read` in a computation.
 - A node a selector or computation creates belongs to that selection. It is stored only under a key made of the values it captured, and never reused under another key (see "bind").
+- A computation calls `read` only on nodes in its `mayRead`. TypeScript checks the node's type against the element type of `mayRead`. It cannot tell apart two nodes of the same type, so membership is a contract, and a node outside `mayRead` can be at or above the reader's height.
+- A computation reads every node it depends on through `reads`, `read`, or a join. A `reads` node that a run does not read costs recomputes and is never stale. A `mayRead` node that a run does not read has no edge, and a change to it does not reach the reader.
 - pico-js compares values with `===` everywhere. That covers the cutoff of a static node, a cached join, and a list join's elements, the uncached join's compare in writeSource, and the `onChange` rule. `===`-equal values count as identical.
 - The graph has no cycles. This includes a cycle through joins that data creates when it points back to itself, such as two records that are each other's parent under `rootName`. `adjustHeights` throws when a switch would close such a cycle. pico-js does not recover from that throw, as it does not recover from any throw.
 - A write batch body writes sources, releases retains, and opens nested batches. It does not read derived nodes and does not retain them.
@@ -879,29 +1224,30 @@ pico-js checks none of these at run time, except the cycle check that `adjustHei
 
 The claim is research part (b)'s goal 1: no computation, selector, top-level read, or callback receives a value that differs from the value computed from the current sources. Goals 2 and 3 follow below it.
 
-Dynamic behavior is confined to joins:
+Dynamic edges are confined to joins and to `read`:
 
-- S, static edges. A static node's edges, a cached join's outer edge, and an uncached join's selector edges are created with the node and never point at another node. Only `freeNode` unlinks them, and only `relink` links them again, to the same dependencies.
-- D, dynamic edges. Only `moveTargetEdge`, `refreshListJoin`, and `drainWriteHeap` move an edge, and each moves only a join's target edge.
-- R, raises. Only a cached join's refresh or pull starts `adjustHeights`, when its new target is at or above it. `relink` raises a freed node to catch up with raises that reached its dependencies while it was unlinked, and those raises were started by joins. An uncached join's target is a source, so its switches raise nothing.
+- S, static edges. A static node's `reads` edges, a cached join's outer edge and an uncached join's selector edges are created with the node and never point at another node. Only `freeNode` unlinks them, and only `relink` links them again, to the same dependencies.
+- D, dynamic edges. Only `moveTargetEdge`, `refreshListJoin`, `drainWriteHeap`, `readMayRead`, and `trimMayReadEdges` move or remove an edge. The first three move only a join's target edge. The last two change only a static node's edges after `lastReadsEdge`, which belong to its last run.
+- R, raises. Only a cached join's refresh or pull and `readMayRead` start `adjustHeights`, when the node they are about to link an edge to is at or above them. A node with `mayRead` has those nodes' heights in its own height at creation, so the compare in `readMayRead` fires only after a general join raised the node while no edge existed. `relink` raises a freed node to catch up with raises that reached its dependencies while it was unlinked, and those raises were started by joins. An uncached join's target is a source, so its switches raise nothing.
 
 The invariants:
 
-- H, heights. For every linked edge `X -> Y` with Y derived, `Y.height < X.height`. A static edge satisfies it at creation and at `relink`. A raise keeps it for every edge into a raised node. A target edge is linked only after the raise check. A pulled join links its target edge before the target's pull, so a raise during that pull reaches it.
+- H, heights. For every linked edge `X -> Y` with Y derived, `Y.height < X.height`. A `reads` edge satisfies it at creation and at `relink`. A raise keeps it for every edge into a raised node. A target edge and a `read` edge are linked after the raise check, so each satisfies it when linked. A pulled join links its target edge before the target's pull, so a raise during that pull reaches it.
 - N, necessity. Every derived dependency of a necessary node is necessary, through every kind of edge. `becomeNecessary` and `becomeUnnecessary` keep it, and a join's switch adds the new target before it removes the old one. So no lazy node has a necessary dependent, and the in-line marking of lazy nodes reaches no necessary node.
 - Q, the flush heap. Between batches and flushes the heap is empty. In a batch body and in a flush, every queued node is eager, `Dirty` or `MaybeDirty`, and in `FLUSH_ORDERED` its height is at least `flushHeight`. No write runs in a flush, because computations, selectors, and callbacks do not write. Nothing is added below the cursor, because the only node that becomes necessary in a flush was just pulled and is `Clean`.
 - C, A9's C9 for this engine (`proofs/A9.md`, "Invariant C9"). For each linked edge `X -> Y` with X `Clean`, Y is `Clean`, or Y is queued and the flush has not fallen back, or Y is the node being refreshed. Marking stops only at eager nodes, and it queues each eager node it stops at, so C admits the edges into it. A changed eager node marks or queues its dependents. The fallback's beyond walk removes the queued clause.
-- CUR, current reads in `FLUSH_ORDERED`. When the flush takes a node at `flushHeight`, every pull its refresh starts is of a node below `flushHeight`, unless `pullTarget` or `relink` saw a node at or above it and fell back first. By Q no queued node is below `flushHeight`, so by C every `Clean` node below `flushHeight` has only `Clean` nodes below it, and a node that is not `Clean` recomputes from values pulled first. A9's CUR induction on height applies to that region (`proofs/A9.md`, "Lemma CUR").
+- CUR, current reads in `FLUSH_ORDERED`. When the flush takes a node at `flushHeight`, every pull its refresh starts, whether of a `reads` node, a `read` node, or a target, is of a node below `flushHeight`, unless `pullCurrent` or `relink` saw a node at or above it and fell back first. By Q no queued node is below `flushHeight`, so by C every `Clean` node below `flushHeight` has only `Clean` nodes below it, and a node that is not `Clean` recomputes from values pulled first. A9's CUR induction on height applies to that region (`proofs/A9.md`, "Lemma CUR").
 - REQ, the requeue. A taken join that raises has read no target value and stored nothing. It returns to the heap above its target, so when the flush takes it again, every eager node below the target that was queued has been refreshed.
 - FB, after a fallback. No `Clean` node is above a queued node or the taken node. A pull of a queued node refreshes it at once, and verify pulls it instead of descending. From here v0's per-path argument applies to every pull (`libs/pico-js/docs/correctness.md`, "Proof of I for each path"), and the order of the remaining takes does not matter for correctness.
 - U, uncached joins. When writeSource returns, every linked uncached join's target is its selector's result on the current values, because the write heap takes uncached joins in height order and each selector's inputs are sources or lower uncached joins. A static node or cached join that reads an uncached join whose value changed was queued or marked by `markDependents` before writeSource returned.
+- M, `mayRead`. When a run finishes, the node has a linked edge to every node the run read through `read`, and no other edge after `lastReadsEdge`. By the purity contract, the value is a function of the `reads` values, `previous`, and the values of those nodes. A change to a node the run did not read cannot change what the run would compute again, so the node need not hear of it. A change to a node the run read reaches the node through its edge.
 - L, lazy nodes. Between a batch and the next batch, a lazy node that is not `Clean` has no `Clean` lazy dependent, as in v0 (`libs/pico-js/docs/correctness.md`, "L"). `becomeUnnecessary` keeps it by marking in line from a queued node that leaves the heap.
 
 From these:
 
-- Goal 1. A static computation receives values of nodes below it that are final (CUR) or were refreshed on demand after a fallback (FB). A cached join reads its target only below itself (REQ, H) or after a fallback. A selector of an uncached join reads current sources and lower uncached joins (U). A top-level read and a retain run with an empty heap (Q), so v0's lazy argument applies. Callbacks run after the heap is empty, and an `onChange` read is a top-level read.
+- Goal 1. A static computation receives, and `read` returns, values of nodes below it that are final (CUR) or were refreshed on demand after a fallback (FB). A cached join reads its target only below itself (REQ, H) or after a fallback. A selector of an uncached join reads current sources and lower uncached joins (U). A top-level read and a retain run with an empty heap (Q), so v0's lazy argument applies. Callbacks run after the heap is empty, and an `onChange` read is a top-level read.
 - Goal 2. In `FLUSH_ORDERED`, a node whose value is `===` to its previous value queues and marks nothing, and marking from a write stops at the first eager node on each path. Nothing past an unchanged eager node is visited until a fallback in the same flush.
-- Goal 3. A join's target changes whenever its outer value names another node, its height adapts upward by R, and necessity follows the moved edge.
+- Goal 3. A join's target changes whenever its outer value names another node, its height adapts upward by R, and necessity follows the moved edge. A `mayRead` node that the last run read reaches the reader by its edge (M).
 - Callbacks. Each observed node is refreshed with a change at most once per flush, because after its refresh every node below it is final (H, CUR), and no write runs in the flush. An observed uncached join's callback compares against its value before the batch.
 
 ## Comparison
@@ -936,9 +1282,9 @@ export function readDerived<TValue>(
 
 - v0 costs, per derived read, a pull, a flag check, and an edge-reuse check. Per write, it marks every node above the written source, including the readers of an observed node that will keep its value. Per read of a marked node, it verifies.
 - v0 cannot express goal 2. An eager node that keeps its value still has its dependents marked, and they are verified on their next read.
-- v0 expresses any dynamic read inline, with no API change at the read.
-- This engine costs, against v0: one more field per derived node, a height and heap links to maintain, a values array per computation, a join node (two for a cached bind) at every place a computation follows data, edges and a cleanup-queue entry for every created node, and a necessity walk on every retain or release with an `onChange` that changes necessity.
-- This engine saves, against v0: the edge-reuse check on every read, the beyond walk on every write that reaches an observed node, and the verification of everything past an unchanged eager node.
+- v0 expresses any dynamic read inline, with no declaration. This engine requires every node a computation may read to be named at creation, in `reads` or `mayRead`, or to be the target of a general join.
+- This engine costs, against v0: four more fields per derived node, a height and heap links to maintain, a values array per computation, a join node (two for a cached bind) at every place a computation follows data to a node that no `mayRead` names, edges and a cleanup-queue entry for every created node, and a necessity walk on every retain or release with an `onChange` that changes necessity.
+- This engine saves, against v0: the edge-reuse check on every read of a `reads` node, the beyond walk on every write that reaches an observed node, and the verification of everything past an unchanged eager node.
 
 ### The inline-read model (N1)
 
@@ -946,17 +1292,18 @@ N1 keeps v0's inline reads and adds Incremental's heap for necessary nodes, with
 
 - N1 costs a height, two heap links, and a necessary-dependent count per derived node, as this engine does. On top of that it costs a height compare on every derived read, a raise whenever a necessary reader reads a node at least as tall as itself, through any edge, a refresh walk on each upward read while a heap bucket in range is occupied, and the edge-reuse check of v0 on every read (research part (e), "Costs").
 - N1 expresses every dynamic read with no API change. Its refresh walk is a suspending read, the one piece of its scheduler without a counterpart in Incremental (research part (e), "Where pico-js's goals differ from Incremental").
-- This engine cannot express a computation whose set of reads depends on data without a join. A computation that reads a node only on one branch either lists the node as a dependency, and recomputes when it changes on the other branch, or moves the branch into a join, as `chosen` does above. Following data to a depth that data decides needs one join per step, and a data-sized fan-out needs a list join.
-- This engine needs no suspension and no refresh walk. A static node's dependencies are below it by construction. A join chooses its target before it reads it, and requeues on a raise. The only upward read is a join pulled by a waiting reader, and it falls back. Research part (c) describes this tradeoff: "Static nodes plus a join that flattens a node-valued node is Incremental's map plus join. It needs no suspension ... It costs two nodes per join and an API change at every dynamic read."
+- This engine expresses a conditional read among nodes that exist at creation with `mayRead`. A computation that reads a node only on one branch lists it in `mayRead` and does not recompute when it changes on the other branch. It cannot express a read of a node that no declaration names, whose identity data decides, without a general join. Following data to a depth that data decides needs one join per step, and a data-sized fan-out needs a list join.
+- This engine needs no suspension and no refresh walk. A static node's `reads` and `mayRead` are below it by construction. A join chooses its target before it reads it, and requeues on a raise. The only upward reads are a general join pulled by a waiting reader, and a `read` of a node that a join raised after the reader's height was set. Each makes the height compare and falls back when the node is at or above the flush position. Research part (c) describes this tradeoff: "Static nodes plus a join that flattens a node-valued node is Incremental's map plus join. It needs no suspension ... It costs two nodes per join and an API change at every dynamic read."
 - Jane Street states that bind is often expensive, because each change of its left-hand side reruns its right-hand side and allocates nodes (`doc/part2-dynamic.mdx:153-188`), and that it pays when the right-hand side is small or the left-hand side changes rarely (`doc/part4-pitfalls.mdx:113-120`). A pico-js join reruns no right-hand side. A selector returns an existing node from its owner, or creates one when the owner has none.
 
 ## Benchmarks
 
 Each benchmark runs against v0 at `95b11b6f3`, with the counters this engine adds. They count flush-heap takes, write-heap takes, raises and the nodes each raise visits, requeues, fallbacks, and marks of lazy nodes.
 
-- The app scenarios in `../pico-js-artifacts/benchS16h/app/app.ts`: S1, S2, S3a, S3b, S4a, S4b, S5a, S5b, S6a, S6b, S7, S8, S9a, S9b, S10, S13, S14, S15a, S15b, and S12 at depths 50, 200, and 1000, at the reference size. The bench's client fields read inline, so the port writes each field as a static node over its dependencies, each followed link to a scalar as `bindSource`, each followed link to another field as `bindDerived`, and each plural link as a list join. S12 pulls a recursive field for the first time at each depth. A chain that a pull discovers from the top costs one raise per level, and each raise walks the levels above it, so the first pull at depth d visits on the order of d²/2 nodes, as the `rootName` trace shows for three levels. S12 measures that cost.
+- The app scenarios in `../pico-js-artifacts/benchS16h/app/app.ts`: S1, S2, S3a, S3b, S4a, S4b, S5a, S5b, S6a, S6b, S7, S8, S9a, S9b, S10, S13, S14, S15a, S15b, and S12 at depths 50, 200, and 1000, at the reference size. The bench's client fields read inline, so the port writes each field as a static node over its `reads`, each conditional read among fixed nodes as a `mayRead`, each followed link to a scalar as `bindSource`, each followed link to another field as `bindDerived`, and each plural link as a list join. S12 pulls a recursive field for the first time at each depth. A chain that a pull discovers from the top costs one raise per level, and each raise walks the levels above it, so the first pull at depth d visits on the order of d²/2 nodes, as the `rootName` trace shows for three levels. S12 measures that cost.
 - The S16 family, each at 1, 10, 100, and 1000 subscribers: S16 (one source holding an object of 50 fields, a projection of one field, N observed readers of the projection, and 5% of events changing the projected field), S16c (every event changes it), S16r (each reader also reads its own scalar, and every other event re-renders one reader), S16v (the projected field never changes), and S16d (S16 with five pass-through layers under the projection). The projection is necessary, so it is an eager stop point, and an event that leaves its value unchanged should visit no reader.
 - A link change at depths 1, 3, and 10. The graph is the `rootName` chain under two roots with different names, with one observed reader of the bottom record's `rootName`. Each event writes the parent link of the record directly under the root, alternating between the two roots, so the change passes through d joins to the reader. Three variants: both roots at the same height (no raise), one root under a deeper chain (one raise on the first switch, none after), and a switch to a record whose `rootName` was never created over a deeper chain (the fallback path).
+- A conditional between two fixed targets, encoded two ways: both targets in `reads` and both in `mayRead`, each with one observed reader. Events flip the condition in 1%, 10%, and 50% of runs, and the rest change the selected target, the other target, or neither. The counters are recomputes of the reader, edge links and unlinks, and heap takes.
 - A list join of 10, 100, and 1000 targets with one observed reader of the list join. Four kinds of event run as separate scenarios. In the first, one target's value changes. In the second, the outer array replaces one element. In the third, the outer array appends one element. In the fourth, a write goes to a source that nothing in the graph reads.
 
 ## Open questions
@@ -972,3 +1319,9 @@ Each benchmark runs against v0 at `95b11b6f3`, with the counters this engine add
 9. Whether a derived node keeps one dependency list in array order, as this doc holds, or v0's two lists, which let `verify` skip source edges without a kind check (research part (f)).
 10. Whether `CachedJoinOptions` exists at all. This doc offers it on the constructors whose default is uncached, because the default implies a choice. No case in this doc needs it.
 11. What `adjustHeights` throws on a cycle. The options are an `Error` naming the two nodes, or a `RangeError` as a stack overflow in v0 would give.
+12. Whether `read` of a node already read earlier in the same run reuses that edge, instead of linking another by position, which is what this doc holds.
+
+## Later work
+
+- Encoding an arbitrary computation into `reads`, selections, and joins automatically needs a compiler that analyzes the computation's code, as the Skip language does. This doc encodes by hand: the author decides which nodes go in `reads`, which in `mayRead`, and which conditionals become joins.
+- A lint rule that checks the hand encoding: that a computation calls `read` only on nodes in its `mayRead`, and that a computation reads no node that it does not declare.
