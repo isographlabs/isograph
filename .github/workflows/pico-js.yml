@@ -1,0 +1,20 @@
+name: pico-js
+
+on:
+  workflow_call:
+
+jobs:
+  pico-js:
+    name: pico-js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-js
+      - name: Test
+        run: pnpm --filter @isograph/pico-js test
+      - name: Random differential test
+        run: pnpm --filter @isograph/pico-js test:random
+        env:
+          PICO_JS_RANDOM_SEEDS: 2000
+      - name: Exhaustive model check
+        run: pnpm --filter @isograph/pico-js test:exhaustive

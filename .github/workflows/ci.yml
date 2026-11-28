@@ -16,6 +16,10 @@ jobs:
     name: JavaScript
     uses: ./.github/workflows/js.yml
 
+  pico-js:
+    name: pico-js
+    uses: ./.github/workflows/pico-js.yml
+
   build-website:
     name: Build website
     uses: ./.github/workflows/build-website.yml
@@ -91,6 +95,7 @@ jobs:
         build-website,
         rust,
         js,
+        pico-js,
         cli-linux-x64,
         cli-linux-arm64,
         cli-macos-x64,

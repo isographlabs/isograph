@@ -95,6 +95,26 @@ repos:
         language: system
         files: '^(libs/isograph-disposable-types/|tsconfig\.build\.json$)'
         pass_filenames: false
+      - id: pico-js-test
+        name: engine test
+        entry: pnpm --filter @isograph/pico-js test
+        language: system
+        files: '^libs/pico-js/'
+        pass_filenames: false
+      # The random differential test at 1,000 seeds, which takes about 10 s.
+      # CI runs 2,000.
+      - id: pico-js-random
+        name: engine random test
+        entry: env PICO_JS_RANDOM_SEEDS=1000 pnpm --filter @isograph/pico-js test:random
+        language: system
+        files: '^libs/pico-js/'
+        pass_filenames: false
+      - id: pico-js-typecheck
+        name: engine typecheck
+        entry: pnpm --filter @isograph/pico-js tsc
+        language: system
+        files: '^(libs/pico-js/|tsconfig\.build\.json$)'
+        pass_filenames: false
       # The runtime's tests and typecheck import its workspace dependencies' dist.
       - id: runtime-dependencies-build
         name: runtime dependencies build
