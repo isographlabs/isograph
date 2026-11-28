@@ -102,3 +102,27 @@ The hazard is a source-only node that, during its own refresh, switches branch a
 This saves A5's one extra marking pass per change of a projection's value. The S16c scenario (the projection changes on every event) and the pure-engine projection microbenchmark judge it. Build it only if A5 is measurably above the base there.
 
 It needs a written correctness proof before it lands, like the one for A5s in the scratchpad proofs.
+
+## pico-js: a build-time transform that hoists dependency declarations
+
+The contract is that every derived read is declared before it happens. A9 (`createDerivedNode` with `mayRead`, `declareDependencies`, and the undeclared-read fallback) is the engine side. This entry removes the declaration work from the people who write computations.
+
+Users write plain `readDerived` calls and no declarations. A Babel or TypeScript transform, not a lint autofix, analyzes each computation and hoists each read's target as early as its inputs allow:
+
+- A target that depends on no value read in the computation goes into the creation-time `mayRead` array. It costs nothing per run.
+- A target that depends on data gets a `declareDependencies(callingNode, [targets])` call inserted right after the read that produces that data.
+
+The source stays free of duplicated declarations. Only the built output has them.
+
+A lint rule flags the reads the transform cannot analyze, such as reads through opaque helpers, so the author restructures them or declares them by hand.
+
+The engine keeps the O(1) check on newly linked edges and the fallback marking from A9 as a safety net. A read the transform missed costs a slowdown, not a stale value.
+
+Tokens returned by a declaration, where each token is an index into the declared list, are an alternative that could be cheap. A transform that writes the declarations makes them unnecessary.
+
+Prerequisites:
+
+- A9 lands.
+- A9's timing shows that declaring pays off on S16 and S16d.
+
+Isograph's existing Babel plugin and compiler are the place to host the transform.
