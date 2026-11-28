@@ -103,26 +103,23 @@ This saves A5's one extra marking pass per change of a projection's value. The S
 
 It needs a written correctness proof before it lands, like the one for A5s in the scratchpad proofs.
 
-## pico-js: a build-time transform that hoists dependency declarations
+## pico-js: a lint rule that enforces hoisted dependency declarations
 
-The contract is that every derived read is declared before it happens. A9 (`createDerivedNode` with `mayRead`, `declareDependencies`, and the undeclared-read fallback) is the engine side. This entry removes the declaration work from the people who write computations.
+The contract is that every derived read is declared before it happens. A9 (`createDerivedNode` with `mayRead`, `declareDependencies`, and the undeclared-read fallback) is the engine side. This entry is the enforcement side.
 
-Users write plain `readDerived` calls and no declarations. A Babel or TypeScript transform, not a lint autofix, analyzes each computation and hoists each read's target as early as its inputs allow:
+Users write the declarations themselves. A lint rule enforces exactly what a hoisting compiler would have generated:
 
-- A target that depends on no value read in the computation goes into the creation-time `mayRead` array. It costs nothing per run.
-- A target that depends on data gets a `declareDependencies(callingNode, [targets])` call inserted right after the read that produces that data.
+- Every derived read is declared before it happens.
+- A target that depends on no value read in the computation is in the creation-time `mayRead` array. It costs nothing per run.
+- A target that depends on data is declared in a `declareDependencies(callingNode, [targets])` call placed right after the read that produces that data, and not later.
 
-The source stays free of duplicated declarations. Only the built output has them.
+The rule reports any other placement. It may offer an autofix that moves or inserts declarations.
 
-A lint rule flags the reads the transform cannot analyze, such as reads through opaque helpers, so the author restructures them or declares them by hand.
+The engine keeps the O(1) check on newly linked edges and the fallback marking from A9 as a safety net. A read the rule did not catch costs a slowdown, not a stale value.
 
-The engine keeps the O(1) check on newly linked edges and the fallback marking from A9 as a safety net. A read the transform missed costs a slowdown, not a stale value.
-
-Tokens returned by a declaration, where each token is an index into the declared list, are an alternative that could be cheap. A transform that writes the declarations makes them unnecessary.
+Tokens returned by a declaration, where each token is an index into the declared list, would remove the duplication between a declaration and its read, if they are cheap enough.
 
 Prerequisites:
 
 - A9 lands.
 - A9's timing shows that declaring pays off on S16 and S16d.
-
-Isograph's existing Babel plugin and compiler are the place to host the transform.
